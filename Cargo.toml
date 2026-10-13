@@ -1,12 +1,21 @@
 [workspace]
-members = ["crates/*", "examples/contract"]
-exclude = ["research/serde-internals-probe", "research/serde-wire-probe"]
+members = [
+    "benchmarks",
+    "crates/*",
+    "examples/contract",
+    "examples/blog/contracts",
+    "examples/blog/server",
+    "examples/blog/rust-client",
+]
 resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 publish = false
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/zachitzcovitch/spline"
+readme = "README.md"
 
 [workspace.dependencies]
 spline = { path = "crates/spline" }

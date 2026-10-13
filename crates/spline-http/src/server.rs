@@ -89,10 +89,19 @@ pub fn respond<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
     policy: &P,
 ) -> Response {
     match result {
-        Ok(value) => match serde_json::to_vec(&value) {
+        Ok(value) if success == 204 => match serde_json::to_value(value) {
+            Ok(Value::Null) => {
+                let mut response = Response::new(Body::empty());
+                *response.status_mut() = StatusCode::NO_CONTENT;
+                response
+            }
+            _ => Fault::internal().into_response(),
+        },
+        Ok(value) if matches!(success, 200 | 201) => match serde_json::to_vec(&value) {
             Ok(body) => json_response(StatusCode::from_u16(success).unwrap(), body, None),
             Err(_) => Fault::internal().into_response(),
         },
+        Ok(_) => Fault::internal().into_response(),
         Err(error) => {
             let status = policy.status(&error);
             if !status.is_client_error() && !status.is_server_error() {

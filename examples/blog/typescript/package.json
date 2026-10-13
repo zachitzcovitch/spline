@@ -1,0 +1,10 @@
+{
+  "name": "spline-blog-client",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node run.mjs",
+    "check": "tsc --project tsconfig.json"
+  }
+}

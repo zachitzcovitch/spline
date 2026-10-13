@@ -212,6 +212,11 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             )?;
         });
         if let Some(binding) = http {
+            if binding.status == 204 {
+                assertions.push(quote_spanned! {output.span()=>
+                    #runtime::__private::assert_no_content::<super::#output_alias>();
+                });
+            }
             let metadata = binding.metadata(&runtime);
             registrations.push(quote! { __spline_builder.http(#name, #metadata)?; });
             http_methods.push(crate::http::Method {
@@ -261,10 +266,22 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             #(#requests)*
             /// Describe the contract and collect its directional schemas.
             pub fn describe() -> #runtime::contract::Result<#runtime::contract::ContractDescription> {
-                #(#assertions)*
                 let mut __spline_builder = #runtime::contract::ContractBuilder::new(#namespace, #contract_docs)?;
-                #(#registrations)*
+                __register_operations(&mut __spline_builder)?;
                 __spline_builder.finish()
+            }
+            /// Register this resource into an application's shared schema registry.
+            pub fn register(application: &mut #runtime::contract::ApplicationBuilder, group: &str)
+                -> #runtime::contract::Result<()>
+            {
+                application.resource(group, #namespace, #contract_docs, __register_operations)
+            }
+            fn __register_operations(__spline_builder: &mut #runtime::contract::ContractBuilder)
+                -> #runtime::contract::Result<()>
+            {
+                #(#assertions)*
+                #(#registrations)*
+                Ok(())
             }
             #http_code
         }

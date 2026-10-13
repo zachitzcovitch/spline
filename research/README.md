@@ -27,7 +27,24 @@ The relocated prototypes' old manifests and lockfiles were replaced by root
 workspace manifests and lockfiles. Historical notes retain their original
 verification evidence; commands referring to the former manifests are historical.
 
-The standalone [Serde wire probe](serde-wire-probe/Cargo.toml) and
-[Serde internals probe](serde-internals-probe/README.md) remain here with their
-original dependencies and tests. They are excluded from the root workspace;
-the schema crate uses the latter only as a dev dependency for comparison tests.
+The standalone probe packages, duplicate lockfiles, and placeholder prototype
+directories have been removed. Their useful evidence is now maintained in the
+root workspace and exercised by CI:
+
+| Former experiment | Maintained evidence |
+| --- | --- |
+| Serde attribute inspection | [`spline-schema/tests/support/parser`](../crates/spline-schema/tests/support/parser), a test-only adapter and owned inspection model. |
+| Parser vs. real Serde behavior | [`serde_inspection.rs`](../crates/spline-schema/tests/serde_inspection.rs), 19 comparison tests, and [`tests/ui`](../crates/spline-schema/tests/ui), three compiler-failure fixtures. |
+| Serde JSON wire behavior | [`serde_behavior.rs`](../crates/spline-schema/tests/serde_behavior.rs), 10 direct Serde checks using the current workspace versions. |
+| JavaScript integer precision | [`json-numbers.mjs`](../crates/spline-typescript/typescript/json-numbers.mjs), included in `npm run check`. |
+
+```sh
+cargo test --locked -p spline-schema
+npm run check
+```
+
+These notes remain as design history: their dates, proposed interfaces, benchmark
+limitations, and original tool versions describe the evaluated milestones. Use
+the linked current guides for supported APIs and the [roadmap](../ROADMAP.md) for
+future work. The production compiler adapter lives in
+[`spline-macros/src/adapter.rs`](../crates/spline-macros/src/adapter.rs).

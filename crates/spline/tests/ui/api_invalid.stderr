@@ -1,0 +1,23 @@
+error: API requires at least one resource
+ --> tests/ui/api_invalid.rs:3:12
+  |
+3 | api! { mod empty {} }
+  |            ^^^^^
+
+error: duplicate API resource group
+ --> tests/ui/api_invalid.rs:5:47
+  |
+5 | api! { mod duplicates { users: self::missing, users: self::missing } }
+  |                                               ^^^^^
+
+error: resource group conflicts with the application client API
+ --> tests/ui/api_invalid.rs:7:23
+  |
+7 | api! { mod reserved { new: self::missing } }
+  |                       ^^^
+
+error: resource groups must be ASCII identifiers
+ --> tests/ui/api_invalid.rs:9:22
+  |
+9 | api! { mod unicode { café: self::missing } }
+  |                      ^^^^

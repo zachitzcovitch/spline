@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible problem with a contract, generated client, or tool.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include what you expected and what you observed.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: A small contract, request, or sequence of commands is ideal.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the Spline commit, OS, rustc --version, Node version, and relevant features.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Compiler diagnostics, HTTP responses, or client failures.
+      render: text

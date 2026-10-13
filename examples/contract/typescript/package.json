@@ -1,6 +1,7 @@
 {
   "name": "spline-contract-typescript-checks",
   "private": true,
+  "license": "MIT OR Apache-2.0",
   "type": "module",
   "scripts": { "check": "tsc --project tsconfig.json" }
 }

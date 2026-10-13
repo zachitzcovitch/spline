@@ -2,6 +2,10 @@
 
 Evaluated: 2026-10-12.
 
+**Workspace update:** the inspection adapter and its tests now live under
+[`spline-schema/tests`](../crates/spline-schema/tests). The old standalone package
+and lockfile were removed; the evaluation below records the original findings.
+
 ## Recommendation
 
 **Reuse `serde_derive_internals` behind a private adapter in the next Spline schema
@@ -9,9 +13,9 @@ prototype.** It provides useful, tested interpretation of Serde attributes and
 validation rules. Spline should own the schema graph, supported representation
 policy, type registration, and exporters.
 
-The [isolated experiment](serde-internals-probe/README.md) demonstrates that this
+The [test-only inspection adapter](../crates/spline-schema/tests/support/parser) demonstrates that this
 boundary is practical. All references to Serde's internal AST and Syn stay in
-`src/adapter.rs`; the returned metadata consists of owned Spline-defined types.
+`adapter.rs`; the returned metadata consists of owned Spline-defined types.
 
 The recommended production dependency is an exact pin to the evaluated release,
 with upgrades treated as explicit adapter changes. This is a recommendation for
@@ -213,15 +217,14 @@ Recommended dependency and upgrade policy:
 From the repository root:
 
 ```sh
-cargo test --locked --manifest-path research/serde-internals-probe/Cargo.toml
-cargo fmt --manifest-path research/serde-internals-probe/Cargo.toml -- --check
-cargo clippy --locked --manifest-path research/serde-internals-probe/Cargo.toml --all-targets -- -D warnings
-cargo tree --locked --manifest-path research/serde-internals-probe/Cargo.toml --edges normal --depth 2
+cargo test --locked -p spline-schema --test serde_inspection --test ui
+cargo fmt --all -- --check
+cargo clippy --locked -p spline-schema --all-targets -- -D warnings
 ```
 
 The expected result is 19 passing compatibility tests plus a passing trybuild test
 covering three compiler-failure fixtures. The inspected dependency versions are
-recorded in the probe's lockfile.
+recorded in the root lockfile.
 
 ## Next design step
 
@@ -240,7 +243,7 @@ calls. It records the resulting API proposal and verified cases.
 
 ## References
 
-- [Probe source and tests](serde-internals-probe/README.md).
+- [Inspection adapter](../crates/spline-schema/tests/support/parser) and [comparison tests](../crates/spline-schema/tests/serde_inspection.rs).
 - [0.30.0 container API](https://docs.rs/serde_derive_internals/0.30.0/serde_derive_internals/ast/struct.Container.html).
 - [0.29.1 container API](https://docs.rs/serde_derive_internals/0.29.1/serde_derive_internals/ast/struct.Container.html).
 - [0.30.0 published source](https://docs.rs/crate/serde_derive_internals/0.30.0/source/).

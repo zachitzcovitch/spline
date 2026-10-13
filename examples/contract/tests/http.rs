@@ -45,6 +45,14 @@ pub trait Echo {
     async fn health(&self) -> Result<(), ()>;
 
     #[query]
+    #[http(get = "/no-content", status = 204)]
+    async fn no_content(&self) -> Result<Empty, ()>;
+
+    #[mutation]
+    #[http(post = "/command", body = "fail", status = 204)]
+    async fn command(&self, fail: bool) -> Result<(), ()>;
+
+    #[query]
     #[http(get = "/echo/{value}")]
     async fn inspect(
         &self,
@@ -54,10 +62,23 @@ pub trait Echo {
         note: Option<String>,
     ) -> Result<EchoValue, ()>;
 }
+pub type Empty = ();
 struct EchoService;
 impl Echo for EchoService {
     async fn health(&self) -> Result<(), ()> {
         Ok(())
+    }
+
+    async fn no_content(&self) -> Result<Empty, ()> {
+        Ok(())
+    }
+
+    async fn command(&self, fail: bool) -> Result<(), ()> {
+        if fail {
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 
     async fn inspect(
@@ -253,6 +274,12 @@ async fn encoded_paths_scalar_queries_and_base_prefixes_round_trip() {
     let server = serve(axum::Router::new().nest("/v1", router)).await;
     let client = echo::Client::new(&format!("{}/v1/", server.base)).unwrap();
     assert!(client.health().await.is_ok());
+    assert!(client.no_content().await.is_ok());
+    assert!(client.command(false).await.is_ok());
+    assert!(matches!(
+        client.command(true).await,
+        Err(CallError::Application(()))
+    ));
     let value = "slash/space ?#%ü";
     let note = "query &+?/ü";
     assert_eq!(

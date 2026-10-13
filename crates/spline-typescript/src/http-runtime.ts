@@ -6,6 +6,8 @@ export type __PREFIX__HttpFailure =
 export type __PREFIX__HttpOptions = {
   fetch?: typeof globalThis.fetch;
   headers?: { [name: string]: string };
+  /** Compatible projects closed response objects onto known fields. Requests remain schema-checked. */
+  responsePolicy?: "compatible" | "strict";
 };
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
@@ -20,6 +22,10 @@ export function create__PREFIX__Client(
   }
   const fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
   const defaultHeaders = new globalThis.Headers(options.headers);
+  const responsePolicy = options.responsePolicy ?? "compatible";
+  if (responsePolicy !== "compatible" && responsePolicy !== "strict") {
+    throw new globalThis.TypeError("responsePolicy must be compatible or strict");
+  }
 
   type Wire =
     | ["null" | "string" | "boolean"]
@@ -59,8 +65,80 @@ export function create__PREFIX__Client(
         && (schema[1] || globalThis.Object.keys(value).every(name => schema[2].some(f => f[0] === name)));
     }
   };
+  const same = (a: unknown, b: unknown): boolean => {
+    if (a === b) return true;
+    if (globalThis.Array.isArray(a) && globalThis.Array.isArray(b)) {
+      return a.length === b.length && a.every((v, i) => same(v, b[i]));
+    }
+    return object(a) && object(b) && globalThis.Object.keys(a).length === globalThis.Object.keys(b).length
+      && globalThis.Object.keys(a).every(key => owns(b, key) && same(a[key], b[key]));
+  };
+  // Undefined is a failure sentinel: parsed JSON cannot contain it. Projection
+  // prevents extra fields from leaking into returned values or strict Rust DTOs.
+  const project = (value: unknown, schema: Wire, depth = 0): unknown => {
+    if (depth >= 256) return undefined;
+    const child = (value: unknown, schema: Wire): unknown => project(value, schema, depth + 1);
+    switch (schema[0]) {
+      case "ref": {
+        const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
+        return target === undefined ? undefined : child(value, target);
+      }
+      case "object": {
+        if (!object(value)) return undefined;
+        const known = new globalThis.Set(schema[2].map(f => f[0]));
+        if (responsePolicy === "strict" && !schema[1]
+            && globalThis.Object.keys(value).some(name => !known.has(name))) return undefined;
+        const entries: [string, unknown][] = schema[1]
+          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name)) : [];
+        for (const [name, type, optional] of schema[2]) {
+          if (!owns(value, name)) {
+            if (!optional) return undefined;
+            continue;
+          }
+          const decoded = child(value[name], type);
+          if (decoded === undefined) return undefined;
+          entries.push([name, decoded]);
+        }
+        // fromEntries creates own data properties even for names like __proto__.
+        return globalThis.Object.fromEntries(entries);
+      }
+      case "map": {
+        if (!object(value)) return undefined;
+        const entries: [string, unknown][] = [];
+        for (const [name, entry] of globalThis.Object.entries(value)) {
+          const decoded = child(entry, schema[1]);
+          if (decoded === undefined) return undefined;
+          entries.push([name, decoded]);
+        }
+        return globalThis.Object.fromEntries(entries);
+      }
+      case "array": {
+        if (!globalThis.Array.isArray(value)) return undefined;
+        const decoded = value.map(v => child(v, schema[1]));
+        return decoded.some(v => v === undefined) ? undefined : decoded;
+      }
+      case "tuple": {
+        if (!globalThis.Array.isArray(value) || value.length !== schema[1].length) return undefined;
+        const decoded = schema[1].map((s, i) => child(value[i], s));
+        return decoded.some(v => v === undefined) ? undefined : decoded;
+      }
+      case "union": {
+        let result: unknown;
+        for (const alternative of schema[1]) {
+          const candidate = child(value, alternative);
+          if (candidate !== undefined) {
+            if (result !== undefined && !same(result, candidate)) return undefined;
+            result = candidate;
+          }
+        }
+        return result;
+      }
+      default: return valid(value, schema, depth) ? value : undefined;
+    }
+  };
   type Plan = {
-    method: "GET" | "POST"; path: string; body: string | null; status: number;
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string; body: string | null; status: number;
     paths: string[]; queries: [string, boolean][];
     input: Wire; output: Wire; error: Wire;
   };
@@ -112,6 +190,17 @@ export function create__PREFIX__Client(
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
     const marker = response.headers.get("x-spline-error");
     const success = response.status === plan.status;
+    if (success && response.status === 204) {
+      if (marker !== null || response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
+        return { ok: false, error: { kind: "protocol", message: "invalid 204 response headers" } };
+      }
+      let text: string;
+      try { text = await response.text(); }
+      catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
+      return text.length === 0
+        ? { ok: true, value: undefined as O }
+        : { ok: false, error: { kind: "protocol", message: "204 response must have an empty body" } };
+    }
     if (success && (!jsonType(response) || marker !== null)) {
       return { ok: false, error: { kind: "protocol", message: "invalid success response headers" } };
     }
@@ -128,13 +217,14 @@ export function create__PREFIX__Client(
     try { value = globalThis.JSON.parse(text); }
     catch (error) { return { ok: false, error: { kind: "protocol", message: message(error) } }; }
     if (success) {
-      return valid(value, plan.output)
-        ? { ok: true, value: value as O }
+      const decoded = project(value, plan.output);
+      return decoded !== undefined
+        ? { ok: true, value: decoded as O }
         : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
     }
-    if (object(value) && marker === "application" && value.kind === "application"
-        && owns(value, "value") && valid(value.value, plan.error)) {
-      return { ok: false, error: { kind: "application", value: value.value as E } };
+    if (object(value) && marker === "application" && value.kind === "application" && owns(value, "value")) {
+      const decoded = project(value.value, plan.error);
+      if (decoded !== undefined) return { ok: false, error: { kind: "application", value: decoded as E } };
     }
     if (object(value) && marker === "framework" && value.kind === "framework"
         && typeof value.code === "string" && typeof value.message === "string") {

@@ -1,0 +1,18 @@
+[package]
+name = "spline-example-blog-client"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "../README.md"
+description = "Native Rust client workflow for the Spline blog tutorial"
+
+[[bin]]
+name = "blog-client"
+path = "src/main.rs"
+
+[dependencies]
+spline-example-blog-contracts = { path = "../contracts" }
+spline = { workspace = true, features = ["http"] }
+tokio.workspace = true

@@ -2,6 +2,11 @@
 
 Reviewed: 2026-10-12.
 
+**Workspace update:** this is a historical design note. Direct Serde behavior
+checks now run in [`spline-schema/tests/serde_behavior.rs`](../crates/spline-schema/tests/serde_behavior.rs)
+using the root toolchain/dependencies. See the [research index](README.md) for the
+migration and the [current guides](../README.md) for implemented APIs.
+
 This note builds on the [design discussion](../DESIGN.md#spline-owned-schema-layer).
 It records primary-source findings, behavior probes, and recommendations for the
 next design discussion. The proposed Spline interfaces below are not implemented.
@@ -252,7 +257,7 @@ equivalent.
 
 ### 1. A struct: missing, nullable, and omitted are different
 
-The [Rust probe](serde-wire-probe/src/lib.rs) uses this shape:
+The [Rust behavior tests](../crates/spline-schema/tests/serde_behavior.rs) use this shape:
 
 ```rust
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -366,7 +371,7 @@ as the optional/defaulted fields above demonstrate.
 ### The JSON/TypeScript numeric policy must be explicit
 
 The Rust probe confirms that raw `u64::MAX` becomes an unquoted JSON number. The
-[JavaScript probe](serde-wire-probe/json-numbers.mjs) confirms that ordinary
+[JavaScript precision checks](../crates/spline-typescript/typescript/json-numbers.mjs) confirm that ordinary
 `JSON.parse` loses precision for that value, and conversion to `bigint` afterward
 cannot recover it. Ordinary `JSON.stringify` also rejects a `bigint` value.
 
@@ -425,16 +430,16 @@ no promise that every `Serialize` type is automatically representable.
 
 ## Reproducible evidence
 
-[The isolated probe crate](serde-wire-probe/Cargo.toml) pins Serde 1.0.228 and
-serde_json 1.0.145, with a lockfile. It exercises Serde directly and does not depend
-on a Spline implementation. These pinned releases are distinct from the upstream
-source snapshots reviewed above.
+The original standalone probe pinned Serde 1.0.228 and serde_json 1.0.145.
+Its 10 tests have been promoted to the schema crate's integration suite and now
+use the current workspace versions. They exercise Serde directly; the original
+pins and source snapshots above describe the historical research run.
 
 From the repository root:
 
 ```sh
-cargo test --locked --manifest-path research/serde-wire-probe/Cargo.toml
-node research/serde-wire-probe/json-numbers.mjs
+cargo test --locked -p spline-schema --test serde_behavior
+node crates/spline-typescript/typescript/json-numbers.mjs
 ```
 
 The research run used rustc 1.95.0-nightly (859951e3c, 2026-02-24) and Node v25.2.1:

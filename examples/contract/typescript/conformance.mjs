@@ -9,6 +9,24 @@ assert.equal((await client.get("user_1")).value.displayName, "Zach");
 const created = await client.create({ displayName: "TypeScript" });
 assert.equal(created.ok, true);
 assert.deepEqual(await client.get(created.value.id), created);
+const id = created.value.id;
+const replaced = await client.replace(id, { displayName: "Replacement", bio: "original bio" });
+assert.equal(replaced.ok, true);
+assert.deepEqual(await client.replace(id, { displayName: "Replacement", bio: "original bio" }), replaced);
+assert.deepEqual(await client.update(id, {}), replaced);
+const renamed = await client.update(id, { displayName: "Partial" });
+assert.equal(renamed.value.bio, "original bio");
+const updatedBio = await client.update(id, { bio: "new bio" });
+assert.equal(updatedBio.value.displayName, "Partial");
+assert.equal(updatedBio.value.bio, "new bio");
+const clearedBio = await client.update(id, { bio: null });
+assert.equal(clearedBio.value.displayName, "Partial");
+assert.equal(clearedBio.value.bio, null);
+assert.equal((await client.update(id, { displayName: null })).error.kind, "encode");
+assert.equal((await client.update(id, { typo: true })).error.kind, "encode");
+assert.deepEqual(await client.delete(id), { ok: true, value: undefined });
+assert.equal((await client.get(id)).error.kind, "application");
+assert.equal((await client.delete(id)).error.kind, "application");
 assert.deepEqual(await client.get("missing"), {
   ok: false, error: { kind: "application", value: { kind: "not_found" } },
 });
@@ -18,6 +36,9 @@ assert.equal(invalid.error.value.kind, "invalid_name");
 
 const echo = createEchoClient(base);
 assert.deepEqual(await echo.health(), { ok: true, value: null });
+assert.deepEqual(await echo.no_content(), { ok: true, value: undefined });
+assert.deepEqual(await echo.command(false), { ok: true, value: undefined });
+assert.deepEqual(await echo.command(true), { ok: false, error: { kind: "application", value: null } });
 const value = "slash/space ?#%ü";
 const note = "query &+?/ü";
 assert.deepEqual(await echo.inspect(value, -7, true, note), { ok: true, value: { value, count: -7, flag: true, note } });
@@ -30,6 +51,31 @@ const checked = createUsersClient(base, { fetch: async (...args) => { requests++
 assert.equal((await checked.get({ id: "wrong wrapper" })).error.kind, "encode");
 assert.equal((await checked.create({ displayName: "bad", tags: [1n] })).error.kind, "encode");
 assert.equal(requests, 0);
+
+// WHATWG Response forbids constructing a real 204 with a body. A fetch test
+// double exercises an observable malformed body; framing errors use real headers.
+const empty = createUsersClient(base, { fetch: async () => new Response(null, { status: 204 }) });
+assert.deepEqual(await empty.delete("x"), { ok: true, value: undefined });
+const changedUnitStatus = createEchoClient(base, {
+  fetch: async () => new Response(null, { status: 204 }),
+});
+assert.equal((await changedUnitStatus.health()).error.kind, "protocol");
+const emptyWithMetadata = createUsersClient(base, {
+  fetch: async () => new Response(null, { status: 204, headers: { "content-type": "application/json" } }),
+});
+assert.deepEqual(await emptyWithMetadata.delete("x"), { ok: true, value: undefined });
+for (const headers of [{ "content-length": "0" }, { "transfer-encoding": "chunked" }, { "x-spline-error": "application" }]) {
+  const bad204 = createUsersClient(base, { fetch: async () => new Response(null, { status: 204, headers }) });
+  assert.equal((await bad204.delete("x")).error.kind, "protocol");
+}
+const observableBody = createUsersClient(base, {
+  fetch: async () => ({ status: 204, headers: new Headers(), text: async () => "null" }),
+});
+assert.equal((await observableBody.delete("x")).error.kind, "protocol");
+const wrongDeleteStatus = createUsersClient(base, {
+  fetch: async () => new Response("null", { status: 200, headers: { "content-type": "application/json" } }),
+});
+assert.equal((await wrongDeleteStatus.delete("x")).error.kind, "protocol");
 
 const mock = (body, status = 200, headers = {}) => createUsersClient(base, {
   fetch: async () => new Response(body, { status, headers: { "content-type": "application/json", ...headers } }),

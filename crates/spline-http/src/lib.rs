@@ -4,18 +4,30 @@
 
 mod client;
 mod compatibility;
+mod response;
 pub mod server;
 
 pub use axum;
 pub use client::Client;
 pub use compatibility::verify_serde;
 pub use reqwest;
+pub use response::ResponsePolicy;
 pub use server::{ErrorPolicy, Fault, RequestContext};
 
 use std::fmt;
 
 pub const ERROR_HEADER: &str = "x-spline-error";
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+
+mod sealed {
+    pub trait Unit {}
+    impl Unit for () {}
+}
+
+/// A 204 operation has no success payload. Only Rust unit implements this trait;
+/// aliases of () work, while nullable or custom null-encoded DTOs do not qualify.
+pub trait NoContent: sealed::Unit {}
+impl NoContent for () {}
 
 #[derive(Debug)]
 pub enum BuildError {

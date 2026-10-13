@@ -1,8 +1,10 @@
 use std::collections::BTreeSet;
 use std::fmt::Write;
 
-use spline_contract::{ContractDescription, OperationKind};
-use spline_schema::Direction;
+use spline_contract::{
+    ApplicationDescription, ContractDescription, OperationKind, ResourceDescription,
+};
+use spline_schema::{Direction, Graph};
 
 use crate::{render, validate, Artifact, Error, Root, Typescript};
 
@@ -15,13 +17,50 @@ impl Typescript {
         contract: &ContractDescription,
         name: &str,
     ) -> Result<Artifact, Error> {
+        self.export_resources(
+            contract.schemas(),
+            &[(None, contract.resource())],
+            contract.documentation(),
+            name,
+        )
+    }
+
+    /// Emit shared DTOs once, a flat operation map keyed by stable identity, and
+    /// positional call signatures grouped by the application's resource names.
+    pub fn export_application(
+        &self,
+        application: &ApplicationDescription,
+        name: &str,
+    ) -> Result<Artifact, Error> {
+        self.export_resources(
+            application.schemas(),
+            &application_resources(application),
+            application.documentation(),
+            name,
+        )
+    }
+
+    pub(crate) fn export_resources(
+        &self,
+        schemas: &Graph,
+        resources: &[(Option<&str>, &ResourceDescription)],
+        documentation: &str,
+        name: &str,
+    ) -> Result<Artifact, Error> {
         validate::symbol(name)?;
         let calls = format!("{name}Calls");
         let operations = format!("{name}Operations");
-        let namespace = contract.namespace().replace('.', "_");
         let mut roots = Vec::new();
-        for operation in contract.operations().values() {
-            let stem = format!("{namespace}_{}", operation.name);
+        let mut void_roots = BTreeSet::new();
+        for operation in resources.iter().flat_map(|(_, r)| r.operations().values()) {
+            let stem = operation.id.replace('.', "_");
+            if operation
+                .http
+                .as_ref()
+                .is_some_and(|plan| plan.binding.success_status == 204)
+            {
+                void_roots.insert(format!("{stem}_Output"));
+            }
             roots.push(Root::new(
                 format!("{stem}_Input"),
                 Direction::Deserialize,
@@ -38,7 +77,7 @@ impl Typescript {
                 operation.error.clone(),
             ));
         }
-        let mut artifact = self.export(contract.schemas(), &roots)?;
+        let mut artifact = self.export_roots(schemas, &roots, &void_roots)?;
         let occupied: BTreeSet<_> = artifact
             .symbols
             .values()
@@ -53,12 +92,10 @@ impl Typescript {
             }
         }
         artifact.source.push('\n');
-        artifact
-            .source
-            .push_str(&render::docs(contract.documentation(), 0));
+        artifact.source.push_str(&render::docs(documentation, 0));
         writeln!(artifact.source, "export type {operations} = {{").unwrap();
-        for operation in contract.operations().values() {
-            let stem = format!("{namespace}_{}", operation.name);
+        for operation in resources.iter().flat_map(|(_, r)| r.operations().values()) {
+            let stem = operation.id.replace('.', "_");
             artifact
                 .source
                 .push_str(&render::docs(&operation.documentation, 1));
@@ -72,18 +109,43 @@ impl Typescript {
         artifact.source.push_str("};\n\n");
         artifact.source.push_str("/** Typed call signatures; a binding supplies execution and any extra Failure union. */\n");
         writeln!(artifact.source, "export type {calls}<Failure = never> = {{").unwrap();
-        for operation in contract.operations().values() {
-            let stem = format!("{namespace}_{}", operation.name);
-            artifact
-                .source
-                .push_str(&render::docs(&operation.documentation, 1));
-            let parameters = parameters(operation, &artifact.symbols)?;
-            writeln!(artifact.source, "  {}: ({parameters}) => Promise<\n    | {{ ok: true; value: {stem}_Output }}\n    | {{ ok: false; error: {{ kind: \"application\"; value: {stem}_Error }} | Failure }}\n  >;",
-                render::string(&operation.name)).unwrap();
+        for (group, resource) in resources {
+            let depth = if let Some(group) = group {
+                artifact
+                    .source
+                    .push_str(&render::docs(resource.documentation(), 1));
+                writeln!(artifact.source, "  {}: {{", render::string(group)).unwrap();
+                2
+            } else {
+                1
+            };
+            let indent = "  ".repeat(depth);
+            for operation in resource.operations().values() {
+                let stem = operation.id.replace('.', "_");
+                artifact
+                    .source
+                    .push_str(&render::docs(&operation.documentation, depth));
+                let parameters = parameters(operation, &artifact.symbols)?;
+                writeln!(artifact.source, "{indent}{}: ({parameters}) => Promise<\n{indent}  | {{ ok: true; value: {stem}_Output }}\n{indent}  | {{ ok: false; error: {{ kind: \"application\"; value: {stem}_Error }} | Failure }}\n{indent}>;",
+                    render::string(&operation.name)).unwrap();
+            }
+            if group.is_some() {
+                artifact.source.push_str("  };\n");
+            }
         }
         artifact.source.push_str("};\n");
         Ok(artifact)
     }
+}
+
+pub(crate) fn application_resources(
+    application: &ApplicationDescription,
+) -> Vec<(Option<&str>, &ResourceDescription)> {
+    application
+        .resources()
+        .iter()
+        .map(|(group, resource)| (Some(group.as_str()), resource))
+        .collect()
 }
 
 pub(crate) fn parameter_name(name: &str, index: usize) -> String {

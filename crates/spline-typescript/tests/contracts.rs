@@ -153,3 +153,66 @@ fn schema_overrides_cannot_shadow_call_surface_or_type_parameters() {
         Err(Error::InvalidSymbol(_))
     ));
 }
+
+#[test]
+fn no_content_output_aliases_are_void_without_changing_the_json_unit_shape() {
+    struct Empty;
+    impl Schema for Empty {
+        fn info() -> TypeInfo {
+            TypeInfo::inline("api.EmptyArguments")
+        }
+        fn describe(_: &mut Context<'_>) -> spline_schema::Result<Shape> {
+            Ok(Shape::Object(spline_schema::Object {
+                fields: vec![],
+                unknown_fields: spline_schema::UnknownFields::Reject,
+            }))
+        }
+    }
+    let mut builder = ContractBuilder::new("empty", "").unwrap();
+    builder
+        .operation::<Empty, (), Value>("delete", "delete", OperationKind::Mutation, "")
+        .unwrap();
+    builder
+        .http(
+            "delete",
+            spline_contract::http::HttpBinding {
+                method: spline_contract::http::HttpMethod::Delete,
+                path: "/empty".into(),
+                body: None,
+                success_status: 204,
+            },
+        )
+        .unwrap();
+    builder
+        .operation::<Empty, (), String>("json", "json", OperationKind::Query, "")
+        .unwrap();
+    builder
+        .http(
+            "json",
+            spline_contract::http::HttpBinding {
+                method: spline_contract::http::HttpMethod::Get,
+                path: "/json".into(),
+                body: None,
+                success_status: 200,
+            },
+        )
+        .unwrap();
+    let description = builder.finish().unwrap();
+    assert_eq!(description.operations()["delete"].output, Shape::Null);
+    let source = Typescript::new()
+        .export_http_client(&description, "Empty")
+        .unwrap()
+        .source;
+    assert!(source.contains("export type empty_delete_Output = void;"));
+    assert!(source.contains("export type empty_json_Output = null;"));
+    // Operation result aliases participate in the same collision checks as DTOs.
+    let key = DefinitionId {
+        name: Name::new("api.Value"),
+        direction: Direction::Serialize,
+    };
+    let source = Typescript::new().name(key, "empty_delete_Output");
+    assert!(matches!(
+        source.export_http_client(&description, "Empty"),
+        Err(Error::SymbolCollision(_))
+    ));
+}

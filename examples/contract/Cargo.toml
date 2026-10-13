@@ -3,6 +3,10 @@ name = "spline-example-contract"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "Spline CRUD example and cross-language conformance fixtures"
 default-run = "spline-example-contract"
 
 [dependencies]

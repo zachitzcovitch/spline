@@ -1,13 +1,15 @@
-# First HTTP/JSON binding
+# HTTP/JSON binding
 
 Implemented: 2026-10-13.
 
 ## What is working
 
-The first binding connects a Rust-authored contract to an Axum router, a generated
+The binding connects a Rust-authored contract to an Axum router, a generated
 Rust client backed by reqwest, and a generated TypeScript client backed by fetch.
-The [example](../examples/contract/src/lib.rs) has `users.get` and `users.create`
-over one shared in-memory service. Both clients create a record and read it back.
+The [example](../examples/contract/src/lib.rs) implements get, create, replace,
+update, and delete over one shared in-memory service. Both clients exercise the
+full resource workflow. See [updates and no-content responses](http-updates.md)
+for PATCH field semantics and the 204 profile.
 
 The contract remains an operation/type description. HTTP method, path, body
 selection, and success status are binding metadata consumed by dispatch and both
@@ -60,8 +62,9 @@ the same.
 
 ## HTTP annotation and argument mapping
 
-The initial annotation accepts one `get = "/path"` or `post = "/path"`, an optional
-`body = "argument"`, and `status = 200` or `201` (default 200).
+The annotation accepts one of `get`, `post`, `put`, `patch`, or `delete` with a
+path, a `body = "argument"` mapping where applicable, and `status = 200`, `201`,
+or `204` (default 200).
 
 | Input location | Rule |
 | --- | --- |
@@ -70,9 +73,10 @@ The initial annotation accepts one `get = "/path"` or `post = "/path"`, an optio
 | Query | Remaining arguments become query parameters under their argument names. |
 
 GET is permitted only for queries and has no body. POST can bind either kind,
-including read-only searches. Every operation in an HTTP-annotated contract needs
-a binding. The base `spline` crate remains usable without its optional `http`
-feature for schema/metadata-only contracts.
+including read-only searches. PUT/PATCH/DELETE must be mutations; PUT and PATCH
+require a body mapping, and DELETE is bodyless in this profile. Every operation
+in an HTTP-annotated contract needs a binding. The base `spline` crate remains
+usable without its optional `http` feature for schema/metadata-only contracts.
 
 Path/query arguments support strings, booleans, the evaluated fixed-width integer
 types, and compatible string-literal unions. Optional nullable query values are
@@ -88,19 +92,20 @@ argument overlap are outside this initial profile.
 Binding validation checks argument mappings, scalar shapes, and ambiguous route
 patterns before router registration. The same dynamic route with different
 placeholder names is rejected, including when the HTTP verbs differ, because
-Axum cannot merge those patterns safely. Route conflicts across independently
-merged contracts are still governed by Axum.
+Axum cannot merge those patterns safely. [`spline::api!`](application-composition.md)
+validates these conflicts across all declared resources before merging routers.
+Additional routes merged manually outside that application remain governed by Axum.
 
 ## Wire responses
 
-Success is unwrapped JSON with the declared 200/201 status and
+For 200/201, success is unwrapped JSON with the declared status and
 `Content-Type: application/json`. A successful POST creation looks like:
 
 ```http
 HTTP/1.1 201 Created
 Content-Type: application/json
 
-{"id":"user_2","displayName":"New user"}
+{"id":"user_2","displayName":"New user","bio":null}
 ```
 
 An application error uses the status supplied by the server's error policy:
@@ -135,8 +140,11 @@ limit receives 413. Bodyless operations reject nonempty bodies. Default unmatche
 routes and method rejections remain Axum's responses and are classified by clients
 as unmarked HTTP errors.
 
-This profile always has JSON success bodies. Other verbs, 204/bodyless responses,
-streaming, and per-operation response headers are follow-on work.
+A declared 204 is an empty success response and requires a unit result. Clients
+return `()` in Rust and `undefined`/`void` in TypeScript, with no JSON parsing.
+Application and framework errors still carry JSON. See the [204 rules](http-updates.md#204-is-distinct-from-json-null)
+for validation and the distinction from a 200 JSON-null result. Streaming,
+additional status codes, and per-operation response headers remain follow-on work.
 
 ## Server and request context
 
@@ -174,6 +182,10 @@ Both entry points return an ordinary Axum `Router`, supporting its Tower layers
 and route nesting. Tests cover headers, middleware extensions, factory rejection,
 and a client configured to satisfy that request-scoped policy.
 
+For several resources, `api::router_with` shares this factory and error policy
+across the whole application. The returned session implements each resource trait.
+See [shared state and authentication](application-composition.md#shared-state-and-authentication).
+
 ## Rust client
 
 ```rust
@@ -197,6 +209,12 @@ The generated methods return `Result<Output, spline::http::CallError<ApiError>>`
 | `Protocol(String)` | Unexpected success status, invalid headers/envelope, or invalid response data. |
 | `Encode(String)` | Arguments could not be encoded for their binding. |
 
+Native clients now validate response JSON against the known output/error shape
+before Serde decoding. The default `ResponsePolicy::Compatible` projects closed
+objects onto known fields so added response properties do not break strict Rust
+DTOs. `client.with_response_policy(ResponsePolicy::Strict)` enforces the recorded
+unknown-field rules. Known fields and enum variants stay validated in both modes.
+
 HTTP contracts generate serializable as well as deserializable input wrappers.
 Native client methods also require success/error DTO deserialization. Thus this
 first shared-Rust-client profile requires bidirectional Serde DTOs.
@@ -214,6 +232,8 @@ The exporter has separate entry points:
 
 - `export_contract(...)`: wire types, metadata types, and positional signatures.
 - `export_http_client(...)`: those declarations plus an executable fetch client.
+- `export_application(...)` / `export_http_application(...)`: shared types and
+  grouped signatures/executable clients for several resources.
 
 ```typescript
 const client = createUsersClient("http://127.0.0.1:3000", {
@@ -233,12 +253,14 @@ is constructed. The failure union includes application, framework, HTTP,
 transport, protocol, and encode categories. The default fetch binding uses manual
 redirect handling.
 
-The emitted structural validator checks the JSON-encoded arguments and decoded
-success/application-error payloads. It understands references, unions, recursive
-containers, required/optional fields, unknown-field policy, and supported integer
-ranges. It has a traversal-depth limit of 256. Schema-declared custom predicates
-remain outside that structural check; strict response validation also needs to be
-considered when planning schema evolution across deployed versions.
+The emitted structural validator checks JSON-encoded arguments against the authored
+input schema. Response decoding separately defaults to compatible projection of
+known fields; set `responsePolicy: "strict"` in client options to enforce the
+recorded unknown-field policy. Both response modes validate references, unions,
+recursive containers, required fields, nullability, and supported integer ranges.
+Response projection has a traversal-depth limit of 256. Schema-declared custom
+predicates remain outside that structural check. See [contract evolution](contract-evolution.md)
+for the cross-version policy and tests.
 
 Both clients accept an HTTP(S) base URL with an optional path prefix and reject
 credentials, query strings, and fragments in that base. Headers carry credentials
@@ -265,13 +287,27 @@ The Node runner executes the generated TypeScript through built-in type strippin
 
 ## Evidence
 
-The workspace passes **82 behavior/integration tests**, plus a trybuild harness
-with **20 compiler-failure fixtures**. The seven live HTTP tests include both
+The Rust suite and blog workflow cover **148 behavior/integration checks**, plus trybuild harnesses
+with **26 compiler-failure fixtures** when HTTP is enabled. The seven live HTTP tests include both
 client executables calling one loopback server, Rust/TypeScript path and query
 round trips, request context, declared error statuses, malformed requests,
 protocol failures, transport failures, and native DTO compatibility rejection.
+Six additional evolution tests compare original/newer servers using clients built
+from a fixed older contract, including live TypeScript execution.
+Four resource-update tests cover PUT/PATCH/DELETE, atomic application validation,
+and bodyless responses, alongside the generic `Patch<T>` tests.
+Five application-composition tests exercise grouped clients, shared authentication
+and state, resource-specific errors, common response policies, and construction
+failures. Five core application-builder and four exporter tests cover shared
+schema ownership, rollback, cross-resource routes, deterministic output, and naming.
+The [blog tutorial](../examples/blog/README.md) adds a separate `npm run test:blog`
+smoke test. It builds the server and Rust client crates, launches the actual server
+and both client entry points, then verifies their persisted effects and application
+validation over HTTP.
+The original Serde inspection and wire probes contribute 29 additional behavior
+tests and three of the compiler-failure fixtures, now included in the root suite.
 
-Both TypeScript suites pass strict compilation with **35 expected-error assertions**.
+The TypeScript workspaces pass strict compilation with **58 expected-error assertions**.
 Runtime Node assertions additionally exercise generated request/response validation,
 typed errors, injectable fetch behavior, and direct JSON body selection. Cargo
 formatting, Clippy with warnings denied, metadata-only feature checking, and
@@ -284,8 +320,10 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo check --locked -p spline --no-default-features
 cargo run --locked -p spline-typescript --example export -- --check
 cargo run --locked -p spline-example-contract -- --check
+cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
 npm ci --ignore-scripts --no-audit --no-fund
 npm run check
+npm run test:blog
 ```
 
 The HTTP integration tests need loopback networking and a Node runtime with

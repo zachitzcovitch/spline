@@ -18,9 +18,25 @@ export type example_NewUser_Input = {
   "tags"?: string[];
 };
 
+/**
+ * Complete replacement of the writable profile. An absent bio becomes null.
+ */
+export type example_ReplaceUser_Input = {
+  "displayName": string;
+  "bio"?: string | null;
+};
+
 export type example_UserId_Input = string;
 
 export type example_UserId_Output = string;
+
+/**
+ * Partial update: omitted fields stay unchanged; null clears the nullable bio.
+ */
+export type example_UserPatch_Input = {
+  "displayName"?: string;
+  "bio"?: string | null;
+};
 
 /**
  * A public user record.
@@ -28,6 +44,7 @@ export type example_UserId_Output = string;
 export type example_User_Output = {
   "id": example_UserId_Output;
   "displayName": string;
+  "bio": string | null;
 };
 
 export type users_create_Args_Input = {
@@ -40,6 +57,16 @@ export type users_create_Input = users_create_Args_Input;
 
 export type users_create_Output = example_User_Output;
 
+export type users_delete_Args_Input = {
+  "id": example_UserId_Input;
+};
+
+export type users_delete_Error = example_ApiError_Output;
+
+export type users_delete_Input = users_delete_Args_Input;
+
+export type users_delete_Output = void;
+
 export type users_get_Args_Input = {
   "id": example_UserId_Input;
 };
@@ -50,6 +77,28 @@ export type users_get_Input = users_get_Args_Input;
 
 export type users_get_Output = example_User_Output;
 
+export type users_replace_Args_Input = {
+  "id": example_UserId_Input;
+  "input": example_ReplaceUser_Input;
+};
+
+export type users_replace_Error = example_ApiError_Output;
+
+export type users_replace_Input = users_replace_Args_Input;
+
+export type users_replace_Output = example_User_Output;
+
+export type users_update_Args_Input = {
+  "id": example_UserId_Input;
+  "input": example_UserPatch_Input;
+};
+
+export type users_update_Error = example_ApiError_Output;
+
+export type users_update_Input = users_update_Args_Input;
+
+export type users_update_Output = example_User_Output;
+
 /**
  * Operations on user records.
  */
@@ -59,9 +108,21 @@ export type UsersOperations = {
    */
   "users.create": { kind: "mutation"; input: users_create_Input; output: users_create_Output; error: users_create_Error };
   /**
+   * Delete an existing user with an empty success response.
+   */
+  "users.delete": { kind: "mutation"; input: users_delete_Input; output: users_delete_Output; error: users_delete_Error };
+  /**
    * Fetch an existing user.
    */
   "users.get": { kind: "query"; input: users_get_Input; output: users_get_Output; error: users_get_Error };
+  /**
+   * Replace an existing user's writable profile.
+   */
+  "users.replace": { kind: "mutation"; input: users_replace_Input; output: users_replace_Output; error: users_replace_Error };
+  /**
+   * Apply the supplied fields without changing omitted fields.
+   */
+  "users.update": { kind: "mutation"; input: users_update_Input; output: users_update_Output; error: users_update_Error };
 };
 
 /** Typed call signatures; a binding supplies execution and any extra Failure union. */
@@ -74,11 +135,32 @@ export type UsersCalls<Failure = never> = {
     | { ok: false; error: { kind: "application"; value: users_create_Error } | Failure }
   >;
   /**
+   * Delete an existing user with an empty success response.
+   */
+  "delete": (arg0_id: example_UserId_Input) => Promise<
+    | { ok: true; value: users_delete_Output }
+    | { ok: false; error: { kind: "application"; value: users_delete_Error } | Failure }
+  >;
+  /**
    * Fetch an existing user.
    */
   "get": (arg0_id: example_UserId_Input) => Promise<
     | { ok: true; value: users_get_Output }
     | { ok: false; error: { kind: "application"; value: users_get_Error } | Failure }
+  >;
+  /**
+   * Replace an existing user's writable profile.
+   */
+  "replace": (arg0_id: example_UserId_Input, arg1_input: example_ReplaceUser_Input) => Promise<
+    | { ok: true; value: users_replace_Output }
+    | { ok: false; error: { kind: "application"; value: users_replace_Error } | Failure }
+  >;
+  /**
+   * Apply the supplied fields without changing omitted fields.
+   */
+  "update": (arg0_id: example_UserId_Input, arg1_input: example_UserPatch_Input) => Promise<
+    | { ok: true; value: users_update_Output }
+    | { ok: false; error: { kind: "application"; value: users_update_Error } | Failure }
   >;
 };
 
@@ -90,6 +172,8 @@ export type UsersHttpFailure =
 export type UsersHttpOptions = {
   fetch?: typeof globalThis.fetch;
   headers?: { [name: string]: string };
+  /** Compatible projects closed response objects onto known fields. Requests remain schema-checked. */
+  responsePolicy?: "compatible" | "strict";
 };
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
@@ -104,6 +188,10 @@ export function createUsersClient(
   }
   const fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
   const defaultHeaders = new globalThis.Headers(options.headers);
+  const responsePolicy = options.responsePolicy ?? "compatible";
+  if (responsePolicy !== "compatible" && responsePolicy !== "strict") {
+    throw new globalThis.TypeError("responsePolicy must be compatible or strict");
+  }
 
   type Wire =
     | ["null" | "string" | "boolean"]
@@ -115,11 +203,16 @@ export function createUsersClient(
   const definitions: { [name: string]: Wire } = {
     ["example_ApiError_Output"]: ["union", [["object", false, [["kind", ["literal", "not_found"], false]]], ["object", false, [["kind", ["literal", "invalid_name"], false], ["details", ["object", false, [["message", ["string"], false]]], false]]]]],
     ["example_NewUser_Input"]: ["object", false, [["displayName", ["string"], false], ["tags", ["array", ["string"]], true]]],
-    ["example_User_Output"]: ["object", false, [["id", ["ref", "example_UserId_Output"], false], ["displayName", ["string"], false]]],
+    ["example_ReplaceUser_Input"]: ["object", false, [["displayName", ["string"], false], ["bio", ["union", [["string"], ["null"]]], true]]],
+    ["example_User_Output"]: ["object", false, [["id", ["ref", "example_UserId_Output"], false], ["displayName", ["string"], false], ["bio", ["union", [["string"], ["null"]]], false]]],
     ["example_UserId_Input"]: ["string"],
     ["example_UserId_Output"]: ["string"],
+    ["example_UserPatch_Input"]: ["object", false, [["displayName", ["string"], true], ["bio", ["union", [["string"], ["null"]]], true]]],
     ["users_create_Args_Input"]: ["object", false, [["input", ["ref", "example_NewUser_Input"], false]]],
+    ["users_delete_Args_Input"]: ["object", false, [["id", ["ref", "example_UserId_Input"], false]]],
     ["users_get_Args_Input"]: ["object", false, [["id", ["ref", "example_UserId_Input"], false]]],
+    ["users_replace_Args_Input"]: ["object", false, [["id", ["ref", "example_UserId_Input"], false], ["input", ["ref", "example_ReplaceUser_Input"], false]]],
+    ["users_update_Args_Input"]: ["object", false, [["id", ["ref", "example_UserId_Input"], false], ["input", ["ref", "example_UserPatch_Input"], false]]],
   };
   const object = (value: unknown): value is { [name: string]: unknown } =>
     value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
@@ -151,8 +244,80 @@ export function createUsersClient(
         && (schema[1] || globalThis.Object.keys(value).every(name => schema[2].some(f => f[0] === name)));
     }
   };
+  const same = (a: unknown, b: unknown): boolean => {
+    if (a === b) return true;
+    if (globalThis.Array.isArray(a) && globalThis.Array.isArray(b)) {
+      return a.length === b.length && a.every((v, i) => same(v, b[i]));
+    }
+    return object(a) && object(b) && globalThis.Object.keys(a).length === globalThis.Object.keys(b).length
+      && globalThis.Object.keys(a).every(key => owns(b, key) && same(a[key], b[key]));
+  };
+  // Undefined is a failure sentinel: parsed JSON cannot contain it. Projection
+  // prevents extra fields from leaking into returned values or strict Rust DTOs.
+  const project = (value: unknown, schema: Wire, depth = 0): unknown => {
+    if (depth >= 256) return undefined;
+    const child = (value: unknown, schema: Wire): unknown => project(value, schema, depth + 1);
+    switch (schema[0]) {
+      case "ref": {
+        const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
+        return target === undefined ? undefined : child(value, target);
+      }
+      case "object": {
+        if (!object(value)) return undefined;
+        const known = new globalThis.Set(schema[2].map(f => f[0]));
+        if (responsePolicy === "strict" && !schema[1]
+            && globalThis.Object.keys(value).some(name => !known.has(name))) return undefined;
+        const entries: [string, unknown][] = schema[1]
+          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name)) : [];
+        for (const [name, type, optional] of schema[2]) {
+          if (!owns(value, name)) {
+            if (!optional) return undefined;
+            continue;
+          }
+          const decoded = child(value[name], type);
+          if (decoded === undefined) return undefined;
+          entries.push([name, decoded]);
+        }
+        // fromEntries creates own data properties even for names like __proto__.
+        return globalThis.Object.fromEntries(entries);
+      }
+      case "map": {
+        if (!object(value)) return undefined;
+        const entries: [string, unknown][] = [];
+        for (const [name, entry] of globalThis.Object.entries(value)) {
+          const decoded = child(entry, schema[1]);
+          if (decoded === undefined) return undefined;
+          entries.push([name, decoded]);
+        }
+        return globalThis.Object.fromEntries(entries);
+      }
+      case "array": {
+        if (!globalThis.Array.isArray(value)) return undefined;
+        const decoded = value.map(v => child(v, schema[1]));
+        return decoded.some(v => v === undefined) ? undefined : decoded;
+      }
+      case "tuple": {
+        if (!globalThis.Array.isArray(value) || value.length !== schema[1].length) return undefined;
+        const decoded = schema[1].map((s, i) => child(value[i], s));
+        return decoded.some(v => v === undefined) ? undefined : decoded;
+      }
+      case "union": {
+        let result: unknown;
+        for (const alternative of schema[1]) {
+          const candidate = child(value, alternative);
+          if (candidate !== undefined) {
+            if (result !== undefined && !same(result, candidate)) return undefined;
+            result = candidate;
+          }
+        }
+        return result;
+      }
+      default: return valid(value, schema, depth) ? value : undefined;
+    }
+  };
   type Plan = {
-    method: "GET" | "POST"; path: string; body: string | null; status: number;
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string; body: string | null; status: number;
     paths: string[]; queries: [string, boolean][];
     input: Wire; output: Wire; error: Wire;
   };
@@ -204,6 +369,17 @@ export function createUsersClient(
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
     const marker = response.headers.get("x-spline-error");
     const success = response.status === plan.status;
+    if (success && response.status === 204) {
+      if (marker !== null || response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
+        return { ok: false, error: { kind: "protocol", message: "invalid 204 response headers" } };
+      }
+      let text: string;
+      try { text = await response.text(); }
+      catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
+      return text.length === 0
+        ? { ok: true, value: undefined as O }
+        : { ok: false, error: { kind: "protocol", message: "204 response must have an empty body" } };
+    }
     if (success && (!jsonType(response) || marker !== null)) {
       return { ok: false, error: { kind: "protocol", message: "invalid success response headers" } };
     }
@@ -220,13 +396,14 @@ export function createUsersClient(
     try { value = globalThis.JSON.parse(text); }
     catch (error) { return { ok: false, error: { kind: "protocol", message: message(error) } }; }
     if (success) {
-      return valid(value, plan.output)
-        ? { ok: true, value: value as O }
+      const decoded = project(value, plan.output);
+      return decoded !== undefined
+        ? { ok: true, value: decoded as O }
         : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
     }
-    if (object(value) && marker === "application" && value.kind === "application"
-        && owns(value, "value") && valid(value.value, plan.error)) {
-      return { ok: false, error: { kind: "application", value: value.value as E } };
+    if (object(value) && marker === "application" && value.kind === "application" && owns(value, "value")) {
+      const decoded = project(value.value, plan.error);
+      if (decoded !== undefined) return { ok: false, error: { kind: "application", value: decoded as E } };
     }
     if (object(value) && marker === "framework" && value.kind === "framework"
         && typeof value.code === "string" && typeof value.message === "string") {
@@ -239,10 +416,22 @@ export function createUsersClient(
       method: "POST", path: "/users", body: "input", status: 201, paths: [], queries: [],
       input: ["ref", "users_create_Args_Input"], output: ["ref", "example_User_Output"], error: ["ref", "example_ApiError_Output"],
     }, { ["input"]: arg0_input }),
+    ["delete"]: (arg0_id: example_UserId_Input) => call<users_delete_Output, users_delete_Error>({
+      method: "DELETE", path: "/users/{id}", body: null, status: 204, paths: ["id"], queries: [],
+      input: ["ref", "users_delete_Args_Input"], output: ["null"], error: ["ref", "example_ApiError_Output"],
+    }, { ["id"]: arg0_id }),
     ["get"]: (arg0_id: example_UserId_Input) => call<users_get_Output, users_get_Error>({
       method: "GET", path: "/users/{id}", body: null, status: 200, paths: ["id"], queries: [],
       input: ["ref", "users_get_Args_Input"], output: ["ref", "example_User_Output"], error: ["ref", "example_ApiError_Output"],
     }, { ["id"]: arg0_id }),
+    ["replace"]: (arg0_id: example_UserId_Input, arg1_input: example_ReplaceUser_Input) => call<users_replace_Output, users_replace_Error>({
+      method: "PUT", path: "/users/{id}", body: "input", status: 200, paths: ["id"], queries: [],
+      input: ["ref", "users_replace_Args_Input"], output: ["ref", "example_User_Output"], error: ["ref", "example_ApiError_Output"],
+    }, { ["id"]: arg0_id, ["input"]: arg1_input }),
+    ["update"]: (arg0_id: example_UserId_Input, arg1_input: example_UserPatch_Input) => call<users_update_Output, users_update_Error>({
+      method: "PATCH", path: "/users/{id}", body: "input", status: 200, paths: ["id"], queries: [],
+      input: ["ref", "users_update_Args_Input"], output: ["ref", "example_User_Output"], error: ["ref", "example_ApiError_Output"],
+    }, { ["id"]: arg0_id, ["input"]: arg1_input }),
 
   };
 }

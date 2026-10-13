@@ -1,0 +1,23 @@
+error: PUT, PATCH, and DELETE must be mutations
+ --> tests/ui/http_extended_invalid.rs:4:18
+  |
+4 |     #[http(put = "/test", body = "input")]
+  |                  ^^^^^^^
+
+error: PUT and PATCH require a JSON body mapping
+  --> tests/ui/http_extended_invalid.rs:11:5
+   |
+11 |     #[http(patch = "/test")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: DELETE cannot have a JSON body mapping in this profile
+  --> tests/ui/http_extended_invalid.rs:18:5
+   |
+18 |     #[http(delete = "/test", body = "input")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: supported success statuses are 200, 201, and 204
+  --> tests/ui/http_extended_invalid.rs:25:5
+   |
+25 |     #[http(delete = "/test", status = 202)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

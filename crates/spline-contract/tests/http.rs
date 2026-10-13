@@ -124,3 +124,80 @@ fn ambiguous_dynamic_routes_are_rejected_before_axum_registration() {
     assert!(builder.http("second", binding("/items/{count}")).is_err());
     assert!(builder.http("second", binding("/items/{id}")).is_err());
 }
+
+#[test]
+fn new_verbs_share_a_route_and_validate_their_request_body_profile() {
+    let mut builder = ContractBuilder::new("test", "").unwrap();
+    for (name, method) in [("replace", HttpMethod::Put), ("update", HttpMethod::Patch)] {
+        builder
+            .operation::<Input, String, String>(name, name, OperationKind::Mutation, "")
+            .unwrap();
+        let mut plan = binding("/items/{id}");
+        plan.method = method;
+        let mut missing_body = plan.clone();
+        missing_body.body = None;
+        assert!(builder.http(name, missing_body).is_err());
+        builder.http(name, plan).unwrap();
+    }
+    let description = builder.finish().unwrap();
+    assert_eq!(
+        description.operations()["replace"]
+            .http
+            .as_ref()
+            .unwrap()
+            .binding
+            .method,
+        HttpMethod::Put
+    );
+    assert_eq!(
+        description.operations()["update"]
+            .http
+            .as_ref()
+            .unwrap()
+            .binding
+            .method,
+        HttpMethod::Patch
+    );
+}
+
+#[test]
+fn no_content_requires_a_null_output_and_delete_is_bodyless() {
+    struct Id;
+    impl Schema for Id {
+        fn info() -> TypeInfo {
+            TypeInfo::named("test.IdArgument")
+        }
+        fn describe(_: &mut Context<'_>) -> spline_schema::Result<Shape> {
+            Ok(Shape::Object(Object {
+                fields: vec![Field::required("id", Shape::String)],
+                unknown_fields: UnknownFields::Reject,
+            }))
+        }
+    }
+    let binding = HttpBinding {
+        method: HttpMethod::Delete,
+        path: "/items/{id}".into(),
+        body: None,
+        success_status: 204,
+    };
+    let mut builder = ContractBuilder::new("test", "").unwrap();
+    builder
+        .operation::<Id, String, String>("invalid", "invalid", OperationKind::Mutation, "")
+        .unwrap();
+    assert!(builder
+        .http("invalid", binding.clone())
+        .unwrap_err()
+        .to_string()
+        .contains("204 requires"));
+    builder
+        .operation::<Id, (), String>("delete", "delete", OperationKind::Mutation, "")
+        .unwrap();
+    let mut body = binding.clone();
+    body.body = Some("id".into());
+    assert!(builder.http("delete", body).is_err());
+    builder.http("delete", binding.clone()).unwrap();
+    builder
+        .operation::<Id, (), String>("read", "read", OperationKind::Query, "")
+        .unwrap();
+    assert!(builder.http("read", binding).is_err());
+}

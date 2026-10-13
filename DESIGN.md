@@ -9,6 +9,20 @@ See [the workspace guide](docs/workspace-contracts.md) and [HTTP profile](docs/h
 for the supported API and verification. Broader syntax examples below can include
 capabilities beyond that first profile.
 
+The [evolution policy](docs/contract-evolution.md) now defines compatible and strict
+response decoding and verifies older-contract clients against newer servers.
+Input validation remains authored by the request schema; output enum variants
+remain closed even when additive object properties are tolerated.
+
+The [update profile](docs/http-updates.md) adds PUT/PATCH/DELETE, a typed `Patch<T>`
+field representation, and distinct 204/bodyless success handling in both clients.
+
+[Application composition](docs/application-composition.md) now provides `spline::api!`,
+grouped native/TypeScript clients, a shared request-scoped service factory, and
+cross-resource schema/route validation. The [blog tutorial](examples/blog/README.md)
+demonstrates the application-facing API through separate contract, server, and
+Rust client crates plus a TypeScript package, sharing the root workspace and lockfiles.
+
 ## Purpose
 
 Spline lets an application define its API contract in Rust and derive the pieces
@@ -89,10 +103,11 @@ namespaces:
 | `posts.publish` | `POST /posts/{id}/publish` | `api.posts.publish(id)` |
 
 Rust and TypeScript clients preserve the authored positional method arguments.
-Resource composition can later supply accessors
-such as `client.users().get(id).await`. The composition API for combining contracts
-into an application remains open. Logical input objects remain named in metadata
-and are assembled internally by the generated clients.
+`spline::api!` combines explicitly listed resource companion modules and supplies
+`client.users().get(id).await` in Rust and `client.users.get(id)` in TypeScript.
+Group names are explicit client accessors; resource namespaces retain the stable
+operation identities. Logical input objects remain named in metadata and are
+assembled internally by the generated clients.
 
 ### Semantics
 

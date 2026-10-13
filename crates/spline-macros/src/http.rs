@@ -1,8 +1,35 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Verb {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+}
+
+impl Verb {
+    fn parse(path: &syn::Path) -> Option<Self> {
+        if path.is_ident("get") {
+            Some(Self::Get)
+        } else if path.is_ident("post") {
+            Some(Self::Post)
+        } else if path.is_ident("put") {
+            Some(Self::Put)
+        } else if path.is_ident("patch") {
+            Some(Self::Patch)
+        } else if path.is_ident("delete") {
+            Some(Self::Delete)
+        } else {
+            None
+        }
+    }
+}
+
 pub struct Binding {
-    pub get: bool,
+    pub verb: Verb,
     pub path: syn::LitStr,
     pub body: Option<syn::LitStr>,
     pub status: u16,
@@ -23,9 +50,9 @@ pub fn take(attributes: &mut Vec<syn::Attribute>) -> syn::Result<Option<Binding>
         let mut body = None;
         let mut status = None;
         attribute.parse_nested_meta(|meta| {
-            if meta.path.is_ident("get") || meta.path.is_ident("post") {
+            if let Some(verb) = Verb::parse(&meta.path) {
                 let path: syn::LitStr = meta.value()?.parse()?;
-                if route.replace((meta.path.is_ident("get"), path)).is_some() {
+                if route.replace((verb, path)).is_some() {
                     return Err(meta.error("expected one HTTP method/path"));
                 }
             } else if meta.path.is_ident("body") {
@@ -41,28 +68,45 @@ pub fn take(attributes: &mut Vec<syn::Attribute>) -> syn::Result<Option<Binding>
                     return Err(meta.error("duplicate success status"));
                 }
             } else {
-                return Err(meta.error("supported HTTP options are get, post, body, and status"));
+                return Err(meta.error(
+                    "supported HTTP options are get, post, put, patch, delete, body, and status",
+                ));
             }
             Ok(())
         })?;
-        let (get, path) = route.ok_or_else(|| {
-            syn::Error::new_spanned(&attribute, "HTTP binding requires get or post")
+        let (verb, path) = route.ok_or_else(|| {
+            syn::Error::new_spanned(
+                &attribute,
+                "HTTP binding requires get, post, put, patch, or delete",
+            )
         })?;
         let status = status.unwrap_or(200);
-        if !matches!(status, 200 | 201) {
+        if !matches!(status, 200 | 201 | 204) {
             return Err(syn::Error::new_spanned(
                 &attribute,
-                "supported success statuses are 200 and 201",
+                "supported success statuses are 200, 201, and 204",
             ));
         }
-        if get && body.is_some() {
+        if verb == Verb::Get && body.is_some() {
             return Err(syn::Error::new_spanned(
                 &attribute,
                 "GET cannot have a JSON body mapping",
             ));
         }
+        if verb == Verb::Delete && body.is_some() {
+            return Err(syn::Error::new_spanned(
+                &attribute,
+                "DELETE cannot have a JSON body mapping in this profile",
+            ));
+        }
+        if matches!(verb, Verb::Put | Verb::Patch) && body.is_none() {
+            return Err(syn::Error::new_spanned(
+                &attribute,
+                "PUT and PATCH require a JSON body mapping",
+            ));
+        }
         binding = Some(Binding {
-            get,
+            verb,
             path,
             body,
             status,
@@ -74,10 +118,16 @@ pub fn take(attributes: &mut Vec<syn::Attribute>) -> syn::Result<Option<Binding>
 
 impl Binding {
     pub fn validate(&self, query: bool, fields: &[syn::Ident]) -> syn::Result<()> {
-        if self.get && !query {
+        if self.verb == Verb::Get && !query {
             return Err(syn::Error::new_spanned(
                 &self.path,
                 "mutations cannot be bound to GET",
+            ));
+        }
+        if query && matches!(self.verb, Verb::Put | Verb::Patch | Verb::Delete) {
+            return Err(syn::Error::new_spanned(
+                &self.path,
+                "PUT, PATCH, and DELETE must be mutations",
             ));
         }
         let names: Vec<_> = fields
@@ -114,10 +164,12 @@ impl Binding {
     }
 
     pub fn metadata(&self, runtime: &syn::Path) -> TokenStream {
-        let method = if self.get {
-            quote!(#runtime::contract::http::HttpMethod::Get)
-        } else {
-            quote!(#runtime::contract::http::HttpMethod::Post)
+        let method = match self.verb {
+            Verb::Get => quote!(#runtime::contract::http::HttpMethod::Get),
+            Verb::Post => quote!(#runtime::contract::http::HttpMethod::Post),
+            Verb::Put => quote!(#runtime::contract::http::HttpMethod::Put),
+            Verb::Patch => quote!(#runtime::contract::http::HttpMethod::Patch),
+            Verb::Delete => quote!(#runtime::contract::http::HttpMethod::Delete),
         };
         let path = &self.path;
         let body = match &self.body {
@@ -153,7 +205,17 @@ pub fn generate(
     let mut policies = Vec::new();
     for method in methods {
         let name = &method.name;
-        if ["new", "with_http", "Client"].contains(&name.to_string().as_str()) {
+        if [
+            "new",
+            "with_http",
+            "with_response_policy",
+            "__from_inner",
+            "Client",
+            "__Service",
+            "__ErrorPolicy",
+        ]
+        .contains(&name.to_string().as_str())
+        {
             return Err(syn::Error::new_spanned(
                 name,
                 "operation name conflicts with the HTTP client API",
@@ -178,10 +240,12 @@ pub fn generate(
             }
         });
         policies.push(quote!(#runtime::http::ErrorPolicy<super::#error>));
-        let route_method = if method.binding.get {
-            quote!(#runtime::http::axum::routing::get)
-        } else {
-            quote!(#runtime::http::axum::routing::post)
+        let route_method = match method.binding.verb {
+            Verb::Get => quote!(#runtime::http::axum::routing::get),
+            Verb::Post => quote!(#runtime::http::axum::routing::post),
+            Verb::Put => quote!(#runtime::http::axum::routing::put),
+            Verb::Patch => quote!(#runtime::http::axum::routing::patch),
+            Verb::Delete => quote!(#runtime::http::axum::routing::delete),
         };
         routes.push(quote! {
             let __spline_plan = ::std::sync::Arc::new(
@@ -218,17 +282,34 @@ pub fn generate(
 
         impl Client {
             pub fn new(base_url: &str) -> ::core::result::Result<Self, #runtime::http::BuildError> {
-                #(#verify)*
-                Ok(Self { inner: #runtime::http::Client::new(base_url, &describe()?)? })
+                Self::__from_inner(#runtime::http::Client::new(base_url, &describe()?)?)
             }
             pub fn with_http(base_url: &str, client: #runtime::http::reqwest::Client)
                 -> ::core::result::Result<Self, #runtime::http::BuildError>
             {
+                Self::__from_inner(#runtime::http::Client::with_http(base_url, &describe()?, client)?)
+            }
+            #[doc(hidden)]
+            pub fn __from_inner(inner: #runtime::http::Client) -> ::core::result::Result<Self, #runtime::http::BuildError> {
                 #(#verify)*
-                Ok(Self { inner: #runtime::http::Client::with_http(base_url, &describe()?, client)? })
+                Ok(Self { inner })
+            }
+            pub fn with_response_policy(mut self, policy: #runtime::http::ResponsePolicy) -> Self {
+                self.inner = self.inner.with_response_policy(policy);
+                self
             }
             #(#client_methods)*
         }
+
+        // Generated composition bounds; implementations still target the authored
+        // resource trait and the ordinary ErrorPolicy implementations.
+        #[doc(hidden)]
+        #[allow(private_bounds)]
+        pub trait __Service: super::#trait_name {}
+        impl<S: super::#trait_name> __Service for S {}
+        #[doc(hidden)]
+        pub trait __ErrorPolicy: #(#policies)+* {}
+        impl<P: #(#policies)+*> __ErrorPolicy for P {}
 
         pub fn router<S, P>(service: S, errors: P)
             -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
@@ -248,9 +329,20 @@ pub fn generate(
             F: ::core::ops::Fn(#runtime::http::RequestContext) -> Fut + ::core::marker::Send + ::core::marker::Sync + 'static,
             Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, #runtime::http::Fault>> + ::core::marker::Send + 'static,
         {
+            __router_with(::std::sync::Arc::new(factory), ::std::sync::Arc::new(errors))
+        }
+
+        #[doc(hidden)]
+        pub fn __router_with<S, P, F, Fut>(
+            __spline_factory: ::std::sync::Arc<F>, __spline_errors: ::std::sync::Arc<P>,
+        ) -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
+        where
+            S: super::#trait_name + 'static,
+            P: #(#policies)+*,
+            F: ::core::ops::Fn(#runtime::http::RequestContext) -> Fut + ::core::marker::Send + ::core::marker::Sync + 'static,
+            Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, #runtime::http::Fault>> + ::core::marker::Send + 'static,
+        {
             let __spline_description = describe()?;
-            let __spline_factory = ::std::sync::Arc::new(factory);
-            let __spline_errors = ::std::sync::Arc::new(errors);
             let mut __spline_router = #runtime::http::axum::Router::new();
             #(#routes)*
             Ok(__spline_router)

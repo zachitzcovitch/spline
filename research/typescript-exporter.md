@@ -9,7 +9,7 @@ new operation-signature export. The prototype commands below are historical.
 
 ## Result
 
-The [exporter prototype](typescript-exporter-probe/README.md) completes the first
+The [exporter implementation](../crates/spline-typescript) completes the first
 path from Rust data types to a generated artifact checked by another language:
 
 ```text

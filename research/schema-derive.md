@@ -9,7 +9,7 @@ current commands; the prototype commands below are historical.
 
 ## Result
 
-The [derive workspace](schema-derive-probe/README.md) now generates the typed
+The [derive implementation](../crates/spline-macros) generates the typed
 descriptions previously written by hand in the [registry prototype](schema-registry.md).
 Its facade re-exports the runtime API and `#[derive(Schema)]`.
 

@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod adapter;
+mod api;
 mod attrs;
 mod contract;
 mod expand;
@@ -20,6 +21,14 @@ pub fn schema(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn contract(attributes: TokenStream, input: TokenStream) -> TokenStream {
     contract::expand(attributes.into(), input.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// Compose HTTP resource companion modules into one application API.
+#[proc_macro]
+pub fn api(input: TokenStream) -> TokenStream {
+    api::expand(input.into())
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

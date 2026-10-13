@@ -1,9 +1,12 @@
 {
   "name": "spline-workspace",
   "private": true,
-  "workspaces": ["crates/spline-typescript/typescript", "examples/contract/typescript"],
+  "license": "MIT OR Apache-2.0",
+  "workspaces": ["crates/spline-typescript/typescript", "examples/contract/typescript", "examples/blog/typescript"],
   "scripts": {
-    "check": "npm run check --workspaces"
+    "check": "npm run check --workspaces",
+    "test:blog": "node --test examples/blog/tests/workflow.mjs",
+    "bench:typescript": "node benchmarks/typescript.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

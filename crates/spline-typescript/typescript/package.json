@@ -2,7 +2,8 @@
   "name": "spline-schema-typescript-checks",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT OR Apache-2.0",
   "scripts": {
-    "check": "tsc --project tsconfig.json"
+    "check": "tsc --project tsconfig.json && node json-numbers.mjs"
   }
 }

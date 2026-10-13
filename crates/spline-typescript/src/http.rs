@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
-use spline_contract::{http::HttpMethod, ContractDescription};
-use spline_schema::{DefinitionId, Presence, Shape, UnknownFields};
+use spline_contract::{
+    http::HttpMethod, ApplicationDescription, ContractDescription, ResourceDescription,
+};
+use spline_schema::{DefinitionId, Graph, Presence, Shape, UnknownFields};
 
 use crate::{contract, render, Artifact, Error, Typescript};
 
@@ -12,20 +14,50 @@ impl Typescript {
         contract: &ContractDescription,
         name: &str,
     ) -> Result<Artifact, Error> {
-        let mut artifact = self.export_contract(contract, name)?;
+        self.export_http_resources(
+            contract.schemas(),
+            &[(None, contract.resource())],
+            contract.documentation(),
+            name,
+        )
+    }
+
+    /// Generate one grouped client sharing a base URL, fetch implementation,
+    /// default headers, response policy, and runtime schema table.
+    pub fn export_http_application(
+        &self,
+        application: &ApplicationDescription,
+        name: &str,
+    ) -> Result<Artifact, Error> {
+        self.export_http_resources(
+            application.schemas(),
+            &contract::application_resources(application),
+            application.documentation(),
+            name,
+        )
+    }
+
+    fn export_http_resources(
+        &self,
+        schemas: &Graph,
+        resources: &[(Option<&str>, &ResourceDescription)],
+        documentation: &str,
+        name: &str,
+    ) -> Result<Artifact, Error> {
+        let mut artifact = self.export_resources(schemas, resources, documentation, name)?;
         let occupied: BTreeSet<_> = artifact
             .symbols
             .values()
             .cloned()
-            .chain(contract.operations().values().flat_map(|op| {
-                ["Input", "Output", "Error"].map(|suffix| {
-                    format!(
-                        "{}_{}_{suffix}",
-                        contract.namespace().replace('.', "_"),
-                        op.name
-                    )
-                })
-            }))
+            .chain(
+                resources
+                    .iter()
+                    .flat_map(|(_, r)| r.operations().values())
+                    .flat_map(|op| {
+                        ["Input", "Output", "Error"]
+                            .map(|suffix| format!("{}_{suffix}", op.id.replace('.', "_")))
+                    }),
+            )
             .collect();
         for symbol in [
             format!("{name}HttpFailure"),
@@ -37,7 +69,7 @@ impl Typescript {
             }
         }
         let mut definitions = String::from("{\n");
-        for (id, definition) in contract.schemas().definitions() {
+        for (id, definition) in schemas.definitions() {
             writeln!(
                 definitions,
                 "    [{}]: {},",
@@ -48,56 +80,64 @@ impl Typescript {
         }
         definitions.push_str("  }");
         let mut methods = String::new();
-        for operation in contract.operations().values() {
-            let plan = operation
-                .http
-                .as_ref()
-                .ok_or_else(|| Error::MissingHttpBinding(operation.id.clone()))?;
-            let method = match plan.binding.method {
-                HttpMethod::Get => "GET",
-                HttpMethod::Post => "POST",
-            };
-            let body = plan
-                .binding
-                .body
-                .as_ref()
-                .map(|name| render::string(name))
-                .unwrap_or_else(|| "null".into());
-            let paths = plan
-                .path_parameters
-                .iter()
-                .map(|p| render::string(&p.name))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let queries = plan
-                .query_parameters
-                .iter()
-                .map(|p| format!("[{}, {}]", render::string(&p.name), p.optional))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let parameters = contract::parameters(operation, &artifact.symbols)?;
-            let fields = operation
-                .arguments
-                .iter()
-                .enumerate()
-                .map(|(index, arg)| {
-                    format!(
-                        "[{}]: {}",
-                        render::string(&arg.name),
-                        contract::parameter_name(&arg.name, index)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            let stem = format!(
-                "{}_{}",
-                contract.namespace().replace('.', "_"),
-                operation.name
-            );
-            writeln!(methods, "    [{}]: ({parameters}) => call<{stem}_Output, {stem}_Error>({{\n      method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n      input: {}, output: {}, error: {},\n    }}, {{ {fields} }}),",
+        for (group, resource) in resources {
+            let indent = if group.is_some() { "      " } else { "    " };
+            if let Some(group) = group {
+                writeln!(methods, "    [{}]: {{", render::string(group)).unwrap();
+            }
+            for operation in resource.operations().values() {
+                let plan = operation
+                    .http
+                    .as_ref()
+                    .ok_or_else(|| Error::MissingHttpBinding(operation.id.clone()))?;
+                let method = match plan.binding.method {
+                    HttpMethod::Get => "GET",
+                    HttpMethod::Post => "POST",
+                    HttpMethod::Put => "PUT",
+                    HttpMethod::Patch => "PATCH",
+                    HttpMethod::Delete => "DELETE",
+                };
+                let body = plan
+                    .binding
+                    .body
+                    .as_ref()
+                    .map(|name| render::string(name))
+                    .unwrap_or_else(|| "null".into());
+                let paths = plan
+                    .path_parameters
+                    .iter()
+                    .map(|p| render::string(&p.name))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let queries = plan
+                    .query_parameters
+                    .iter()
+                    .map(|p| format!("[{}, {}]", render::string(&p.name), p.optional))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let parameters = contract::parameters(operation, &artifact.symbols)?;
+                let fields = operation
+                    .arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(index, arg)| {
+                        format!(
+                            "[{}]: {}",
+                            render::string(&arg.name),
+                            contract::parameter_name(&arg.name, index)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let stem = operation.id.replace('.', "_");
+                writeln!(methods, "{indent}[{}]: ({parameters}) => call<{stem}_Output, {stem}_Error>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
                 render::string(&operation.name), render::string(&plan.binding.path), plan.binding.success_status,
                 wire(&operation.input, &artifact.symbols)?, wire(&operation.output, &artifact.symbols)?, wire(&operation.error, &artifact.symbols)?,
             ).unwrap();
+            }
+            if group.is_some() {
+                methods.push_str("    },\n");
+            }
         }
         let template = include_str!("http-runtime.ts").replace("__PREFIX__", name);
         let (prefix, rest) = template.split_once("/*__DEFINITIONS__*/").unwrap();

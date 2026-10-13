@@ -15,7 +15,8 @@ and Axum dispatch. Public calls now preserve authored positional parameters, and
 the example explicitly names its generated companion module `users`.
 
 The running source of truth is [examples/contract/src/lib.rs](../examples/contract/src/lib.rs).
-It has exactly two operations: `users.get` (query) and `users.create` (mutation).
+It began with `users.get` (query) and `users.create` (mutation), and now also
+implements replace, update, and delete through the [extended HTTP profile](http-updates.md).
 Its tests decode generated input structs, call a real Rust implementation, and
 compare its TypeScript artifact with a fresh export.
 
@@ -40,9 +41,10 @@ external runtime dependencies. The proc-macro crate pins `serde_derive_internals
 0.30.0 and Syn 3.0.3. The facade integrates Serde 1.0.229 for generated inputs.
 
 One root Cargo lockfile now covers the workspace, and one npm workspace/lockfile
-covers both TypeScript test suites. The earlier standalone Serde behavior and
-internals probes remain excluded research packages. The schema tests retain a
-dev-only dependency on the internals probe for its existing comparison fixtures.
+covers the TypeScript checks, including the [blog tutorial](../examples/blog/README.md).
+The earlier standalone Serde behavior and internals probes have been promoted
+to test-only modules and integration tests in `spline-schema`. They use the root
+lockfile and run in CI; the schema runtime retains its std-only dependency graph.
 
 The [research index](../research/README.md) maps the former package locations to
 their workspace replacements. Historical design notes remain available; their
@@ -84,7 +86,8 @@ in the authored declaration:
 users
 ├── get::Input { id: UserId }
 ├── create::Input { input: NewUser }
-└── describe() -> Result<ContractDescription, contract::Error>
+├── describe() -> Result<ContractDescription, contract::Error>
+└── register(&mut ApplicationBuilder, group) -> Result<(), contract::Error>
 ```
 
 Input wrappers derive `Deserialize` and a deserialize-only `Schema`, reject
@@ -127,7 +130,7 @@ wire types, and a syntactic `Result<Output, Error>` return. Standard qualified
 Result paths are also accepted; generated return types use core's Result.
 
 Each method needs exactly one query/mutation annotation. The
-[HTTP profile](http-binding.md) now supports explicit GET/POST annotations.
+[HTTP profile](http-binding.md) now supports explicit GET/POST/PUT/PATCH/DELETE annotations.
 Unsupported attributes receive diagnostics. Generic operations,
 associated items, borrowed wire parameters, Self-dependent types, custom Result
 aliases, defaults/bodies, supertraits, and conditional method annotations are
@@ -157,8 +160,10 @@ Empty contracts, invalid identifiers, and duplicate operations are rejected.
 
 Operations and definitions are stored in ordered maps. Reversing declaration
 order produces equal descriptors and byte-identical TypeScript. The result is a
-sealed `ContractDescription` with read-only accessors. API-level composition across
-multiple contracts is a follow-on feature.
+sealed `ContractDescription` with read-only accessors. `ApplicationBuilder` now
+registers multiple resources into one shared registry, preserving ownership and
+transactional checks across contracts. See [application composition](application-composition.md)
+for the generated router/grouped clients and metadata-only registration API.
 
 ## TypeScript operation export
 
@@ -235,7 +240,7 @@ checked-in artifact. Rust tests also check artifacts for drift.
 
 ## Follow-up
 
-The first [HTTP binding](http-binding.md) is now implemented and verified with
-both clients against one server. The next profile decisions concern additional
-verbs and response forms, client call controls, and declarative error-status
-metadata for specification export.
+The [HTTP binding](http-binding.md), including [updates and 204 responses](http-updates.md),
+is implemented and verified with both clients against one server. Follow-on profile
+decisions include client call controls, broader response metadata, and declarative
+error-status metadata for specification export.

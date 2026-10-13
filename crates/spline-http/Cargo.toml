@@ -3,6 +3,9 @@ name = "spline-http"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
 description = "HTTP/JSON binding runtime for Spline, using Axum and reqwest"
 
 [dependencies]

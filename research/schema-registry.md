@@ -9,7 +9,7 @@ manifest commands recorded below describe the original experiment.
 
 ## Result
 
-The [executable prototype](schema-registry-probe/README.md) implements a `Schema`
+The [registry implementation](../crates/spline-schema) implements a `Schema`
 trait with two required methods, a directional registry, and a small JSON
 wire-shape model. It also connects the [previous attribute adapter](serde-internals-reuse.md)
 to typed field descriptions in its test fixtures.

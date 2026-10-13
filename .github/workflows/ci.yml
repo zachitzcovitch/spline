@@ -36,9 +36,17 @@ jobs:
         run: cargo check --locked -p spline --no-default-features
       - name: Run Rust and cross-language HTTP tests
         run: cargo test --locked --workspace
+      - name: Run multi-crate blog workflow
+        run: npm run test:blog
       - name: Check schema artifact freshness
         run: cargo run --locked -p spline-typescript --example export -- --check
       - name: Check contract artifact freshness
         run: cargo run --locked -p spline-example-contract -- --check
+      - name: Check tutorial client freshness
+        run: cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
       - name: Check generated TypeScript types
         run: npm run check
+      - name: Check Rust benchmark fixtures
+        run: cargo bench --locked -p spline-benchmarks -- --test
+      - name: Check TypeScript benchmark fixtures
+        run: npm run bench:typescript -- --check

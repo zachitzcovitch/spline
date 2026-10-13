@@ -3,6 +3,10 @@ name = "spline-macros"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Schema derives and contract/application macros for Spline"
 
 [lib]
 proc-macro = true

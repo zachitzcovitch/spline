@@ -1,0 +1,20 @@
+name: Feature request
+description: Describe a use case or an improvement to Spline's API or tooling.
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What are you trying to build?
+      description: Describe the use case and where the current API gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed experience
+      description: An example contract or client call helps make the idea concrete.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current approach
+      description: How do you solve this today, if at all?

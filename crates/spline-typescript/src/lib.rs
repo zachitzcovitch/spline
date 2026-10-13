@@ -1,4 +1,4 @@
-//! A deterministic wire-type exporter. No runtime validators or codecs are emitted.
+//! Deterministic wire types, contract/application signatures, and HTTP clients.
 
 #![forbid(unsafe_code)]
 
@@ -7,7 +7,7 @@ mod http;
 mod render;
 mod validate;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use spline_schema::{DefinitionId, Direction, Graph, Name, Shape};
@@ -94,6 +94,16 @@ impl Typescript {
     /// Emit all definitions plus optional root aliases, sorted by final symbol.
     /// There are no filesystem effects; callers decide where/how to save source.
     pub fn export(&self, graph: &Graph, roots: &[Root]) -> Result<Artifact, Error> {
+        self.export_roots(graph, roots, &BTreeSet::new())
+    }
+
+    /// Binding-level bodyless result aliases, distinct from the JSON null shape.
+    pub(crate) fn export_roots(
+        &self,
+        graph: &Graph,
+        roots: &[Root],
+        void_roots: &BTreeSet<String>,
+    ) -> Result<Artifact, Error> {
         for id in self.overrides.keys() {
             if !graph.definitions().contains_key(id) {
                 return Err(Error::UnknownOverride(id.clone()));
@@ -148,7 +158,11 @@ impl Typescript {
             source.push_str("export type ");
             source.push_str(&symbol);
             source.push_str(" = ");
-            source.push_str(&render::shape(shape, &symbols, 0)?);
+            if void_roots.contains(&symbol) {
+                source.push_str("void");
+            } else {
+                source.push_str(&render::shape(shape, &symbols, 0)?);
+            }
             source.push_str(";\n\n");
         }
         if source.ends_with("\n\n") {

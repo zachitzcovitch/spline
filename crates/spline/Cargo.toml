@@ -3,6 +3,9 @@ name = "spline"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
 description = "Rust-authored API contracts and schemas"
 
 [features]

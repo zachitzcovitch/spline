@@ -1,14 +1,18 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use reqwest::header;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use spline_contract::{
     http::{HttpMethod, HttpPlan, Scalar},
-    ContractDescription,
+    ApplicationDescription, ContractDescription, Operation,
 };
+use spline_schema::{Graph, Shape};
 
-use crate::{json_content_type, BuildError, CallError, Fault, ERROR_HEADER};
+use crate::{
+    json_content_type, response, BuildError, CallError, Fault, ResponsePolicy, ERROR_HEADER,
+};
 
 const PATH_COMPONENT: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
     .remove(b'-')
@@ -20,21 +24,55 @@ const PATH_COMPONENT: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHA
 pub struct Client {
     base: url::Url,
     http: reqwest::Client,
-    plans: BTreeMap<String, HttpPlan>,
+    plans: Arc<BTreeMap<String, CallPlan>>,
+    schemas: Arc<Graph>,
+    response_policy: ResponsePolicy,
+}
+
+#[derive(Clone, Debug)]
+struct CallPlan {
+    http: HttpPlan,
+    output: Shape,
+    error: Shape,
 }
 
 impl Client {
     pub fn new(base: &str, contract: &ContractDescription) -> Result<Self, BuildError> {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|error| BuildError::Configuration(error.to_string()))?;
-        Self::with_http(base, contract, client)
+        Self::with_http(base, contract, default_http()?)
     }
 
     pub fn with_http(
         base: &str,
         contract: &ContractDescription,
+        http: reqwest::Client,
+    ) -> Result<Self, BuildError> {
+        Self::build(
+            base,
+            contract.schemas(),
+            contract.operations().values(),
+            http,
+        )
+    }
+
+    pub fn for_application(
+        base: &str,
+        application: &ApplicationDescription,
+    ) -> Result<Self, BuildError> {
+        Self::for_application_with_http(base, application, default_http()?)
+    }
+
+    pub fn for_application_with_http(
+        base: &str,
+        application: &ApplicationDescription,
+        http: reqwest::Client,
+    ) -> Result<Self, BuildError> {
+        Self::build(base, application.schemas(), application.operations(), http)
+    }
+
+    fn build<'a>(
+        base: &str,
+        schemas: &Graph,
+        operations: impl Iterator<Item = &'a Operation>,
         http: reqwest::Client,
     ) -> Result<Self, BuildError> {
         let base =
@@ -50,20 +88,38 @@ impl Client {
                 "base URL must be HTTP(S), without credentials, query, or fragment".into(),
             ));
         }
-        let plans = contract
-            .operations()
-            .values()
+        let plans = operations
             .map(|operation| {
                 operation
                     .http
                     .clone()
-                    .map(|plan| (operation.id.clone(), plan))
+                    .map(|http| {
+                        (
+                            operation.id.clone(),
+                            CallPlan {
+                                http,
+                                output: operation.output.clone(),
+                                error: operation.error.clone(),
+                            },
+                        )
+                    })
                     .ok_or_else(|| {
                         BuildError::Configuration(format!("{} has no HTTP binding", operation.id))
                     })
             })
             .collect::<Result<_, _>>()?;
-        Ok(Self { base, http, plans })
+        Ok(Self {
+            base,
+            http,
+            plans: Arc::new(plans),
+            schemas: Arc::new(schemas.clone()),
+            response_policy: ResponsePolicy::default(),
+        })
+    }
+
+    pub fn with_response_policy(mut self, policy: ResponsePolicy) -> Self {
+        self.response_policy = policy;
+        self
     }
 
     pub async fn call<I: Serialize, O: DeserializeOwned, E: DeserializeOwned>(
@@ -71,10 +127,11 @@ impl Client {
         operation: &str,
         input: I,
     ) -> Result<O, CallError<E>> {
-        let plan = self
+        let call = self
             .plans
             .get(operation)
             .ok_or_else(|| CallError::Protocol("unknown operation".into()))?;
+        let plan = &call.http;
         let value =
             serde_json::to_value(input).map_err(|error| CallError::Encode(error.to_string()))?;
         let values = value
@@ -111,6 +168,9 @@ impl Client {
         let mut request = match plan.binding.method {
             HttpMethod::Get => self.http.get(url),
             HttpMethod::Post => self.http.post(url),
+            HttpMethod::Put => self.http.put(url),
+            HttpMethod::Patch => self.http.patch(url),
+            HttpMethod::Delete => self.http.delete(url),
         }
         .header(header::ACCEPT, "application/json");
         if let Some(body) = &plan.binding.body {
@@ -133,13 +193,36 @@ impl Client {
                 .and_then(|v| v.to_str().ok()),
         );
         if status == plan.binding.success_status {
-            if !json || error_kind.is_some() {
+            if status == 204 {
+                if response.headers().contains_key(ERROR_HEADER)
+                    || response.headers().contains_key(header::CONTENT_LENGTH)
+                    || response.headers().contains_key(header::TRANSFER_ENCODING)
+                {
+                    return Err(CallError::Protocol("invalid 204 response headers".into()));
+                }
+                let bytes = response.bytes().await.map_err(CallError::Transport)?;
+                if !bytes.is_empty() {
+                    return Err(CallError::Protocol(
+                        "204 response must have an empty body".into(),
+                    ));
+                }
+                // The generated contract requires unit. Decode its unit value
+                // locally; there is deliberately no JSON body to parse.
+                return serde_json::from_value(Value::Null)
+                    .map_err(|error| CallError::Protocol(error.to_string()));
+            }
+            if !json || response.headers().contains_key(ERROR_HEADER) {
                 return Err(CallError::Protocol(
                     "invalid success response headers".into(),
                 ));
             }
             let bytes = response.bytes().await.map_err(CallError::Transport)?;
-            return serde_json::from_slice(&bytes)
+            let value: Value = serde_json::from_slice(&bytes)
+                .map_err(|error| CallError::Protocol(error.to_string()))?;
+            let value =
+                response::project(&value, &call.output, &self.schemas, self.response_policy)
+                    .map_err(CallError::Protocol)?;
+            return serde_json::from_value(value)
                 .map_err(|error| CallError::Protocol(error.to_string()));
         }
         if status < 400 {
@@ -161,7 +244,10 @@ impl Client {
                 let value = value
                     .get("value")
                     .ok_or_else(|| CallError::Protocol("application error has no value".into()))?;
-                let error = serde_json::from_value(value.clone())
+                let value =
+                    response::project(value, &call.error, &self.schemas, self.response_policy)
+                        .map_err(CallError::Protocol)?;
+                let error = serde_json::from_value(value)
                     .map_err(|error| CallError::Protocol(error.to_string()))?;
                 Err(CallError::Application(error))
             }
@@ -178,6 +264,13 @@ impl Client {
             _ => Err(CallError::Protocol("unrecognized error envelope".into())),
         }
     }
+}
+
+fn default_http() -> Result<reqwest::Client, BuildError> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|error| BuildError::Configuration(error.to_string()))
 }
 
 fn scalar_text(value: &Value, scalar: Scalar) -> Result<String, String> {

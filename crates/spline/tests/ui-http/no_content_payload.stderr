@@ -1,0 +1,41 @@
+error[E0277]: the trait bound `std::string::String: spline::spline_http::NoContent` is not satisfied
+ --> tests/ui-http/no_content_payload.rs:2:7
+  |
+2 |   trait NonUnit {
+  |  _______^
+3 | |     #[mutation]
+4 | |     #[http(delete = "/test", status = 204)]
+5 | |     async fn delete(&self) -> Result<String, ()>;
+  | |___________________________________________^ the trait `spline::spline_http::NoContent` is not implemented for `std::string::String`
+  |
+help: the trait `spline::spline_http::NoContent` is implemented for `()`
+ --> $WORKSPACE/crates/spline-http/src/lib.rs
+  |
+  | impl NoContent for () {}
+  | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `spline::__private::assert_no_content`
+ --> src/lib.rs
+  |
+  |     pub fn assert_no_content<T: spline_http::NoContent>() {}
+  |                                 ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `assert_no_content`
+
+error[E0277]: the trait bound `Option<()>: spline::spline_http::NoContent` is not satisfied
+  --> tests/ui-http/no_content_payload.rs:9:7
+   |
+ 9 |   trait NullableIsNotUnit {
+   |  _______^
+10 | |     #[mutation]
+11 | |     #[http(delete = "/nullable", status = 204)]
+12 | |     async fn delete(&self) -> Result<Option<()>, ()>;
+   | |_______________________________________________^ the trait `spline::spline_http::NoContent` is not implemented for `Option<()>`
+   |
+help: the trait `spline::spline_http::NoContent` is implemented for `()`
+  --> $WORKSPACE/crates/spline-http/src/lib.rs
+   |
+   | impl NoContent for () {}
+   | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `spline::__private::assert_no_content`
+  --> src/lib.rs
+   |
+   |     pub fn assert_no_content<T: spline_http::NoContent>() {}
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `assert_no_content`

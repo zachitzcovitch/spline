@@ -1,6 +1,9 @@
 # User contract: HTTP server and two clients
 
-[src/lib.rs](src/lib.rs) defines one query and one mutation, Serde/schema DTOs,
+For a guided first application, start with the [blog tutorial](../blog/README.md).
+This directory includes the CRUD example and deeper protocol conformance fixtures.
+
+[src/lib.rs](src/lib.rs) defines get/create/replace/update/delete, Serde/schema DTOs,
 and a shared in-memory Rust implementation of the generated server trait. The
 explicit `module = "users"` declaration names the public companion namespace.
 
@@ -21,9 +24,15 @@ cargo run --locked -p spline-example-contract --bin rust-client -- http://127.0.
 node examples/contract/typescript/client.mjs http://127.0.0.1:3000
 ```
 
-Each client reads the seeded user, creates a user, fetches the new record, and
-handles a typed NotFound error. Node 25.2.1 is the tested runtime for executing
-the generated TypeScript directly.
+Each client reads the seeded user, creates and fetches a record, replaces its
+profile, partially updates it, and deletes it with a bodyless 204. The clients also
+handle a typed NotFound error. Node 25.2.1 is the tested runtime for executing the
+generated TypeScript directly.
+
+`UserPatch` uses `spline::Patch<T>`: an omitted field stays unchanged, a supplied
+value replaces it, and `bio: null` clears the nullable bio. A null display name is
+invalid. PUT uses a complete replacement DTO, so its omitted bio becomes null.
+See [updates and no-content responses](../../docs/http-updates.md) for the wire rules.
 
 From the repository root:
 
@@ -37,3 +46,35 @@ npm run check --workspace spline-contract-typescript-checks
 The HTTP suite starts ephemeral loopback servers and executes both clients, plus
 request-context, URL encoding, and error-path checks. See the
 [HTTP binding guide](../../docs/http-binding.md) for the profile and client errors.
+
+## Evolution fixtures
+
+The [versioned contracts](fixtures/evolution.rs) and
+[evolution tests](tests/evolution.rs) exercise a v1 client against a v2 server.
+The same generator command also maintains
+[evolution-v1.generated.ts](typescript/evolution-v1.generated.ts), checked by
+TypeScript and executed by the test suite.
+
+```sh
+cargo test --locked -p spline-example-contract --test evolution
+```
+
+Compatible response decoding is the default in both clients. The tests cover
+strict opt-in behavior, additive fields, optional inputs, and breaking enum or
+required-field changes. See [the evolution guide](../../docs/contract-evolution.md).
+
+## Application composition fixtures
+
+[fixtures/application.rs](fixtures/application.rs) composes `Users` and `Posts`
+with `spline::api!`, a shared store, request-scoped authentication, and different
+resource error types. The existing generator also maintains
+[application.generated.ts](typescript/application.generated.ts).
+
+```sh
+cargo test --locked -p spline-example-contract --test application
+```
+
+The test starts an authenticated application server and executes grouped Rust and
+TypeScript clients against it. See [application composition](../../docs/application-composition.md)
+for the API and configuration, or the [blog walkthrough](../blog/README.md) for a
+step-by-step application using those APIs.

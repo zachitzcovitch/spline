@@ -1,0 +1,20 @@
+[package]
+name = "spline-example-blog-contracts"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "../README.md"
+description = "Shared Users and Posts contracts for the Spline blog tutorial"
+
+[[example]]
+name = "blog-export"
+path = "examples/export.rs"
+
+[dependencies]
+spline = { workspace = true, features = ["http"] }
+serde.workspace = true
+
+[dev-dependencies]
+spline-typescript.workspace = true

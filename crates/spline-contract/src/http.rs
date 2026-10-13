@@ -8,6 +8,9 @@ use std::collections::BTreeSet;
 pub enum HttpMethod {
     Get,
     Post,
+    Put,
+    Patch,
+    Delete,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,13 +63,31 @@ pub(crate) fn plan(operation: &Operation, binding: HttpBinding, graph: &Graph) -
     if !matches!(resolve(&operation.input, graph)?, Shape::Object(_)) {
         return Err(fail("HTTP operations require a named input object"));
     }
-    if !matches!(binding.success_status, 200 | 201) {
-        return Err(fail("supported success statuses are 200 and 201"));
+    if !matches!(binding.success_status, 200 | 201 | 204) {
+        return Err(fail("supported success statuses are 200, 201, and 204"));
+    }
+    if binding.success_status == 204 && !matches!(resolve(&operation.output, graph)?, Shape::Null) {
+        return Err(fail("204 requires a unit/null output schema"));
     }
     if binding.method == HttpMethod::Get
         && (binding.body.is_some() || operation.kind == OperationKind::Mutation)
     {
         return Err(fail("GET must be a query without a request body"));
+    }
+    if matches!(
+        binding.method,
+        HttpMethod::Put | HttpMethod::Patch | HttpMethod::Delete
+    ) && operation.kind != OperationKind::Mutation
+    {
+        return Err(fail("PUT, PATCH, and DELETE must be mutations"));
+    }
+    if matches!(binding.method, HttpMethod::Put | HttpMethod::Patch) && binding.body.is_none() {
+        return Err(fail("PUT and PATCH require a JSON body mapping"));
+    }
+    if binding.method == HttpMethod::Delete && binding.body.is_some() {
+        return Err(fail(
+            "DELETE cannot have a JSON body mapping in this profile",
+        ));
     }
     if !binding.path.starts_with('/') || binding.path.contains(['?', '#']) {
         return Err(fail("path must be absolute without a query or fragment"));
@@ -196,4 +217,10 @@ fn scalar(
             ))
         }
     })
+}
+/// Axum permits different methods on the same path spelling, but not competing
+/// parameter spellings for the same route pattern.
+pub(crate) fn conflicts(left: &HttpPlan, right: &HttpPlan) -> bool {
+    left.route_key == right.route_key
+        && (left.binding.path != right.binding.path || left.binding.method == right.binding.method)
 }

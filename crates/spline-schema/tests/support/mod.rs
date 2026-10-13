@@ -3,7 +3,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use spline_schema::*;
-use spline_serde_internals_probe as parser;
+pub mod parser;
 
 macro_rules! fixture {
     ($source:ident, $($item:tt)*) => {

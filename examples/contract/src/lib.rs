@@ -1,7 +1,7 @@
-//! One resource contract, one query, one mutation, and generated TypeScript.
+//! One resource contract with generated Rust and TypeScript HTTP clients.
 
 use serde::{Deserialize, Serialize};
-use spline::Schema;
+use spline::{Patch, Schema};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(transparent)]
@@ -15,6 +15,7 @@ pub struct UserId(pub String);
 pub struct User {
     pub id: UserId,
     pub display_name: String,
+    pub bio: Option<String>,
 }
 
 /// Information supplied when creating a user.
@@ -25,6 +26,26 @@ pub struct NewUser {
     pub display_name: String,
     #[serde(default)]
     pub tags: Vec<String>,
+}
+
+/// Complete replacement of the writable profile. An absent bio becomes null.
+#[derive(Debug, Serialize, Deserialize, Schema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[spline(name = "example.ReplaceUser")]
+pub struct ReplaceUser {
+    pub display_name: String,
+    pub bio: Option<String>,
+}
+
+/// Partial update: omitted fields stay unchanged; null clears the nullable bio.
+#[derive(Debug, Default, PartialEq, Serialize, Deserialize, Schema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[spline(name = "example.UserPatch")]
+pub struct UserPatch {
+    #[serde(default, skip_serializing_if = "spline::Patch::is_missing")]
+    pub display_name: Patch<String>,
+    #[serde(default, skip_serializing_if = "spline::Patch::is_missing")]
+    pub bio: Patch<Option<String>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
@@ -52,6 +73,21 @@ pub trait Users {
     #[mutation]
     #[http(post = "/users", body = "input", status = 201)]
     async fn create(&self, input: NewUser) -> Result<User, ApiError>;
+
+    /// Replace an existing user's writable profile.
+    #[mutation]
+    #[http(put = "/users/{id}", body = "input")]
+    async fn replace(&self, id: UserId, input: ReplaceUser) -> Result<User, ApiError>;
+
+    /// Apply the supplied fields without changing omitted fields.
+    #[mutation]
+    #[http(patch = "/users/{id}", body = "input")]
+    async fn update(&self, id: UserId, input: UserPatch) -> Result<User, ApiError>;
+
+    /// Delete an existing user with an empty success response.
+    #[mutation]
+    #[http(delete = "/users/{id}", status = 204)]
+    async fn delete(&self, id: UserId) -> Result<(), ApiError>;
 }
 
 #[derive(Clone)]
@@ -69,6 +105,7 @@ impl Default for DemoUsers {
         let user = User {
             id: UserId("user_1".into()),
             display_name: "Zach".into(),
+            bio: None,
         };
         Self {
             store: std::sync::Arc::new(tokio::sync::RwLock::new(Store {
@@ -100,10 +137,56 @@ impl Users for DemoUsers {
         let user = User {
             id: UserId(format!("user_{}", store.next_id)),
             display_name: input.display_name,
+            bio: None,
         };
         store.next_id += 1;
         store.users.insert(user.id.0.clone(), user.clone());
         Ok(user)
+    }
+
+    async fn replace(&self, id: UserId, input: ReplaceUser) -> Result<User, ApiError> {
+        if input.display_name.trim().is_empty() {
+            return Err(ApiError::InvalidName {
+                message: "display name is required".into(),
+            });
+        }
+        let mut store = self.store.write().await;
+        let user = store.users.get_mut(&id.0).ok_or(ApiError::NotFound)?;
+        *user = User {
+            id,
+            display_name: input.display_name,
+            bio: input.bio,
+        };
+        Ok(user.clone())
+    }
+
+    async fn update(&self, id: UserId, input: UserPatch) -> Result<User, ApiError> {
+        if let Patch::Value(name) = &input.display_name {
+            if name.trim().is_empty() {
+                return Err(ApiError::InvalidName {
+                    message: "display name is required".into(),
+                });
+            }
+        }
+        let mut store = self.store.write().await;
+        let user = store.users.get_mut(&id.0).ok_or(ApiError::NotFound)?;
+        if let Patch::Value(name) = input.display_name {
+            user.display_name = name;
+        }
+        if let Patch::Value(bio) = input.bio {
+            user.bio = bio;
+        }
+        Ok(user.clone())
+    }
+
+    async fn delete(&self, id: UserId) -> Result<(), ApiError> {
+        self.store
+            .write()
+            .await
+            .users
+            .remove(&id.0)
+            .ok_or(ApiError::NotFound)?;
+        Ok(())
     }
 }
 
@@ -149,10 +232,10 @@ mod tests {
     }
 
     #[test]
-    fn metadata_and_artifact_have_one_query_and_one_mutation() {
+    fn metadata_and_artifact_cover_the_resource_operations() {
         let description = users::describe().unwrap();
         assert_eq!(description.namespace(), "users");
-        assert_eq!(description.operations().len(), 2);
+        assert_eq!(description.operations().len(), 5);
         assert_eq!(
             description.operations()["get"].kind,
             spline::contract::OperationKind::Query
@@ -162,6 +245,15 @@ mod tests {
             spline::contract::OperationKind::Mutation
         );
         assert_eq!(description.operations()["get"].id, "users.get");
+        assert_eq!(
+            description.operations()["delete"]
+                .http
+                .as_ref()
+                .unwrap()
+                .binding
+                .success_status,
+            204
+        );
         assert_eq!(
             typescript().unwrap(),
             include_str!("../typescript/generated.ts")
