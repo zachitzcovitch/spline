@@ -1,0 +1,9 @@
+[package]
+name = "spline-contract"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+description = "Transport-neutral operation metadata backed by Spline schemas"
+
+[dependencies]
+spline-schema.workspace = true

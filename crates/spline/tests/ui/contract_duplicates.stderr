@@ -1,0 +1,5 @@
+error: duplicate contract operation name
+ --> tests/ui/contract_duplicates.rs:5:20
+  |
+5 |     #[query(name = "get")]
+  |                    ^^^^^

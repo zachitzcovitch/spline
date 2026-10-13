@@ -1,0 +1,11 @@
+{
+  "name": "spline-workspace",
+  "private": true,
+  "workspaces": ["crates/spline-typescript/typescript", "examples/contract/typescript"],
+  "scripts": {
+    "check": "npm run check --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

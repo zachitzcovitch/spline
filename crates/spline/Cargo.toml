@@ -1,0 +1,21 @@
+[package]
+name = "spline"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+description = "Rust-authored API contracts and schemas"
+
+[features]
+default = []
+http = ["dep:spline-http"]
+
+[dependencies]
+spline-schema.workspace = true
+spline-contract.workspace = true
+spline-macros.workspace = true
+serde.workspace = true
+spline-http = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+trybuild.workspace = true

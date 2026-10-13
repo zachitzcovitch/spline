@@ -1,0 +1,5 @@
+error: path placeholder must name a distinct operation argument
+ --> tests/ui/contract_http.rs:4:18
+  |
+4 |     #[http(get = "/users/{missing}")]
+  |                  ^^^^^^^^^^^^^^^^^^

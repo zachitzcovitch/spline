@@ -1,0 +1,20 @@
+error: future cannot be sent between threads safely
+  --> tests/ui/contract_send.rs:9:28
+   |
+ 9 |     async fn get(&self) -> Result<(), ()> {
+   |                            ^^^^^^^^^^^^^^ future returned by `get` is not `Send`
+   |
+   = help: within `impl Future<Output = Result<(), ()>>`, the trait `Send` is not implemented for `Rc<()>`
+note: future is not `Send` as this value is used across an await
+  --> tests/ui/contract_send.rs:11:32
+   |
+10 |         let local = std::rc::Rc::new(());
+   |             ----- has type `Rc<()>` which is not `Send`
+11 |         std::future::ready(()).await;
+   |                                ^^^^^ await occurs here, with `local` maybe used later
+note: required by a bound in `Users::get::{anon_assoc#0}`
+  --> tests/ui/contract_send.rs:1:1
+   |
+ 1 | #[spline::contract(namespace = "users")]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Users::get::{anon_assoc#0}`
+   = note: this error originates in the attribute macro `spline::contract` (in Nightly builds, run with -Z macro-backtrace for more info)

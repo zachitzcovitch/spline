@@ -1,0 +1,17 @@
+error: this contract slice requires a safe, non-generic trait without supertraits
+ --> tests/ui/contract_signature.rs:2:7
+  |
+2 | trait Generic<T> {
+  |       ^^^^^^^
+
+error: operations require an unannotated &self receiver
+  --> tests/ui/contract_signature.rs:10:18
+   |
+10 |     async fn get(&mut self) -> Result<(), ()>;
+   |                  ^^^^^^^^^
+
+error: operation return type must be Result<Output, Error>
+  --> tests/ui/contract_signature.rs:16:25
+   |
+16 |     async fn get(&self) -> String;
+   |                         ^^^^^^^^^

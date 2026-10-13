@@ -1,0 +1,5 @@
+error: adjacent newtype payload codecs/overrides need a manual deserialize Schema (missing-content behavior differs from struct fields)
+ --> tests/ui/adjacent_payload_codec.rs:6:65
+  |
+6 |     Value(#[serde(with = "codec")] #[spline(schema = "String")] Option<String>),
+  |                                                                 ^^^^^^^^^^^^^^

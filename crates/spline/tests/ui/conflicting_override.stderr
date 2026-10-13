@@ -1,0 +1,5 @@
+error: schema conflicts with serialize_as/deserialize_as; choose shared or directional overrides
+ --> tests/ui/conflicting_override.rs:4:19
+  |
+4 | #[spline(schema = "String", serialize_as = "u32")]
+  |                   ^^^^^^^^

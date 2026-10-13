@@ -1,0 +1,11 @@
+error: duplicate wire field name in this Schema direction
+ --> tests/ui/duplicate_names.rs:7:22
+  |
+7 |     #[serde(rename = "same")]
+  |                      ^^^^^^
+
+error: duplicate wire variant name in this Schema direction
+  --> tests/ui/duplicate_names.rs:15:22
+   |
+15 |     #[serde(rename = "same")]
+   |                      ^^^^^^

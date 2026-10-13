@@ -1,0 +1,11 @@
+error: operation wire types must be concrete owned types
+ --> tests/ui/contract_borrowed.rs:4:29
+  |
+4 |     async fn get(&self, id: &str) -> Result<(), ()>;
+  |                             ^^^^
+
+error: Self-dependent operation types are unsupported
+  --> tests/ui/contract_borrowed.rs:10:35
+   |
+10 |     async fn get(&self) -> Result<Self, ()>;
+   |                                   ^^^^

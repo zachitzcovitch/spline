@@ -1,0 +1,11 @@
+error: each operation requires #[query] or #[mutation]
+ --> tests/ui/contract_kinds.rs:3:14
+  |
+3 |     async fn get(&self) -> Result<(), ()>;
+  |              ^^^
+
+error: operation needs exactly one query or mutation annotation
+ --> tests/ui/contract_kinds.rs:9:5
+  |
+9 |     #[mutation]
+  |     ^^^^^^^^^^^

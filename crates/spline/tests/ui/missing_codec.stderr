@@ -1,0 +1,5 @@
+error: custom Serde deserialize codec needs #[spline(schema = "WireType")] or a directional override
+ --> tests/ui/missing_codec.rs:6:12
+  |
+6 |     value: u64,
+  |            ^^^

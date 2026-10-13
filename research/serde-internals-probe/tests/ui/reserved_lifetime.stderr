@@ -1,0 +1,5 @@
+error: cannot deserialize when there is a lifetime parameter called 'de
+ --> tests/ui/reserved_lifetime.rs:4:17
+  |
+4 | struct Borrowed<'de> {
+  |                 ^^^

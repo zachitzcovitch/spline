@@ -1,0 +1,11 @@
+error: Schema currently supports owned DTOs with type parameters; lifetime and const parameters need a manual implementation
+ --> tests/ui/generic_kinds.rs:4:17
+  |
+4 | struct Borrowed<'a> {
+  |                 ^^
+
+error: Schema currently supports owned DTOs with type parameters; lifetime and const parameters need a manual implementation
+ --> tests/ui/generic_kinds.rs:9:14
+  |
+9 | struct Fixed<const N: usize> {
+  |              ^^^^^^^^^^^^^^

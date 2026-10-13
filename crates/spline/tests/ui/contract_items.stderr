@@ -1,0 +1,11 @@
+error: contracts contain operation methods only
+ --> tests/ui/contract_items.rs:3:5
+  |
+3 |     type User;
+  |     ^^^^^^^^^^
+
+error: operations must be async, safe, non-generic method declarations without a body
+ --> tests/ui/contract_items.rs:9:5
+  |
+9 |     fn get(&self) -> Result<(), ()>;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

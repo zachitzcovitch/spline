@@ -1,0 +1,5 @@
+error: logical names must be dot-separated ASCII identifiers
+ --> tests/ui/invalid_name.rs:4:17
+  |
+4 | #[spline(name = "api.invalid-name")]
+  |                 ^^^^^^^^^^^^^^^^^^

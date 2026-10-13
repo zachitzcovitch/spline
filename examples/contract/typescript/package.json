@@ -1,0 +1,6 @@
+{
+  "name": "spline-contract-typescript-checks",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "tsc --project tsconfig.json" }
+}

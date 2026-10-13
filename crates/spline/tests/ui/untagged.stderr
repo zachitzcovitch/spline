@@ -1,0 +1,5 @@
+error: unsupported Serde representation in deserialize Schema; use a manual implementation or whole-type schema override
+ --> tests/ui/untagged.rs:4:9
+  |
+4 | #[serde(untagged)]
+  |         ^^^^^^^^

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Install TypeScript dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Check workspace lints
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Check metadata-only facade
+        run: cargo check --locked -p spline --no-default-features
+      - name: Run Rust and cross-language HTTP tests
+        run: cargo test --locked --workspace
+      - name: Check schema artifact freshness
+        run: cargo run --locked -p spline-typescript --example export -- --check
+      - name: Check contract artifact freshness
+        run: cargo run --locked -p spline-example-contract -- --check
+      - name: Check generated TypeScript types
+        run: npm run check

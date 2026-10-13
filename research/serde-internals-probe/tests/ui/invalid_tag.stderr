@@ -1,0 +1,8 @@
+error: enum tags `kind` for type and content conflict with each other
+ --> tests/ui/invalid_tag.rs:4:1
+  |
+4 | / #[serde(tag = "kind", content = "kind")]
+5 | | enum InvalidTag {
+6 | |     Value { value: String },
+7 | | }
+  | |_^

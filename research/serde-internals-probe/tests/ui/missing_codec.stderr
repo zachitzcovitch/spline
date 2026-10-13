@@ -1,0 +1,5 @@
+error[E0425]: cannot find function `missing` in this scope
+ --> tests/ui/missing_codec.rs:5:32
+  |
+5 |     #[serde(deserialize_with = "missing")]
+  |                                ^^^^^^^^^ not found in this scope

@@ -1,0 +1,17 @@
+error: GET cannot have a JSON body mapping
+ --> tests/ui/http_invalid.rs:4:5
+  |
+4 |     #[http(get = "/test", body = "input")]
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: mutations cannot be bound to GET
+  --> tests/ui/http_invalid.rs:11:18
+   |
+11 |     #[http(get = "/test")]
+   |                  ^^^^^^^
+
+error: HTTP contracts require a binding on every operation
+  --> tests/ui/http_invalid.rs:16:7
+   |
+16 | trait Partial {
+   |       ^^^^^^^
