@@ -205,10 +205,11 @@ The same configured typed service can be bound to its authored HTTP route:
 let router = users::http::get::router(configured_service, error_statuses)?;
 ```
 
-This route clones the configured service before invoking it, waits for readiness,
-decodes arguments, and produces normal HTTP responses. Application failures use
-the declared error policy. Service/readiness failures produce a framework 500 with
-code `service_failure` rather than masquerading as application errors.
+This route clones the configured service, decodes arguments, then waits for readiness
+and invokes that same service instance. It produces normal HTTP responses.
+Application failures use the declared error policy. Service/readiness failures
+produce a framework 500 with code `service_failure` rather than masquerading as
+application errors.
 
 This entry point uses a reusable configured service and requires it to be
 `Clone + Send + Sync + 'static`, with a Send future. For request-scoped principals,

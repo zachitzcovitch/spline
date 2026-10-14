@@ -117,7 +117,7 @@ the resource's concrete implementation and error-policy bounds. See
 
 Generated inputs must be `DeserializeOwned + Send`; success and application-error
 types must be `Serialize + Send`. All referenced wire types need schema
-descriptions. These are the metadata-only/server-facing requirements. The HTTP
+descriptions. These are the neutral contract/server-facing requirements. The HTTP
 profile also needs input serialization and output/error deserialization, with a
 construction-time compatibility check for shared Rust DTOs.
 
@@ -166,7 +166,7 @@ Each method needs exactly one query/mutation annotation. The
 Unsupported attributes receive diagnostics. Generic operations,
 associated items, borrowed wire parameters, Self-dependent types, custom Result
 aliases, defaults/bodies, supertraits, and conditional method annotations are
-outside this initial surface. The broader HTTP authoring proposal remains in
+outside the supported surface. Broader binding design questions are described in
 [DESIGN.md](../DESIGN.md#http-binding).
 
 ## Metadata construction
@@ -265,8 +265,9 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-Use `--write` instead of `--check` for either generator to intentionally update its
-checked-in artifact. Rust tests also check artifacts for drift.
+Use `--write` instead of `--check` to intentionally update the checked-in artifacts.
+Rust tests also check artifacts for drift. [Contributing](../CONTRIBUTING.md#generated-artifacts-and-diagnostics)
+lists all generators, including the blog application.
 
 ## Follow-up
 

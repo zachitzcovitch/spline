@@ -32,7 +32,7 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Check workspace lints
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
-      - name: Check metadata-only facade
+      - name: Check neutral facade without HTTP
         run: cargo check --locked -p spline --no-default-features
       - name: Check neutral dependency boundary
         run: npm run check:neutral

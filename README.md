@@ -4,9 +4,10 @@ A Rust-first contract system for servers and clients. Define your operations and
 wire types once in Rust; implement the server traits and consume the same contract
 through typed Rust and TypeScript clients.
 
-Spline combines Serde serialization, a directional schema graph, Axum routing, and
-generated clients with typed application errors. Resource contracts compose into
-one application with shared state, request context, and client configuration.
+Spline combines Serde serialization, a directional schema graph, typed Tower
+execution, and generated clients with typed application errors. Resource contracts
+compose into a neutral application; the HTTP binding adds Axum routing, shared
+request context, and client configuration.
 
 [Tutorial](examples/blog/README.md) · [HTTP guide](docs/http-binding.md) ·
 [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) ·
@@ -100,7 +101,8 @@ error policies, and supported DTO compatibility.
 | Schemas | Directional names/presence, tagged enums, generic and recursive types, explicit custom-codec descriptions. |
 | HTTP | GET/POST/PUT/PATCH/DELETE, scalar path/query arguments, selected JSON bodies, 200/201/204 successes. |
 | Clients | Positional calls, typed errors, shared configuration, compatible or strict response decoding. |
-| Composition | Grouped clients and one router with shared request-scoped services. |
+| Execution | Typed Tower operation services and positional in-process Rust clients. |
+| Composition | Neutral resource/schema composition; grouped HTTP clients and one router with shared request-scoped services. |
 
 The evaluated numeric JSON profile uses 8/16/32-bit integers. Larger integers and
 floats need an explicit wire representation. Streaming, OpenAPI, and declarative

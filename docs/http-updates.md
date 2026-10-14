@@ -104,7 +104,7 @@ client.update(id, UserPatch {
 The generated TypeScript input is structurally:
 
 ```typescript
-type UserPatchInput = {
+type UserPatch = {
   displayName?: string;
   bio?: string | null;
 };
@@ -155,9 +155,8 @@ binding validates the framing and body those implementations expose.
 
 ## Verification
 
-The workspace passes **104 behavior/integration tests** and **22 compiler-failure
-fixtures** with the HTTP feature enabled. The TypeScript suites have **49
-expected-error assertions**. Existing evolution fixtures continue to pass.
+The [HTTP guide's evidence section](http-binding.md#evidence) records the expanded
+workspace suite, including these update checks and the existing evolution fixtures.
 
 Evidence includes:
 
@@ -183,5 +182,6 @@ cargo run --locked -p spline-example-contract -- --check
 npm run check
 ```
 
-The normal workspace run enables HTTP through the example. The extra 204 compiler
-fixture is feature-gated; the metadata-only crate remains independently usable.
+The normal workspace run enables HTTP through the example. HTTP-specific compiler
+fixtures are feature-gated; neutral metadata and typed execution remain usable
+without the facade's HTTP feature.

@@ -108,9 +108,9 @@ Normal parameter names are preserved, such as `id` and `input`. Reserved names o
 names shadowing the runtime call helper receive a local `argN` fallback. The
 original logical field name and wire mapping stay intact.
 
-204 results use `void` in operation metadata and signatures; 200/201 unit results
-use JSON `null`. Standalone schema export continues to represent the JSON null shape
-as `null`.
+HTTP-bound 204 results use `void` in operation metadata and signatures; 200/201 unit
+results use JSON `null`. Neutral contract/application export and standalone schema
+export continue to represent unit's JSON shape as `null`.
 
 ## Migrating older generated imports
 

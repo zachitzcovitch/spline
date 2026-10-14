@@ -139,9 +139,9 @@ schemas need their own conformance evidence when they depend on extra properties
 
 ## Verification and regeneration
 
-The expanded workspace now passes **104 behavior/integration tests** plus **22
-compiler-failure fixtures** with HTTP enabled. The TypeScript suites include **49
-expected-error assertions**; the original evolution cases remain covered.
+The [HTTP guide's evidence section](http-binding.md#evidence) records the expanded
+workspace suite. The versioned evolution cases remain covered by Rust, live Node
+clients, strict TypeScript assertions, and generated-artifact checks.
 
 ```sh
 cargo test --locked -p spline-example-contract --test evolution

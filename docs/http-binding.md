@@ -85,7 +85,7 @@ require a body mapping, and DELETE is bodyless in this profile. Every operation
 in a selected HTTP contract needs a binding. Incomplete mappings do not invalidate
 neutral composition or in-process calls; selecting `::http::describe()` returns a
 missing-binding error. The base `spline` crate remains
-usable without its optional `http` feature for schema/metadata-only contracts.
+usable without its optional `http` feature for neutral contracts and typed execution.
 
 Path/query arguments support strings, booleans, the evaluated fixed-width integer
 types, and compatible string-literal unions. Optional nullable query values are
@@ -348,7 +348,7 @@ and contracts with incomplete optional HTTP mappings.
 The TypeScript workspaces pass strict compilation with **61 expected-error assertions**.
 Runtime Node assertions additionally exercise generated request/response validation,
 typed errors, injectable fetch behavior, and direct JSON body selection. Cargo
-formatting, Clippy with warnings denied, metadata-only feature checking, and
+formatting, Clippy with warnings denied, neutral facade/dependency checking, and
 generated-artifact freshness pass.
 
 ```sh

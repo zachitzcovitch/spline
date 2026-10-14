@@ -226,7 +226,7 @@ policy, and construction failures. TypeScript also has static negative assertion
 
 Verification covers the Rust suite and blog checks (170 behavior/integration checks
 and 29 compiler-failure fixtures), strict TypeScript checks (61 expected-error
-assertions), Clippy with warnings denied, formatting, metadata-only feature
+assertions), Clippy with warnings denied, formatting, neutral facade/dependency
 checking, and generated-artifact freshness commands.
 
 ```sh
