@@ -25,7 +25,7 @@ pub fn contract(attributes: TokenStream, input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Compose HTTP resource companion modules into one application API.
+/// Compose HTTP resource modules into one application API.
 #[proc_macro]
 pub fn api(input: TokenStream) -> TokenStream {
     api::expand(input.into())

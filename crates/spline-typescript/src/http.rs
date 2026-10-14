@@ -1,10 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt::Write;
 
 use spline_contract::{
     http::HttpMethod, ApplicationDescription, ContractDescription, ResourceDescription,
 };
-use spline_schema::{DefinitionId, Graph, Presence, Shape, UnknownFields};
+use spline_schema::{Graph, Presence, Shape, UnknownFields};
 
 use crate::{contract, render, Artifact, Error, Typescript};
 
@@ -45,24 +45,14 @@ impl Typescript {
         name: &str,
     ) -> Result<Artifact, Error> {
         let mut artifact = self.export_resources(schemas, resources, documentation, name)?;
-        let occupied: BTreeSet<_> = artifact
-            .symbols
-            .values()
-            .cloned()
-            .chain(
-                resources
-                    .iter()
-                    .flat_map(|(_, r)| r.operations().values())
-                    .flat_map(|op| {
-                        ["Input", "Output", "Error"]
-                            .map(|suffix| format!("{}_{suffix}", op.id.replace('.', "_")))
-                    }),
-            )
-            .collect();
+        let occupied: BTreeSet<_> = artifact.symbols.values().cloned().collect();
         for symbol in [
             format!("{name}HttpFailure"),
             format!("{name}HttpOptions"),
             format!("create{name}Client"),
+            format!("{name}Client"),
+            "__SplineWire".into(),
+            "__SplinePlan".into(),
         ] {
             if occupied.contains(&symbol) {
                 return Err(Error::SymbolCollision(symbol));
@@ -73,8 +63,8 @@ impl Typescript {
             writeln!(
                 definitions,
                 "    [{}]: {},",
-                render::string(&artifact.symbols[id]),
-                wire(&definition.shape, &artifact.symbols)?
+                render::string(&id.to_string()),
+                wire(&definition.shape)
             )
             .unwrap();
         }
@@ -119,20 +109,14 @@ impl Typescript {
                 let fields = operation
                     .arguments
                     .iter()
-                    .enumerate()
-                    .map(|(index, arg)| {
-                        format!(
-                            "[{}]: {}",
-                            render::string(&arg.name),
-                            contract::parameter_name(&arg.name, index)
-                        )
-                    })
+                    .zip(contract::parameter_names(operation))
+                    .map(|(arg, name)| format!("[{}]: {}", render::string(&arg.name), name))
                     .collect::<Vec<_>>()
                     .join(", ");
-                let stem = operation.id.replace('.', "_");
-                writeln!(methods, "{indent}[{}]: ({parameters}) => call<{stem}_Output, {stem}_Error>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
-                render::string(&operation.name), render::string(&plan.binding.path), plan.binding.success_status,
-                wire(&operation.input, &artifact.symbols)?, wire(&operation.output, &artifact.symbols)?, wire(&operation.error, &artifact.symbols)?,
+                writeln!(methods, "{indent}[{}]: ({parameters}) => call<{}, {}>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
+                render::string(&operation.name), contract::output(operation, &artifact.symbols)?, render::shape(&operation.error, &artifact.symbols, 1)?,
+                render::string(&plan.binding.path), plan.binding.success_status,
+                wire(&operation.input), wire(&operation.output), wire(&operation.error),
             ).unwrap();
             }
             if group.is_some() {
@@ -149,34 +133,23 @@ impl Typescript {
     }
 }
 
-fn wire(shape: &Shape, symbols: &BTreeMap<DefinitionId, String>) -> Result<String, Error> {
-    Ok(match shape {
+fn wire(shape: &Shape) -> String {
+    match shape {
         Shape::Null => "[\"null\"]".into(),
         Shape::String => "[\"string\"]".into(),
         Shape::Boolean => "[\"boolean\"]".into(),
         Shape::Integer { signed, bits } => format!("[\"integer\", {signed}, {bits}]"),
         Shape::Literal(value) => format!("[\"literal\", {}]", render::string(value)),
-        Shape::Ref(id) => format!(
-            "[\"ref\", {}]",
-            render::string(
-                symbols
-                    .get(id)
-                    .ok_or_else(|| Error::MissingReference(id.clone()))?
-            )
-        ),
-        Shape::Array(value) => format!("[\"array\", {}]", wire(value, symbols)?),
-        Shape::Map(value) => format!("[\"map\", {}]", wire(value, symbols)?),
+        Shape::Ref(id) => format!("[\"ref\", {}]", render::string(&id.to_string())),
+        Shape::Array(value) => format!("[\"array\", {}]", wire(value)),
+        Shape::Map(value) => format!("[\"map\", {}]", wire(value)),
         Shape::Tuple(values) | Shape::Union(values) => {
             let kind = if matches!(shape, Shape::Tuple(_)) {
                 "tuple"
             } else {
                 "union"
             };
-            let values = values
-                .iter()
-                .map(|v| wire(v, symbols))
-                .collect::<Result<Vec<_>, _>>()?
-                .join(", ");
+            let values = values.iter().map(wire).collect::<Vec<_>>().join(", ");
             format!("[{kind:?}, [{values}]]")
         }
         Shape::Object(object) => {
@@ -184,19 +157,19 @@ fn wire(shape: &Shape, symbols: &BTreeMap<DefinitionId, String>) -> Result<Strin
                 .fields
                 .iter()
                 .map(|f| {
-                    Ok(format!(
+                    format!(
                         "[{}, {}, {}]",
                         render::string(&f.name),
-                        wire(&f.shape, symbols)?,
+                        wire(&f.shape),
                         f.presence == Presence::Optional
-                    ))
+                    )
                 })
-                .collect::<Result<Vec<_>, Error>>()?
+                .collect::<Vec<_>>()
                 .join(", ");
             format!(
                 "[\"object\", {}, [{fields}]]",
                 object.unknown_fields == UnknownFields::Ignore
             )
         }
-    })
+    }
 }

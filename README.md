@@ -26,10 +26,10 @@ and typed error handling, with exact commands and a guided reading order.
 
 ## Define a resource contract
 
-From the [working example](examples/contract/src/lib.rs):
+Declare the contract in a normal Rust resource module, for example `users.rs`:
 
 ```rust
-#[spline::contract(namespace = "users", module = "users")]
+#[spline::contract]
 pub trait Users {
     /// Fetch an existing user.
     #[query]
@@ -46,10 +46,15 @@ pub trait Users {
 DTOs use Serde and `#[derive(spline::Schema)]`. The macro generates:
 
 - An implementable `Users: Send + Sync` trait with `Send` operation futures.
-- Typed argument structs in the explicitly named `users` companion module.
+- Typed argument structs and HTTP support in the existing `users` module.
 - `users::router(service, error_status)` and `users::Client::new(base_url)`.
 - `users::describe()` for export tooling and introspection. Server/client setup
   collects the metadata internally.
+
+The namespace defaults to the resource module name, so this gives `users.get` and
+`users.create`. An inline `pub mod users { ... }` works the same way. Optional
+`namespace` and `module` settings pin an identity or create a separate companion
+when needed. The [blog tutorial](examples/blog/README.md) demonstrates the defaults.
 
 Export the metadata:
 
@@ -113,7 +118,7 @@ the old-client/new-server guarantees and their boundaries.
 
 ## Compose resources into an application
 
-List the generated resource modules once:
+List the resource modules once:
 
 ```rust
 spline::api! {
@@ -236,6 +241,8 @@ same machine and toolchain.
   policies, closed enums, and versioned Rust/TypeScript conformance fixtures.
 - [Application composition](docs/application-composition.md): grouped clients,
   shared state/authentication, and whole-application validation.
+- [TypeScript types and editor support](docs/typescript.md): readable public names,
+  direct signatures, directional differences, and collision overrides.
 - [Overall design](DESIGN.md): agreed direction and the broader roadmap.
 - [Research index](research/README.md): the experiments and source reviews behind
    the implementation, including where their code and tests now live.

@@ -1,0 +1,15 @@
+error[E0255]: the name `describe` is defined multiple times
+ --> tests/ui/contract_support_collision.rs:3:1
+  |
+1 | fn describe() {}
+  | ------------- previous definition of the value `describe` here
+2 |
+3 | #[spline::contract]
+  | ^^^^^^^^^^^^^^^^^^^ `describe` reimported here
+  |
+  = note: `describe` must be defined only once in the value namespace of this module
+  = note: this error originates in the attribute macro `spline::contract` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: you can use `as` to change the binding name of the import
+  |
+3 | #[spline::contract] as other_describe
+  |                     +++++++++++++++++

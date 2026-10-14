@@ -18,7 +18,7 @@ pub enum ApiError {
 }
 
 /// A small user API.
-#[spline::contract(namespace = "api.users")]
+#[spline::contract(namespace = "api.users", module = "users_contract")]
 pub trait Users {
     /// Look up a user.
     #[query(name = "get")]

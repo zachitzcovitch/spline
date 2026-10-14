@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{format_ident, quote, quote_spanned};
 use syn::parse::Parser;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -35,14 +35,13 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
     })
     .parse2(attributes)?;
     let mut item: syn::ItemTrait = syn::parse2(input)?;
-    let namespace = namespace.ok_or_else(|| {
-        syn::Error::new_spanned(&item.ident, "contract requires namespace = \"resource\"")
-    })?;
-    if !namespace.value().split('.').all(identifier) {
-        return Err(syn::Error::new_spanned(
-            namespace,
-            "namespace must be dot-separated ASCII identifiers",
-        ));
+    if let Some(namespace) = &namespace {
+        if !namespace.value().split('.').all(identifier) {
+            return Err(syn::Error::new_spanned(
+                namespace,
+                "namespace must be dot-separated ASCII identifiers",
+            ));
+        }
     }
     if !item.generics.params.is_empty()
         || item.generics.where_clause.is_some()
@@ -60,11 +59,30 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
     let trait_name = &item.ident;
     let runtime_alias = format_ident!("__Spline_{}_Runtime", trait_name);
     let runtime: syn::Path = syn::parse_quote!(__spline_runtime);
-    let module =
-        module.unwrap_or_else(|| format_ident!("{}_contract", snake_case(&unraw(trait_name))));
+    // An explicit companion is itself the resource module. Otherwise capture
+    // module_path! at the authored trait location, before entering generated scopes.
+    let namespace = namespace.or_else(|| {
+        module
+            .as_ref()
+            .map(|module| syn::LitStr::new(&unraw(module), module.span()))
+    });
+    let namespace_alias = format_ident!("__Spline_{}_Namespace", trait_name);
+    let source_namespace = if namespace.is_none() {
+        quote! {
+            #[doc(hidden)] #[allow(non_snake_case)]
+            fn #namespace_alias() -> &'static str {
+                ::core::module_path!().rsplit("::").next().unwrap().trim_start_matches("r#")
+            }
+        }
+    } else {
+        quote!()
+    };
+    let namespace_value = match &namespace {
+        Some(namespace) => quote!(#namespace),
+        None => quote!(super::#namespace_alias()),
+    };
     let visibility = &item.vis;
     let serde_path = quote!(#runtime::__private::serde).to_string();
-    let runtime_path = runtime.to_token_stream().to_string();
     let contract_docs = documentation(&item.attrs);
     let mut wire_names = BTreeSet::new();
     let mut aliases = Vec::new();
@@ -72,6 +90,7 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
     let mut registrations = Vec::new();
     let mut assertions = Vec::new();
     let mut http_methods = Vec::new();
+    let mut operation_modules = Vec::new();
 
     for trait_item in &mut item.items {
         let syn::TraitItem::Fn(method) = trait_item else {
@@ -82,6 +101,21 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
         };
         let method_name = method.sig.ident.clone();
         let rust_name = unraw(&method_name);
+        if [
+            "Client",
+            "__Service",
+            "__ErrorPolicy",
+            "__spline_runtime",
+            "__register_operations",
+            "__spline_namespace",
+        ]
+        .contains(&rust_name.as_str())
+        {
+            return Err(syn::Error::new_spanned(
+                &method_name,
+                "operation name conflicts with generated contract support",
+            ));
+        }
         let http = crate::http::take(&mut method.attrs)?;
         let (kind, name) = operation_attributes(&mut method.attrs, &rust_name, method_name.span())?;
         if !wire_names.insert(name.value()) {
@@ -132,6 +166,7 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
         let mut fields = Vec::new();
         let mut field_names = Vec::new();
         let mut field_types = Vec::new();
+        let mut schema_fields = Vec::new();
         let mut arguments = BTreeSet::new();
         for (index, argument) in sig.inputs.iter().skip(1).enumerate() {
             let syn::FnArg::Typed(argument) = argument else {
@@ -168,6 +203,17 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             // Resolve original argument syntax through an alias in its original
             // module, so generated Input names and relative paths cannot capture it.
             fields.push(quote! { #(#docs)* pub #field: super::super::#alias });
+            let field_name = unraw(field);
+            let docs = attrs::docs(docs);
+            schema_fields.push(quote! {
+                {
+                    let mut field = __spline_cx.field::<super::super::#alias>(
+                        #field_name, #runtime::FieldRules::default(),
+                    )?.expect("operation arguments are not skipped");
+                    field.documentation = ::std::vec![#(::std::string::String::from(#docs)),*];
+                    __spline_fields.push(field);
+                }
+            });
             field_names.push(field.clone());
             field_types.push(alias);
         }
@@ -175,26 +221,49 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             binding.validate(kind, &field_names)?;
         }
         let input_derives = if http.is_some() {
-            quote!(#runtime::Schema, #runtime::__private::serde::Deserialize, #runtime::__private::serde::Serialize)
+            quote!(#runtime::__private::serde::Deserialize, #runtime::__private::serde::Serialize)
         } else {
-            quote!(#runtime::Schema, #runtime::__private::serde::Deserialize)
+            quote!(#runtime::__private::serde::Deserialize)
         };
-        let only_input = if http.is_some() {
+        let disabled_output = if http.is_some() {
             quote!()
         } else {
-            quote!(only = "deserialize",)
+            quote! {
+                if __spline_cx.direction() == #runtime::Direction::Serialize {
+                    return Err(#runtime::Error::Unsupported(::std::string::String::from(
+                        "Serialize Schema is disabled for this type",
+                    )));
+                }
+            }
         };
-        let input_name = format!("{}.{}.Args", namespace.value(), name.value());
+        let wire_name = &name;
         requests.push(quote! {
             #[allow(non_snake_case)]
             pub mod #method_name {
                 use super::__spline_runtime;
                 #[derive(#input_derives)]
-                #[spline(name = #input_name, #only_input crate = #runtime_path)]
                 #[serde(crate = #serde_path, deny_unknown_fields)]
                 pub struct Input { #(#fields,)* }
+
+                impl #runtime::Schema for Input {
+                    fn info() -> #runtime::TypeInfo {
+                        #runtime::TypeInfo::named(#runtime::Name::new(::std::format!(
+                            "{}.{}.Args", super::__spline_namespace(), #wire_name,
+                        )))
+                    }
+                    fn describe(__spline_cx: &mut #runtime::Context<'_>) -> #runtime::Result<#runtime::Shape> {
+                        #disabled_output
+                        let mut __spline_fields = ::std::vec::Vec::new();
+                        #(#schema_fields)*
+                        Ok(#runtime::Shape::Object(#runtime::Object {
+                            fields: __spline_fields,
+                            unknown_fields: #runtime::UnknownFields::Reject,
+                        }))
+                    }
+                }
             }
         });
+        operation_modules.push(method_name.clone());
         assertions.push(quote_spanned! {method_name.span()=>
             #runtime::__private::assert_input::<#method_name::Input>();
             #runtime::__private::assert_output::<super::#output_alias>();
@@ -229,6 +298,14 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
                 binding,
             });
         }
+        // Argument documentation belongs on the generated fields; Rust does not
+        // allow doc attributes on the lowered function parameters themselves.
+        for argument in &mut method.sig.inputs {
+            match argument {
+                syn::FnArg::Receiver(receiver) => receiver.attrs.clear(),
+                syn::FnArg::Typed(argument) => argument.attrs.clear(),
+            }
+        }
         method.sig.asyncness = None;
         method.sig.output = syn::parse_quote!(-> impl ::core::future::Future<
             Output = ::core::result::Result<#output, #error>
@@ -254,37 +331,74 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
                 "HTTP contracts require a binding on every operation",
             ));
         }
-        crate::http::generate(&http_methods, &runtime, trait_name, &namespace)?
+        crate::http::generate(&http_methods, &runtime, trait_name, namespace.as_ref())?
+    };
+    let support = quote! {
+        use super::#runtime_alias as __spline_runtime;
+        fn __spline_namespace() -> &'static str { #namespace_value }
+        #(#requests)*
+        /// Describe the contract and collect its directional schemas.
+        pub fn describe() -> #runtime::contract::Result<#runtime::contract::ContractDescription> {
+            let mut __spline_builder = #runtime::contract::ContractBuilder::new(__spline_namespace(), #contract_docs)?;
+            __register_operations(&mut __spline_builder)?;
+            __spline_builder.finish()
+        }
+        /// Register this resource into an application's shared schema registry.
+        pub fn register(application: &mut #runtime::contract::ApplicationBuilder, group: &str)
+            -> #runtime::contract::Result<()>
+        {
+            application.resource(group, __spline_namespace(), #contract_docs, __register_operations)
+        }
+        fn __register_operations(__spline_builder: &mut #runtime::contract::ContractBuilder)
+            -> #runtime::contract::Result<()>
+        {
+            #(#assertions)*
+            #(#registrations)*
+            Ok(())
+        }
+        #http_code
+    };
+    let generated = if let Some(module) = module {
+        quote! { #visibility mod #module { #support } }
+    } else {
+        let hidden = format_ident!("__Spline_{}_Contract", trait_name);
+        let mut exports = operation_modules;
+        let support_names = if http_methods.is_empty() {
+            vec!["describe", "register"]
+        } else {
+            vec![
+                "describe",
+                "register",
+                "Client",
+                "router",
+                "router_with",
+                "__router_with",
+                "__Service",
+                "__ErrorPolicy",
+            ]
+        };
+        for name in support_names {
+            // One import brings both type and value namespaces into scope. An
+            // operation module named `register` can coexist with register().
+            if !exports.iter().any(|ident| unraw(ident) == name) {
+                exports.push(format_ident!("{name}"));
+            }
+        }
+        quote! {
+            #[doc(hidden)] #[allow(non_snake_case)]
+            mod #hidden { #support }
+            #[doc(inline)]
+            #[allow(unused_imports)]
+            #visibility use #hidden::{#(#exports),*};
+        }
     };
     Ok(quote! {
         #item
         #[doc(hidden)]
         use #source_runtime as #runtime_alias;
+        #source_namespace
         #(#aliases)*
-        #visibility mod #module {
-            use super::#runtime_alias as __spline_runtime;
-            #(#requests)*
-            /// Describe the contract and collect its directional schemas.
-            pub fn describe() -> #runtime::contract::Result<#runtime::contract::ContractDescription> {
-                let mut __spline_builder = #runtime::contract::ContractBuilder::new(#namespace, #contract_docs)?;
-                __register_operations(&mut __spline_builder)?;
-                __spline_builder.finish()
-            }
-            /// Register this resource into an application's shared schema registry.
-            pub fn register(application: &mut #runtime::contract::ApplicationBuilder, group: &str)
-                -> #runtime::contract::Result<()>
-            {
-                application.resource(group, #namespace, #contract_docs, __register_operations)
-            }
-            fn __register_operations(__spline_builder: &mut #runtime::contract::ContractBuilder)
-                -> #runtime::contract::Result<()>
-            {
-                #(#assertions)*
-                #(#registrations)*
-                Ok(())
-            }
-            #http_code
-        }
+        #generated
     })
 }
 
@@ -454,21 +568,4 @@ fn identifier(value: &str) -> bool {
 
 fn unraw(ident: &syn::Ident) -> String {
     ident.to_string().trim_start_matches("r#").into()
-}
-
-fn snake_case(value: &str) -> String {
-    let chars: Vec<_> = value.chars().collect();
-    let mut output = String::new();
-    for (index, character) in chars.iter().copied().enumerate() {
-        if character.is_ascii_uppercase()
-            && index > 0
-            && (chars[index - 1].is_ascii_lowercase()
-                || chars[index - 1].is_ascii_digit()
-                || chars.get(index + 1).is_some_and(char::is_ascii_lowercase))
-        {
-            output.push('_');
-        }
-        output.push(character.to_ascii_lowercase());
-    }
-    output
 }

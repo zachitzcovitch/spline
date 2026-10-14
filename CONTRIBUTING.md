@@ -101,6 +101,9 @@ artifact paths to launch the actual server and client entry points. This check
 runs separately from `cargo test`, avoiding test-only dependencies between the
 application packages. Its TypeScript workspace checks the handwritten client
 along with the generated artifact.
+Its TypeScript language-service check also verifies signature help, narrowed hovers,
+and DTO property completion. Preserve that editor-facing surface when changing
+names or generated signatures; see [docs/typescript.md](docs/typescript.md).
 
 ## Where changes belong
 

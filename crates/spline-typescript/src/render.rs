@@ -95,6 +95,18 @@ pub fn docs(value: &str, indent: usize) -> String {
     output
 }
 
+/// Prefer conventional property spelling while preserving arbitrary wire keys.
+pub fn property(value: &str) -> String {
+    if value.chars().enumerate().all(|(index, c)| {
+        c.is_ascii_alphabetic() || matches!(c, '_' | '$') || (index > 0 && c.is_ascii_digit())
+    }) && !value.is_empty()
+    {
+        value.into()
+    } else {
+        string(value)
+    }
+}
+
 /// JSON-compatible double-quoted literal, also escaping JS line separators.
 pub fn string(value: &str) -> String {
     let mut output = String::from("\"");

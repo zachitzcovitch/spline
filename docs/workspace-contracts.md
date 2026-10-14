@@ -12,7 +12,8 @@ metadata, and TypeScript call signatures.
 
 The subsequent [HTTP binding milestone](http-binding.md) adds executable clients
 and Axum dispatch. Public calls now preserve authored positional parameters, and
-the example explicitly names its generated companion module `users`.
+the CRUD conformance example explicitly names a generated companion module `users`.
+The [blog tutorial](../examples/blog/README.md) uses the new same-module default.
 
 The running source of truth is [examples/contract/src/lib.rs](../examples/contract/src/lib.rs).
 It began with `users.get` (query) and `users.create` (mutation), and now also
@@ -53,7 +54,8 @@ recorded prototype commands are superseded by the root commands below.
 ## Contract authoring and expansion
 
 ```rust
-#[spline::contract(namespace = "users", module = "users")]
+// users.rs, loaded by `pub mod users;`
+#[spline::contract]
 pub trait Users {
     #[query]
     async fn get(&self, id: UserId) -> Result<User, ApiError>;
@@ -76,28 +78,28 @@ that holding an `Rc` across an await cannot satisfy the generated future bound.
 This is static trait dispatch; trait objects and server dispatch adapters are
 separate work.
 
-### Generated companion module
+### Generated resource support
 
-The default module is the snake-case trait name followed by `_contract`. The
-example explicitly uses `module = "users"`, making the public entry point visible
-in the authored declaration:
+By default the trait's existing Rust module is the resource entry point. A trait
+in `users.rs`, loaded by `pub mod users;`, exposes:
 
 ```text
 users
+├── Users
 ├── get::Input { id: UserId }
 ├── create::Input { input: NewUser }
 ├── describe() -> Result<ContractDescription, contract::Error>
 └── register(&mut ApplicationBuilder, group) -> Result<(), contract::Error>
 ```
 
-Input wrappers derive `Deserialize` and a deserialize-only `Schema`, reject
+Input wrappers derive `Deserialize` and implement a deserialize-only `Schema`, reject
 unknown named arguments, and expose public fields for a future dispatcher. A
 zero-argument operation gets an empty named input object. Multiple arguments are
 fields of one object; optional argument types follow the established Serde
 missing-field rules.
 
 HTTP-bound contracts additionally generate input serialization and both schema
-directions for the native client. Their companion module exposes `Client`,
+directions for the native client. Their resource module exposes `Client`,
 `router`, and `router_with`; normal server/client setup collects metadata internally.
 
 Generated inputs must be `DeserializeOwned + Send`; success and application-error
@@ -112,17 +114,34 @@ being captured by the generated `Input`. A hidden runtime import similarly
 preserves a renamed facade path across generated submodules. Tests exercise both
 cases, including a raw-identifier operation name.
 
+The same default works in an inline `pub mod users { ... }`. No attribute on the
+module is needed. Use one default contract per module. If you want multiple
+contracts in the same module, or existing items occupy generated support names,
+set `module = "requests"` to create a separate companion module. Generated support
+uses explicit imports so a conflicting source item is a compiler error rather
+than silently replacing a generated entry point.
+
 ### Identity and options
 
-- `namespace = "users"` is required. Namespaces are dot-separated ASCII identifiers.
-- `module = "requests"` overrides the generated Rust module name.
+- Without options, the namespace is the final component of the authored Rust
+  module path (`users` in `crate::users` or `crate::domain::users`). At the crate
+  root it is the crate name. Rust's declared module determines it, not a filename.
+- `namespace = "v1.users"` optionally pins the namespace independently of Rust
+  organization. Namespaces are dot-separated ASCII identifiers. Default namespaces
+  can collide across nested modules; use overrides when composing such resources.
+- `module = "requests"` optionally creates a companion module. If `namespace` is
+  omitted in that form, the namespace defaults to the companion's name (`requests`).
 - `crate = "renamed_facade"` identifies a renamed facade path.
 - `#[query(name = "get")]` or `#[mutation(name = "create")]` pins the local wire
   operation name independently of the Rust method name.
 
 For example, Rust `lookup` with `#[query(name = "get")]` keeps wire identity
 `users.get` and input-schema identity `users.get.Args`, while its Rust input type
-is `users::lookup::Input` when `module = "users"`. Metadata retains both names.
+is `users::lookup::Input` for the `users` resource module. Metadata retains both names.
+
+Previously, omitting `module` created a trait-derived module such as
+`users_contract`. Put the trait in a resource module for the new default, or add
+`module = "users_contract"` to preserve that earlier layout explicitly.
 
 The first supported contract surface is a safe non-generic trait containing async
 method declarations with an unannotated `&self`, named arguments, concrete owned
@@ -175,21 +194,17 @@ let artifact = spline_typescript::Typescript::new()
 
 The [generated artifact](../examples/contract/typescript/generated.ts) contains:
 
-1. Directional DTO definitions and named input/output/error aliases per operation.
+1. Clean public DTO names; matching directions share one declaration and differing
+   shapes use `Input`/`Output` suffixes.
 2. `UsersOperations`, keyed by stable IDs with literal query/mutation kinds and
    associated input/output/error types.
-3. `UsersCalls<Failure = never>`, with methods keyed by local wire operation names.
+3. `UsersCalls<Failure = never>` and `UsersResult`, with methods keyed by local wire
+   operation names and signatures referencing DTOs directly.
 
 A method's callable type is equivalent to:
 
 ```typescript
-get: (id: example_UserId_Input) => Promise<
-  | { ok: true; value: users_get_Output }
-  | {
-      ok: false;
-      error: { kind: "application"; value: users_get_Error } | Failure;
-    }
->;
+get(id: UserId): Promise<UsersResult<User, ApiError, Failure>>;
 ```
 
 The default exposes only declared application errors. A binding can supply an
@@ -199,9 +214,11 @@ taxonomy for all bindings. `export_http_client` now supplies a fetch implementat
 and the first HTTP failure union; see [its wire format and behavior](http-binding.md).
 The logical named input object stays in metadata, while public calls are positional.
 
-Export checks collisions with operation type aliases, generated surface names,
-the `Failure` parameter, and the global `Promise` type. Existing schema symbol
-overrides continue to update referenced DTO names consistently.
+Export checks collisions among public DTOs, generated utility names, the `Failure`
+parameter, and the global `Promise` type. Schema symbol overrides update references
+consistently. Generated dispatch wrappers and per-operation aliases remain outside
+the public type exports; operation-map entries describe logical inputs directly.
+See [TypeScript naming and editor support](typescript.md).
 
 ## Verified behavior
 

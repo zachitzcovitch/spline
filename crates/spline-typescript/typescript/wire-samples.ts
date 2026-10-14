@@ -1,23 +1,23 @@
 // Generated from real Serde values. Do not edit.
-import type { api_User_Output, api_ApiError_Output, api_Node_Of_core_String_End_Output, api_Tree_Output } from "./generated";
+import type { UserOutput, ApiErrorOutput, NodeOfString, Tree } from "./generated";
 
 export const user = {
   "displayName": "Zach",
   "id": "18446744073709551615",
   "nickname": null,
   "tags": []
-} satisfies api_User_Output;
+} satisfies UserOutput;
 
 export const notFound = {
   "kind": "not_found"
-} satisfies api_ApiError_Output;
+} satisfies ApiErrorOutput;
 
 export const validation = {
   "details": {
     "field": "title"
   },
   "kind": "validation"
-} satisfies api_ApiError_Output;
+} satisfies ApiErrorOutput;
 
 export const node = {
   "children": [
@@ -27,8 +27,8 @@ export const node = {
     }
   ],
   "value": "root"
-} satisfies api_Node_Of_core_String_End_Output;
+} satisfies NodeOfString;
 
 export const tree = [
   []
-] satisfies api_Tree_Output;
+] satisfies Tree;

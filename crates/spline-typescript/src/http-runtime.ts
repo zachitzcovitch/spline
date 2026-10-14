@@ -10,11 +10,13 @@ export type __PREFIX__HttpOptions = {
   responsePolicy?: "compatible" | "strict";
 };
 
+export type __PREFIX__Client = __PREFIX__Calls<__PREFIX__HttpFailure>;
+
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
 export function create__PREFIX__Client(
   baseUrl: string,
   options: __PREFIX__HttpOptions = {},
-): __PREFIX__Calls<__PREFIX__HttpFailure> {
+): __PREFIX__Client {
   const base = new globalThis.URL(baseUrl);
   if (!["http:", "https:"].includes(base.protocol) || base.href.includes("?") || base.href.includes("#")
       || base.username || base.password) {
@@ -27,20 +29,20 @@ export function create__PREFIX__Client(
     throw new globalThis.TypeError("responsePolicy must be compatible or strict");
   }
 
-  type Wire =
+  type __SplineWire =
     | ["null" | "string" | "boolean"]
     | ["integer", boolean, number]
     | ["literal" | "ref", string]
-    | ["array" | "map", Wire]
-    | ["tuple" | "union", Wire[]]
-    | ["object", boolean, [string, Wire, boolean][]];
-  const definitions: { [name: string]: Wire } = /*__DEFINITIONS__*/;
+    | ["array" | "map", __SplineWire]
+    | ["tuple" | "union", __SplineWire[]]
+    | ["object", boolean, [string, __SplineWire, boolean][]];
+  const definitions: { [name: string]: __SplineWire } = /*__DEFINITIONS__*/;
   const object = (value: unknown): value is { [name: string]: unknown } =>
     value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
   const owns = (value: object, name: string): boolean => globalThis.Object.prototype.hasOwnProperty.call(value, name);
-  const valid = (value: unknown, schema: Wire, depth = 0): boolean => {
+  const valid = (value: unknown, schema: __SplineWire, depth = 0): boolean => {
     if (depth > 256) return false;
-    const child = (value: unknown, schema: Wire): boolean => valid(value, schema, depth + 1);
+    const child = (value: unknown, schema: __SplineWire): boolean => valid(value, schema, depth + 1);
     switch (schema[0]) {
       case "null": return value === null;
       case "string": return typeof value === "string";
@@ -75,9 +77,9 @@ export function create__PREFIX__Client(
   };
   // Undefined is a failure sentinel: parsed JSON cannot contain it. Projection
   // prevents extra fields from leaking into returned values or strict Rust DTOs.
-  const project = (value: unknown, schema: Wire, depth = 0): unknown => {
+  const project = (value: unknown, schema: __SplineWire, depth = 0): unknown => {
     if (depth >= 256) return undefined;
-    const child = (value: unknown, schema: Wire): unknown => project(value, schema, depth + 1);
+    const child = (value: unknown, schema: __SplineWire): unknown => project(value, schema, depth + 1);
     switch (schema[0]) {
       case "ref": {
         const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
@@ -136,21 +138,18 @@ export function create__PREFIX__Client(
       default: return valid(value, schema, depth) ? value : undefined;
     }
   };
-  type Plan = {
+  type __SplinePlan = {
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string; body: string | null; status: number;
     paths: string[]; queries: [string, boolean][];
-    input: Wire; output: Wire; error: Wire;
+    input: __SplineWire; output: __SplineWire; error: __SplineWire;
   };
-  type Result<O, E> =
-    | { ok: true; value: O }
-    | { ok: false; error: { kind: "application"; value: E } | __PREFIX__HttpFailure };
   const message = (error: unknown): string => error instanceof globalThis.Error ? error.message : globalThis.String(error);
   const jsonType = (response: globalThis.Response): boolean => {
     const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
     return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
   };
-  const call = async <O, E>(plan: Plan, argumentsObject: unknown): Promise<Result<O, E>> => {
+  const call = async <O, E>(plan: __SplinePlan, argumentsObject: unknown): Promise<__PREFIX__Result<O, E, __PREFIX__HttpFailure>> => {
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {

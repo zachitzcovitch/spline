@@ -62,7 +62,8 @@ model need deeper research.
 Smaller contracts give operations context and allow concise method names:
 
 ```rust
-#[spline::contract(namespace = "users")]
+// users.rs
+#[spline::contract]
 pub trait Users {
     /// Fetch a user by their ID.
     #[query]
@@ -75,7 +76,8 @@ pub trait Users {
     async fn list(&self, filter: UserFilter) -> Result<Page<User>, ApiError>;
 }
 
-#[spline::contract(namespace = "posts")]
+// posts.rs
+#[spline::contract]
 pub trait Posts {
     /// Create a new post.
     #[mutation]
@@ -103,11 +105,16 @@ namespaces:
 | `posts.publish` | `POST /posts/{id}/publish` | `api.posts.publish(id)` |
 
 Rust and TypeScript clients preserve the authored positional method arguments.
-`spline::api!` combines explicitly listed resource companion modules and supplies
+`spline::api!` combines explicitly listed resource modules and supplies
 `client.users().get(id).await` in Rust and `client.users.get(id)` in TypeScript.
 Group names are explicit client accessors; resource namespaces retain the stable
 operation identities. Logical input objects remain named in metadata and are
 assembled internally by the generated clients.
+
+Contract support is exposed in the trait's existing Rust module by default, with
+the namespace inferred from the final module-path component. File and inline
+modules use the same authoring pattern. Optional `module` and `namespace` settings
+provide a separate companion or a pinned logical identity when needed.
 
 ### Semantics
 

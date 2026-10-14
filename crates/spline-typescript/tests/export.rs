@@ -62,7 +62,7 @@ fn explicit_names_update_references_as_well_as_declarations() {
     assert_eq!(artifact.symbols[&key], "UserOutput");
     assert!(artifact.source.contains("export type UserOutput ="));
     assert!(artifact.source.contains("\"items\": UserOutput[];"));
-    assert!(!artifact.source.contains("api_User_Output"));
+    assert!(!artifact.source.contains("export type UserOutput = User"));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn default_name_collisions_require_explicit_overrides() {
     #[spline(name = "api.User")]
     struct Qualified;
     #[derive(spline::Schema)]
-    #[spline(name = "api_User")]
+    #[spline(name = "other.User")]
     struct Flattened;
     let mut registry = Registry::new();
     registry
@@ -83,10 +83,10 @@ fn default_name_collisions_require_explicit_overrides() {
     let graph = registry.finish().unwrap();
     assert_eq!(
         Typescript::new().export(&graph, &[]),
-        Err(Error::SymbolCollision("api_User_Output".into()))
+        Err(Error::SymbolCollision("User".into()))
     );
     let artifact = Typescript::new()
-        .name(id("api_User", Direction::Serialize), "FlattenedOutput")
+        .name(id("other.User", Direction::Serialize), "FlattenedOutput")
         .export(&graph, &[])
         .unwrap();
     assert!(artifact
@@ -105,9 +105,7 @@ fn names_are_checked_across_overrides_definitions_and_roots() {
         Err(Error::InvalidSymbol(_))
     ));
     assert!(matches!(
-        Typescript::new()
-            .name(user, "api_UserId_Output")
-            .export(&graph, &[]),
+        Typescript::new().name(user, "UserId").export(&graph, &[]),
         Err(Error::SymbolCollision(_))
     ));
     assert!(matches!(
@@ -116,7 +114,7 @@ fn names_are_checked_across_overrides_definitions_and_roots() {
             .export(&graph, &[]),
         Err(Error::UnknownOverride(_))
     ));
-    let root = Root::new("api_User_Output", Direction::Serialize, Shape::String);
+    let root = Root::new("UserOutput", Direction::Serialize, Shape::String);
     assert!(matches!(
         Typescript::new().export(&graph, &[root]),
         Err(Error::SymbolCollision(_))
@@ -228,15 +226,9 @@ fn unguarded_alias_recursion_is_rejected_before_producing_typescript() {
 #[test]
 fn structural_recursion_is_allowed_and_uses_names_not_expansion() {
     let artifact = api::artifact(false).unwrap();
-    assert!(artifact
-        .source
-        .contains("export type api_Tree_Output = api_Tree_Output[];"));
-    assert!(artifact
-        .source
-        .contains("\"children\": api_Node_Of_core_String_End_Output[];"));
-    assert!(artifact
-        .source
-        .contains("\"right\": api_Right_Output | null;"));
+    assert!(artifact.source.contains("export type Tree = Tree[];"));
+    assert!(artifact.source.contains("\"children\": NodeOfString[];"));
+    assert!(artifact.source.contains("\"right\": RightOutput | null;"));
 }
 
 #[test]

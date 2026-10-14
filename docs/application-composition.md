@@ -6,8 +6,8 @@ execution API. The lower-level application metadata builder is transport-neutral
 
 ## Declare the application
 
-After defining HTTP-bound `Users` and `Posts` traits with companion modules named
-`users` and `posts`, list those modules explicitly:
+Define HTTP-bound `Users` and `Posts` traits in ordinary `users` and `posts`
+modules using `#[spline::contract]`, then list those resource modules explicitly:
 
 ```rust
 spline::api! {
@@ -24,6 +24,10 @@ macro is invoked, so `self`, `super`, crate paths, and imported module aliases w
 Group names are unique ASCII identifiers and cannot shadow the Rust client's
 constructors, response-policy setter, or `clone`. Raw Rust identifiers are supported.
 For a renamed facade, put `crate = "renamed_facade";` before the module declaration.
+
+File-based and inline Rust modules both work. Contracts with an explicit
+`module = "requests"` companion can be listed in the same application alongside
+same-module contracts; both expose the same registration, router, and client APIs.
 
 Group names determine client accessors. A contract namespace still determines
 operation identity: grouping the `app.users` contract as `people` yields
@@ -131,9 +135,14 @@ if (post.ok) {
 One factory initializes the URL, headers, fetch implementation, response policy,
 and runtime schema table for all groups. The artifact emits shared DTO definitions
 once, a flat `ApiOperations` map keyed by stable operation IDs, and grouped
-`ApiCalls<Failure>` signatures. `ApiHttpOptions` and `ApiHttpFailure` describe the
+`ApiCalls<Failure>` signatures. `ApiClient` and `ApiResult` provide clean client and
+result types; `ApiHttpOptions` and `ApiHttpFailure` describe the
 common HTTP configuration and failures. `export_application` emits only wire types,
 the operation map, and grouped signatures, without execution code.
+
+DTOs use short public names and signatures reference them directly. Matching
+directions share one declaration; different shapes use clear directional suffixes.
+See [TypeScript naming and editor support](typescript.md).
 
 Both clients preserve positional arguments, per-operation application errors,
 compatible/strict response decoding, and bodyless 204 behavior.
@@ -167,8 +176,9 @@ Construction rejects:
 Resource registration is transactional. A failed schema, operation, or route check
 leaves the builder usable without partially registered definitions. Reversing
 resource declaration order produces equal metadata and byte-identical exports.
-TypeScript export checks generated symbols and operation aliases across the whole
-application; ambiguous flattened names require explicit naming or contract changes.
+TypeScript export checks public DTO and utility names across the whole application.
+Short-name collisions require an explicit exporter override. Full logical operation
+and runtime-schema identities retain their original names.
 
 Application router construction runs these checks before merging any resource
 routers. Routes merged manually outside the declared application are governed by
@@ -187,8 +197,8 @@ both clients against the same authenticated server, including custom `publish`,
 shared user changes visible through posts, errors, 204, nested URLs, response
 policy, and construction failures. TypeScript also has static negative assertions.
 
-Verification covers the Rust suite and blog workflow (148 behavior/integration checks
-and 26 compiler-failure fixtures), strict TypeScript checks (58 expected-error
+Verification covers the Rust suite and blog checks (159 behavior/integration checks
+and 27 compiler-failure fixtures), strict TypeScript checks (61 expected-error
 assertions), Clippy with warnings denied, formatting, metadata-only feature
 checking, and generated-artifact freshness commands.
 

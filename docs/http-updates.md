@@ -136,7 +136,7 @@ silently discarding it.
 | 200/201 with Rust unit | JSON `null` | `()` | `null` |
 | 204 with Rust unit | Empty | `()` | `undefined`, typed as `void` |
 
-Only the operation's binding-level output alias becomes `void`. Standalone schema
+Only the operation's binding-level result type becomes `void`. Standalone schema
 export and other operations still describe Rust unit's JSON representation as
 `null`; DTO definitions are not rewritten globally.
 

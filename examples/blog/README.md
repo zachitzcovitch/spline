@@ -14,8 +14,8 @@ examples/blog/
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs          # Public exports and api! composition
-│   │   ├── user.rs         # User DTO, error, and Users trait
-│   │   └── post.rs         # Post DTOs, errors, and Posts trait
+│   │   ├── users.rs        # User DTO, error, Users trait, and generated support
+│   │   └── posts.rs        # Post DTOs, errors, Posts trait, and generated support
 │   └── examples/export.rs  # TypeScript generation
 ├── server/
 │   ├── Cargo.toml
@@ -34,7 +34,9 @@ examples/blog/
 │   ├── run.mjs             # CLI arguments and startup
 │   ├── client.ts           # Workflow, client setup, and result helper
 │   └── generated.ts        # Generated from the contracts crate
-├── tests/workflow.mjs      # Builds and exercises the actual applications
+├── tests/
+│   ├── workflow.mjs        # Builds and exercises the actual applications
+│   └── typescript-editor.mjs # Checks signatures, hovers, and completion
 └── README.md
 ```
 
@@ -129,8 +131,8 @@ unmatched route; an unavailable server gives a transport failure.
 | File | What to look for |
 | --- | --- |
 | [contracts/src/lib.rs](contracts/src/lib.rs) | Public exports and the composed `api` module. |
-| [contracts/src/user.rs](contracts/src/user.rs) | The user DTO, error, and `Users` trait. |
-| [contracts/src/post.rs](contracts/src/post.rs) | Post DTOs, errors, and the `Posts` trait. |
+| [contracts/src/users.rs](contracts/src/users.rs) | The user DTO, error, and `Users` trait. |
+| [contracts/src/posts.rs](contracts/src/posts.rs) | Post DTOs, errors, and the `Posts` trait. |
 | [server/src/main.rs](server/src/main.rs) | Shared store, request-scoped session factory, and Axum startup. |
 | [server/src/auth.rs](server/src/auth.rs) | Turning a request header into the session's user ID. |
 | [server/src/service/mod.rs](server/src/service/mod.rs) | Shared storage and the request-scoped `Session`. |
@@ -149,25 +151,41 @@ Node runs the `.ts` files directly using built-in type stripping.
 
 ## 1. Define the contract
 
-Each resource file groups its DTOs, errors, and operations. `lib.rs` re-exports
-those public types and the generated `users`/`posts` companion modules, then
-composes them into `api`. For a focused read, follow
-[`post.rs`](contracts/src/post.rs) →
+Each resource file groups its DTOs, errors, and operations. `lib.rs` declares
+`pub mod users;` and `pub mod posts;`, re-exports the DTOs and traits for convenience,
+and composes the resource modules into `api`. For a focused read, follow
+[`posts.rs`](contracts/src/posts.rs) →
 [`service/posts.rs`](server/src/service/posts.rs) → a client call.
 
 DTOs derive Serde's `Serialize`/`Deserialize` and Spline's `Schema`. Serde attributes
 describe the wire names: `User.display_name` becomes `displayName` in JSON and
-TypeScript. `#[spline(name = "blog.User")]` assigns a stable schema identity.
+TypeScript. Spline infers schema identities from the Rust types and exposes clean
+TypeScript names such as `User`, `Post`, and `UserError` automatically.
 
-Each resource is an annotated Rust trait. For example, the `Posts` contract declares:
+You can optionally add `#[spline(name = "blog.User")]` to pin a schema identity
+across Rust module moves or type renames. The example uses the defaults; see
+[the TypeScript guide](../../docs/typescript.md#default-names) for the naming rules.
+
+Each resource is an annotated Rust trait in its own ordinary module. The attribute
+needs no options:
 
 ```rust
-#[mutation]
-#[http(post = "/posts", body = "input", status = 201)]
-async fn create(&self, input: NewPost) -> Result<Post, PostError>;
+// contracts/src/posts.rs
+#[spline::contract]
+pub trait Posts {
+    #[mutation]
+    #[http(post = "/posts", body = "input", status = 201)]
+    async fn create(&self, input: NewPost) -> Result<Post, PostError>;
+    // Other operations live in this same trait.
+}
 ```
 
-This records the operation's types, mutation kind, HTTP path, body mapping, and
+Spline exposes `posts::Client`, `posts::router`, and `posts::describe` directly in
+that existing module. Its default namespace is `posts`, giving identities such as
+`posts.create`. The same pattern works with an inline `pub mod posts { ... }` in
+one file.
+
+The declaration records the operation's types, mutation kind, HTTP path, body mapping, and
 success status. Calling `create(new_post)` sends the `NewPost` JSON directly as
 the request body. The authenticated author comes from the session.
 
@@ -175,15 +193,15 @@ The complete API has four operations:
 
 | Identity | HTTP route (under `/api`) | Meaning |
 | --- | --- | --- |
-| `blog.users.get` | `GET /users/{id}` | Read a profile. |
-| `blog.posts.create` | `POST /posts` | Create a draft; returns 201. |
-| `blog.posts.get` | `GET /posts/{id}` | Read a post. |
-| `blog.posts.publish` | `POST /posts/{id}/publish` | Publish your post. |
+| `users.get` | `GET /users/{id}` | Read a profile. |
+| `posts.create` | `POST /posts` | Create a draft; returns 201. |
+| `posts.get` | `GET /posts/{id}` | Read a post. |
+| `posts.publish` | `POST /posts/{id}/publish` | Publish your post. |
 
 `publish` is a custom operation using the same contract machinery as `get` and
 `create`. Publishing an already published post succeeds for its author.
 
-Finally, compose the generated resource modules:
+Finally, compose the resource modules:
 
 ```rust
 spline::api! {
@@ -195,8 +213,10 @@ spline::api! {
 ```
 
 This generates the grouped Rust client, router constructors, and an application
-description for export tooling. Resource names organize client accessors;
-namespaces such as `blog.posts` preserve the operation identities.
+description for export tooling. Resource names organize client accessors. If you
+want to pin operation identities across module renames, set an optional
+`namespace = "blog.posts"` on the trait. An optional `module = "requests"` generates
+a separate companion module instead of exposing support in the current module.
 
 ## 2. Implement the server
 
@@ -286,6 +306,18 @@ directly: check `result.ok`, then `result.error.kind === "application"`, then th
 specific variant in `result.error.value.kind`. Each check narrows the generated
 types, making the expected-error handling explicit in the workflow.
 
+You can also import clean types directly:
+
+```typescript
+import type { User, Post, NewPost, UserError, BlogClient } from "./generated.ts";
+```
+
+Signature help shows `create(input: NewPost)` with a
+`Promise<BlogResult<Post, PostError, BlogHttpFailure>>` result. Narrowed values hover
+as `User` or `UserError`; property completion follows the actual DTO fields. See
+[the TypeScript guide](../../docs/typescript.md) for differing input/output shapes
+and explicit names when resources have colliding short names.
+
 Authorization headers are configured once per client and apply to both groups.
 Spline builds request URLs, encodes arguments, validates/decodes responses, and
 preserves each operation's error type.
@@ -301,8 +333,8 @@ returns a structured framework error with status 401.
 
 ## 4. Change the contract and regenerate
 
-After changing DTOs or operations in `contracts/src/user.rs` or
-`contracts/src/post.rs`, update the corresponding implementation under
+After changing DTOs or operations in `contracts/src/users.rs` or
+`contracts/src/posts.rs`, update the corresponding implementation under
 `server/src/service/` and regenerate the TypeScript artifact:
 
 ```sh
@@ -313,7 +345,8 @@ npm run test:blog
 
 The exporter calls `api::describe()` and
 `Typescript::export_http_application(..., "Blog")`, producing `createBlogClient`,
-directional wire types, and the `BlogOperations`/`BlogCalls` type maps. Edit the
+public DTO types, `BlogClient`/`BlogResult`, and the `BlogOperations`/`BlogCalls`
+type maps. Edit the
 Rust contract to change that generated file. Ordinary server/client startup
 collects its metadata internally.
 
@@ -326,7 +359,8 @@ Check freshness without rewriting the artifact:
 cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
 ```
 
-`npm run test:blog` runs [tests/workflow.mjs](tests/workflow.mjs). It builds the
+`npm run test:blog` runs the workflow and editor checks.
+[tests/workflow.mjs](tests/workflow.mjs) builds the
 server and Rust client packages with `cargo build --locked`, locates their binaries
 from Cargo's JSON output, starts the server on an available loopback port, and runs
 both README clients. It checks persisted posts, authentication, and title validation
@@ -336,6 +370,10 @@ through HTTP, then shuts down the server. The command works with a custom
 This cross-package workflow has its own CI step alongside `cargo test --workspace`.
 CI also checks the generated artifact and type-checks both the generated and
 handwritten TypeScript.
+
+[tests/typescript-editor.mjs](tests/typescript-editor.mjs) checks exact editor
+signature text, narrowed hover names, and DTO completion through TypeScript's
+language service. These checks run alongside the actual client workflow in CI.
 
 For more detail, see [application composition](../../docs/application-composition.md),
 [HTTP behavior](../../docs/http-binding.md), and

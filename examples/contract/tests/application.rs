@@ -326,14 +326,62 @@ fn application_artifact_is_current_and_shared_dtos_are_emitted_once() {
         source,
         include_str!("../typescript/application.generated.ts")
     );
-    assert_eq!(
-        source
-            .matches("export type composition_User_Output =")
-            .count(),
-        1
-    );
+    assert_eq!(source.matches("export type User =").count(), 1);
     assert_eq!(
         source.matches("export function createApiClient(").count(),
         1
     );
+}
+
+mod checks {
+    use super::{Session, User, UserError};
+
+    #[spline::contract]
+    pub trait Checks {
+        #[query(name = "get")]
+        #[http(get = "/checks/{id}")]
+        async fn lookup(&self, id: String) -> Result<User, UserError>;
+    }
+
+    impl Checks for Session {
+        async fn lookup(&self, id: String) -> Result<User, UserError> {
+            super::application::Users::get(self, id).await
+        }
+    }
+}
+
+spline::api! {
+    mod mixed {
+        users: application::users,
+        checks: self::checks,
+    }
+}
+
+#[tokio::test]
+async fn same_module_http_resources_work_directly_and_compose_with_explicit_companions() {
+    let session = Session {
+        database: Database::default(),
+        principal: "alice".into(),
+    };
+    let server = serve(mixed::router(session, Errors).unwrap()).await;
+    let direct = checks::Client::new(&server.base).unwrap();
+    assert_eq!(direct.lookup("alice".into()).await.unwrap().id, "alice");
+    assert!(matches!(
+        direct.lookup("missing".into()).await,
+        Err(CallError::Application(UserError::NotFound))
+    ));
+    let client = mixed::Client::new(&server.base).unwrap();
+    assert_eq!(
+        client.checks().lookup("bob".into()).await.unwrap().id,
+        "bob"
+    );
+    assert_eq!(client.users().get("bob".into()).await.unwrap().id, "bob");
+    let description = checks::describe().unwrap();
+    assert_eq!(description.operations()["get"].id, "checks.get");
+    let source = spline_typescript::Typescript::new()
+        .export_http_application(&mixed::describe().unwrap(), "Mixed")
+        .unwrap()
+        .source;
+    assert!(source.contains("\"checks.get\""));
+    assert!(source.contains("\"app.users.get\""));
 }

@@ -4,9 +4,9 @@ use std::fmt::Write;
 use spline_contract::{
     ApplicationDescription, ContractDescription, OperationKind, ResourceDescription,
 };
-use spline_schema::{Direction, Graph};
+use spline_schema::{DefinitionId, Graph, Shape};
 
-use crate::{render, validate, Artifact, Error, Root, Typescript};
+use crate::{render, validate, Artifact, Error, Typescript};
 
 impl Typescript {
     /// Emit a contract's wire types, operation map, and callable type surface.
@@ -50,43 +50,18 @@ impl Typescript {
         validate::symbol(name)?;
         let calls = format!("{name}Calls");
         let operations = format!("{name}Operations");
-        let mut roots = Vec::new();
-        let mut void_roots = BTreeSet::new();
+        let result = format!("{name}Result");
+        let mut selected = BTreeSet::new();
         for operation in resources.iter().flat_map(|(_, r)| r.operations().values()) {
-            let stem = operation.id.replace('.', "_");
-            if operation
-                .http
-                .as_ref()
-                .is_some_and(|plan| plan.binding.success_status == 204)
-            {
-                void_roots.insert(format!("{stem}_Output"));
-            }
-            roots.push(Root::new(
-                format!("{stem}_Input"),
-                Direction::Deserialize,
-                operation.input.clone(),
-            ));
-            roots.push(Root::new(
-                format!("{stem}_Output"),
-                Direction::Serialize,
-                operation.output.clone(),
-            ));
-            roots.push(Root::new(
-                format!("{stem}_Error"),
-                Direction::Serialize,
-                operation.error.clone(),
-            ));
+            select(input_shape(operation, schemas)?, schemas, &mut selected)?;
+            select(&operation.output, schemas, &mut selected)?;
+            select(&operation.error, schemas, &mut selected)?;
         }
-        let mut artifact = self.export_roots(schemas, &roots, &void_roots)?;
-        let occupied: BTreeSet<_> = artifact
-            .symbols
-            .values()
-            .map(String::as_str)
-            .chain(roots.iter().map(|root| root.symbol.as_str()))
-            .collect();
+        let mut artifact = self.export_selected(schemas, &[], &selected)?;
+        let occupied: BTreeSet<_> = artifact.symbols.values().map(String::as_str).collect();
         // Promise is a global type dependency and Failure a local type parameter.
         // Reject shadowing instead of generating changed or invalid signatures.
-        for symbol in [&calls, &operations, "Promise", "Failure"] {
+        for symbol in [&calls, &operations, &result, "Promise", "Failure"] {
             if occupied.contains(symbol) {
                 return Err(Error::SymbolCollision(symbol.into()));
             }
@@ -95,7 +70,6 @@ impl Typescript {
         artifact.source.push_str(&render::docs(documentation, 0));
         writeln!(artifact.source, "export type {operations} = {{").unwrap();
         for operation in resources.iter().flat_map(|(_, r)| r.operations().values()) {
-            let stem = operation.id.replace('.', "_");
             artifact
                 .source
                 .push_str(&render::docs(&operation.documentation, 1));
@@ -103,10 +77,19 @@ impl Typescript {
                 OperationKind::Query => "query",
                 OperationKind::Mutation => "mutation",
             };
-            writeln!(artifact.source, "  {}: {{ kind: {}; input: {stem}_Input; output: {stem}_Output; error: {stem}_Error }};",
-                render::string(&operation.id), render::string(kind)).unwrap();
+            writeln!(
+                artifact.source,
+                "  {}: {{ kind: {}; input: {}; output: {}; error: {} }};",
+                render::string(&operation.id),
+                render::string(kind),
+                render::shape(input_shape(operation, schemas)?, &artifact.symbols, 1)?,
+                output(operation, &artifact.symbols)?,
+                render::shape(&operation.error, &artifact.symbols, 1)?
+            )
+            .unwrap();
         }
         artifact.source.push_str("};\n\n");
+        writeln!(artifact.source, "export type {result}<Value, ApplicationError, Failure = never> =\n  | {{ ok: true; value: Value }}\n  | {{ ok: false; error: {{ kind: \"application\"; value: ApplicationError }} | Failure }};\n").unwrap();
         artifact.source.push_str("/** Typed call signatures; a binding supplies execution and any extra Failure union. */\n");
         writeln!(artifact.source, "export type {calls}<Failure = never> = {{").unwrap();
         for (group, resource) in resources {
@@ -121,13 +104,18 @@ impl Typescript {
             };
             let indent = "  ".repeat(depth);
             for operation in resource.operations().values() {
-                let stem = operation.id.replace('.', "_");
                 artifact
                     .source
                     .push_str(&render::docs(&operation.documentation, depth));
                 let parameters = parameters(operation, &artifact.symbols)?;
-                writeln!(artifact.source, "{indent}{}: ({parameters}) => Promise<\n{indent}  | {{ ok: true; value: {stem}_Output }}\n{indent}  | {{ ok: false; error: {{ kind: \"application\"; value: {stem}_Error }} | Failure }}\n{indent}>;",
-                    render::string(&operation.name)).unwrap();
+                writeln!(
+                    artifact.source,
+                    "{indent}{}({parameters}): Promise<{result}<{}, {}, Failure>>;",
+                    render::property(&operation.name),
+                    output(operation, &artifact.symbols)?,
+                    render::shape(&operation.error, &artifact.symbols, depth)?
+                )
+                .unwrap();
             }
             if group.is_some() {
                 artifact.source.push_str("  };\n");
@@ -148,9 +136,28 @@ pub(crate) fn application_resources(
         .collect()
 }
 
-pub(crate) fn parameter_name(name: &str, index: usize) -> String {
-    // Prefixing avoids keywords and collisions with other authored argument names.
-    format!("arg{index}_{name}")
+pub(crate) fn parameter_names(operation: &spline_contract::Operation) -> Vec<String> {
+    let authored: BTreeSet<_> = operation
+        .arguments
+        .iter()
+        .map(|a| a.name.as_str())
+        .collect();
+    operation
+        .arguments
+        .iter()
+        .enumerate()
+        .map(|(index, argument)| {
+            if validate::symbol(&argument.name).is_ok() && argument.name != "call" {
+                argument.name.clone()
+            } else {
+                let mut fallback = format!("arg{index}");
+                while authored.contains(fallback.as_str()) {
+                    fallback.push('_');
+                }
+                fallback
+            }
+        })
+        .collect()
 }
 
 pub(crate) fn parameters(
@@ -160,14 +167,76 @@ pub(crate) fn parameters(
     operation
         .arguments
         .iter()
-        .enumerate()
-        .map(|(index, argument)| {
+        .zip(parameter_names(operation))
+        .map(|(argument, name)| {
             Ok(format!(
                 "{}: {}",
-                parameter_name(&argument.name, index),
+                name,
                 render::shape(&argument.shape, symbols, 1)?
             ))
         })
         .collect::<Result<Vec<_>, _>>()
         .map(|parameters| parameters.join(", "))
+}
+
+pub(crate) fn output(
+    operation: &spline_contract::Operation,
+    symbols: &std::collections::BTreeMap<DefinitionId, String>,
+) -> Result<String, Error> {
+    if operation
+        .http
+        .as_ref()
+        .is_some_and(|plan| plan.binding.success_status == 204)
+    {
+        Ok("void".into())
+    } else {
+        render::shape(&operation.output, symbols, 1)
+    }
+}
+
+fn input_shape<'a>(
+    operation: &'a spline_contract::Operation,
+    graph: &'a Graph,
+) -> Result<&'a Shape, Error> {
+    if let Shape::Ref(id) = &operation.input {
+        if id.name.path() == format!("{}.Args", operation.id) {
+            return graph
+                .definitions()
+                .get(id)
+                .map(|d| &d.shape)
+                .ok_or_else(|| Error::MissingReference(id.clone()));
+        }
+    }
+    Ok(&operation.input)
+}
+
+fn select(
+    shape: &Shape,
+    graph: &Graph,
+    selected: &mut BTreeSet<DefinitionId>,
+) -> Result<(), Error> {
+    match shape {
+        Shape::Ref(id) => {
+            if selected.insert(id.clone()) {
+                let definition = graph
+                    .definitions()
+                    .get(id)
+                    .ok_or_else(|| Error::MissingReference(id.clone()))?;
+                select(&definition.shape, graph, selected)?;
+            }
+        }
+        Shape::Array(child) | Shape::Map(child) => select(child, graph, selected)?,
+        Shape::Tuple(children) | Shape::Union(children) => {
+            for child in children {
+                select(child, graph, selected)?;
+            }
+        }
+        Shape::Object(object) => {
+            for field in &object.fields {
+                select(&field.shape, graph, selected)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }

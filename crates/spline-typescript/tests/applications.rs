@@ -72,13 +72,7 @@ fn grouped_exports_are_deterministic_and_share_one_schema_and_runtime() {
         artifact,
         exporter.export_http_application(&reversed, "Api").unwrap()
     );
-    assert_eq!(
-        artifact
-            .source
-            .matches("export type test_Shared_Output =")
-            .count(),
-        1
-    );
+    assert_eq!(artifact.source.matches("export type Shared =").count(), 1);
     assert_eq!(artifact.source.matches("const call = async").count(), 1);
     assert!(artifact.source.contains("\"users\": {"));
     assert!(artifact
@@ -102,7 +96,10 @@ fn application_symbols_and_root_aliases_are_checked_together() {
         "createApiClient",
         "Promise",
         "Failure",
-        "v1_posts_get_Input",
+        "ApiResult",
+        "ApiClient",
+        "__SplineWire",
+        "__SplinePlan",
     ] {
         assert!(
             matches!(
@@ -115,10 +112,14 @@ fn application_symbols_and_root_aliases_are_checked_together() {
         );
     }
     let ambiguous = self::application(&[("first", "a.b"), ("second", "a_b")], true);
-    assert!(matches!(
-        Typescript::new().export_http_application(&ambiguous, "Api"),
-        Err(Error::SymbolCollision(_))
-    ));
+    // Logical identities remain distinct even when legacy underscore flattening
+    // would have produced colliding operation aliases.
+    let source = Typescript::new()
+        .export_http_application(&ambiguous, "Api")
+        .unwrap()
+        .source;
+    assert!(source.contains("\"a.b.get\""));
+    assert!(source.contains("\"a_b.get\""));
 }
 
 #[test]

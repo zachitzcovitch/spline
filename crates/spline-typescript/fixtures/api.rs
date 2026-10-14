@@ -211,25 +211,25 @@ pub fn samples() -> std::result::Result<String, serde_json::Error> {
     };
     let mut output = String::from(
         "// Generated from real Serde values. Do not edit.\n\
-         import type { api_User_Output, api_ApiError_Output, api_Node_Of_core_String_End_Output, api_Tree_Output } from \"./generated\";\n\n",
+         import type { UserOutput, ApiErrorOutput, NodeOfString, Tree } from \"./generated\";\n\n",
     );
     let values = [
-        ("user", "api_User_Output", serde_json::to_value(user)?),
+        ("user", "UserOutput", serde_json::to_value(user)?),
         (
             "notFound",
-            "api_ApiError_Output",
+            "ApiErrorOutput",
             serde_json::to_value(ApiError::NotFound)?,
         ),
         (
             "validation",
-            "api_ApiError_Output",
+            "ApiErrorOutput",
             serde_json::to_value(ApiError::Validation {
                 field: "title".into(),
             })?,
         ),
         (
             "node",
-            "api_Node_Of_core_String_End_Output",
+            "NodeOfString",
             serde_json::to_value(Node {
                 value: "root",
                 children: vec![Node {
@@ -240,7 +240,7 @@ pub fn samples() -> std::result::Result<String, serde_json::Error> {
         ),
         (
             "tree",
-            "api_Tree_Output",
+            "Tree",
             serde_json::to_value(Tree(vec![Tree(vec![])]))?,
         ),
     ];

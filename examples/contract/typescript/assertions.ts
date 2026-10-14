@@ -1,4 +1,4 @@
-import type { UsersCalls, UsersOperations, example_UserId_Input, example_NewUser_Input, example_UserPatch_Input, users_delete_Output } from "./generated";
+import type { UsersCalls, UsersOperations, UserId, NewUser, UserPatch } from "./generated";
 import { createUsersClient } from "./generated";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends
@@ -7,10 +7,10 @@ type Expect<T extends true> = T;
 type KindChecks = [
   Expect<Equal<UsersOperations["users.get"]["kind"], "query">>,
   Expect<Equal<UsersOperations["users.create"]["kind"], "mutation">>,
-  Expect<Equal<Parameters<UsersCalls["get"]>, [example_UserId_Input]>>,
-  Expect<Equal<Parameters<UsersCalls["create"]>, [example_NewUser_Input]>>,
-  Expect<Equal<Parameters<UsersCalls["update"]>, [example_UserId_Input, example_UserPatch_Input]>>,
-  Expect<Equal<users_delete_Output, void>>,
+  Expect<Equal<Parameters<UsersCalls["get"]>, [UserId]>>,
+  Expect<Equal<Parameters<UsersCalls["create"]>, [NewUser]>>,
+  Expect<Equal<Parameters<UsersCalls["update"]>, [UserId, UserPatch]>>,
+  Expect<Equal<UsersOperations["users.delete"]["output"], void>>,
 ];
 
 declare const calls: UsersCalls<{ kind: "transport"; message: string }>;
@@ -78,7 +78,7 @@ http.update("user_1", { bio: undefined });
 // @ts-expect-error delete has no JSON body argument
 http.delete("user_1", {});
 // @ts-expect-error no content is not JSON null
-const jsonNullIsNotNoContent: users_delete_Output = null;
+const jsonNullIsNotNoContent: UsersOperations["users.delete"]["output"] = null;
 async function deleted() {
   const result = await http.delete("user_1");
   if (result.ok) {

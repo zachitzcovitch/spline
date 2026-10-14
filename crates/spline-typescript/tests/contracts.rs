@@ -38,7 +38,48 @@ fn positional_signatures_follow_argument_order_not_alphabetical_order() {
         .unwrap();
     assert!(artifact
         .source
-        .contains("\"inspect\": (arg0_zebra: string, arg1_alpha: boolean)"));
+        .contains("inspect(zebra: string, alpha: boolean)"));
+}
+
+#[test]
+fn keyword_and_runtime_shadowing_parameters_receive_local_safe_names() {
+    struct Input;
+    impl Schema for Input {
+        fn info() -> TypeInfo {
+            TypeInfo::inline("test.Input")
+        }
+        fn describe(_: &mut Context<'_>) -> spline_schema::Result<Shape> {
+            Ok(Shape::Object(spline_schema::Object {
+                fields: ["call", "arg0", "default", "arg2"]
+                    .into_iter()
+                    .map(|name| spline_schema::Field::required(name, Shape::String))
+                    .collect(),
+                unknown_fields: spline_schema::UnknownFields::Reject,
+            }))
+        }
+    }
+    let mut builder = ContractBuilder::new("safe", "").unwrap();
+    builder
+        .operation::<Input, (), ()>("inspect", "inspect", OperationKind::Query, "")
+        .unwrap();
+    builder
+        .http(
+            "inspect",
+            spline_contract::http::HttpBinding {
+                method: spline_contract::http::HttpMethod::Get,
+                path: "/safe".into(),
+                body: None,
+                success_status: 200,
+            },
+        )
+        .unwrap();
+    let source = Typescript::new()
+        .export_http_client(&builder.finish().unwrap(), "Safe")
+        .unwrap()
+        .source;
+    assert!(source.contains("inspect(arg0_: string, arg0: string, arg2_: string, arg2: string)"));
+    assert!(source.contains("[\"call\"]: arg0_"));
+    assert!(source.contains("[\"default\"]: arg2_"));
 }
 
 #[test]
@@ -118,10 +159,10 @@ fn operation_exports_are_deterministic_and_preserve_kind_and_types() {
         .contains("\"users.create\": { kind: \"mutation\""));
     assert!(first
         .source
-        .contains("export type users_get_Input = api_Value_Input;"));
+        .contains("input: Value; output: Value; error: Value"));
     assert!(first
         .source
-        .contains("export type users_get_Error = api_Value_Output;"));
+        .contains("get(input: Value): Promise<UsersResult<Value, Value, Failure>>"));
     assert!(first
         .source
         .contains("export type UsersCalls<Failure = never>"));
@@ -139,7 +180,7 @@ fn schema_overrides_cannot_shadow_call_surface_or_type_parameters() {
         "Failure",
         "UsersCalls",
         "UsersOperations",
-        "users_get_Input",
+        "UsersResult",
     ] {
         assert!(matches!(
             Typescript::new()
@@ -155,7 +196,7 @@ fn schema_overrides_cannot_shadow_call_surface_or_type_parameters() {
 }
 
 #[test]
-fn no_content_output_aliases_are_void_without_changing_the_json_unit_shape() {
+fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
     struct Empty;
     impl Schema for Empty {
         fn info() -> TypeInfo {
@@ -203,14 +244,14 @@ fn no_content_output_aliases_are_void_without_changing_the_json_unit_shape() {
         .export_http_client(&description, "Empty")
         .unwrap()
         .source;
-    assert!(source.contains("export type empty_delete_Output = void;"));
-    assert!(source.contains("export type empty_json_Output = null;"));
-    // Operation result aliases participate in the same collision checks as DTOs.
+    assert!(source.contains("delete(): Promise<EmptyResult<void, Value, Failure>>"));
+    assert!(source.contains("json(): Promise<EmptyResult<null, string, Failure>>"));
+    // Generated result utility names participate in the same checks as DTOs.
     let key = DefinitionId {
         name: Name::new("api.Value"),
         direction: Direction::Serialize,
     };
-    let source = Typescript::new().name(key, "empty_delete_Output");
+    let source = Typescript::new().name(key, "EmptyResult");
     assert!(matches!(
         source.export_http_client(&description, "Empty"),
         Err(Error::SymbolCollision(_))

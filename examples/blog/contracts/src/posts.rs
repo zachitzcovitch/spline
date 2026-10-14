@@ -5,7 +5,6 @@ use crate::User;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Schema)]
 #[serde(deny_unknown_fields)]
-#[spline(name = "blog.Post")]
 pub struct Post {
     pub id: String,
     pub author: User,
@@ -17,7 +16,6 @@ pub struct Post {
 /// The author comes from the authenticated session, so clients supply only content.
 #[derive(Serialize, Deserialize, Schema)]
 #[serde(deny_unknown_fields)]
-#[spline(name = "blog.NewPost")]
 pub struct NewPost {
     pub title: String,
     pub body: String,
@@ -25,7 +23,6 @@ pub struct NewPost {
 
 #[derive(Debug, Serialize, Deserialize, Schema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-#[spline(name = "blog.PostError")]
 pub enum PostError {
     NotFound,
     Forbidden,
@@ -33,7 +30,7 @@ pub enum PostError {
 }
 
 /// Drafts and publishing operations.
-#[spline::contract(namespace = "blog.posts", module = "posts")]
+#[spline::contract]
 pub trait Posts {
     /// Read a post. Authenticated readers can view drafts as well as published posts.
     #[query]

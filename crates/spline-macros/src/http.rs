@@ -197,7 +197,7 @@ pub fn generate(
     methods: &[Method],
     runtime: &syn::Path,
     trait_name: &syn::Ident,
-    namespace: &syn::LitStr,
+    namespace: Option<&syn::LitStr>,
 ) -> syn::Result<TokenStream> {
     let mut client_methods = Vec::new();
     let mut verify = Vec::new();
@@ -225,8 +225,13 @@ pub fn generate(
         let types = &method.types;
         let output = &method.output;
         let error = &method.error;
-        let id = format!("{}.{}", namespace.value(), method.wire_name.value());
         let wire_name = &method.wire_name;
+        let id = if let Some(namespace) = namespace {
+            let id = format!("{}.{}", namespace.value(), wire_name.value());
+            quote!(#id)
+        } else {
+            quote!(&::std::format!("{}.{}", self::__spline_namespace(), #wire_name))
+        };
         verify.push(quote! {
             #runtime::http::verify_serde::<#name::Input>()?;
             #runtime::http::verify_serde::<super::#output>()?;

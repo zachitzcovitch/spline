@@ -1,19 +1,19 @@
 import type {
-  api_User_Input,
-  api_User_Output,
-  api_UserId_Output,
-  api_ApiError_Input,
-  api_ApiError_Output,
-  api_Node_Of_core_String_End_Output,
-  api_Page_Of_api_User_End_Output,
-  api_Page_Of_api_Post_End_Output,
-  api_Left_Output,
-  api_Tree_Output,
-  api_OpenRecord_Input,
-  api_OpenRecord_Output,
-  api_Empty_Output,
-  api_Unit_Output,
-  api_Unusual_Output,
+  UserInput,
+  UserOutput,
+  UserId,
+  ApiErrorInput,
+  ApiErrorOutput,
+  NodeOfString,
+  PageOfUserOutput,
+  PageOfPost,
+  LeftOutput,
+  Tree,
+  OpenRecordInput,
+  OpenRecordOutput,
+  Empty,
+  Unit,
+  Unusual,
   OptionalIdsOutput,
   LabelsOutput,
   PairOutput,
@@ -33,36 +33,36 @@ type Expect<T extends true> = T;
 type Optional<T, K extends keyof T> = {} extends Pick<T, K> ? true : false;
 
 type ShapeChecks = [
-  Expect<Equal<api_UserId_Output, string>>,
-  Expect<Equal<api_User_Input["nickname"], string | null | undefined>>,
-  Expect<Equal<api_User_Output["nickname"], string | null>>,
-  Expect<Optional<api_User_Input, "tags">>,
-  Expect<Equal<Optional<api_User_Output, "tags">, false>>,
-  Expect<Equal<api_User_Output["bio"], string | undefined>>,
+  Expect<Equal<UserId, string>>,
+  Expect<Equal<UserInput["nickname"], string | null | undefined>>,
+  Expect<Equal<UserOutput["nickname"], string | null>>,
+  Expect<Optional<UserInput, "tags">>,
+  Expect<Equal<Optional<UserOutput, "tags">, false>>,
+  Expect<Equal<UserOutput["bio"], string | undefined>>,
   Expect<Equal<OptionalIdsOutput, (string | null)[]>>,
   Expect<Equal<PairOutput, [string, boolean]>>,
   Expect<Equal<ShadowArray, string>>,
   Expect<Equal<ShadowRecord, boolean>>,
 ];
 
-const input: api_User_Input = { id: "7", displayName: "Zach" };
-const nullableInput: api_User_Input = { ...input, nickname: null, bio: null };
-const output: api_User_Output = { id: "7", displayName: "Zach", nickname: null, tags: [] };
-const withBio: api_User_Output = { ...output, bio: "Hello" };
-const wireUser: api_User_Output = serializedUser;
+const input: UserInput = { id: "7", displayName: "Zach" };
+const nullableInput: UserInput = { ...input, nickname: null, bio: null };
+const output: UserOutput = { id: "7", displayName: "Zach", nickname: null, tags: [] };
+const withBio: UserOutput = { ...output, bio: "Hello" };
+const wireUser: UserOutput = serializedUser;
 
 // @ts-expect-error nickname is present on serialized output, even if null
-const missingNickname: api_User_Output = { id: "7", displayName: "Zach", tags: [] };
+const missingNickname: UserOutput = { id: "7", displayName: "Zach", tags: [] };
 // @ts-expect-error defaulted input does not imply omitted output
-const missingTags: api_User_Output = { id: "7", displayName: "Zach", nickname: null };
+const missingTags: UserOutput = { id: "7", displayName: "Zach", nickname: null };
 // @ts-expect-error the precisely omitted Option emits a string when present
-const nullBio: api_User_Output = { ...output, bio: null };
+const nullBio: UserOutput = { ...output, bio: null };
 // @ts-expect-error exactOptionalPropertyTypes distinguishes omission from undefined
-const undefinedBio: api_User_Output = { ...output, bio: undefined };
+const undefinedBio: UserOutput = { ...output, bio: undefined };
 // @ts-expect-error required IDs use the string wire codec, not numeric JSON
-const numericId: api_User_Input = { id: 7, displayName: "Zach" };
+const numericId: UserInput = { id: 7, displayName: "Zach" };
 // @ts-expect-error deny_unknown_fields also rejects excess properties in fresh literals
-const extraInput: api_User_Input = { ...input, extra: true };
+const extraInput: UserInput = { ...input, extra: true };
 
 const ids: OptionalIdsOutput = ["1", null, "2"];
 // @ts-expect-error nullable elements do not make the array itself nullable
@@ -81,60 +81,60 @@ const pair: PairOutput = ["hello", true];
 // @ts-expect-error tuples have fixed length and ordered element types
 const shortPair: PairOutput = ["hello"];
 
-const notFoundInput: api_ApiError_Input = { kind: "not_found", details: null };
-const notFound: api_ApiError_Output = { kind: "not_found" };
-const validation: api_ApiError_Output = { kind: "validation", details: { field: "title" } };
+const notFoundInput: ApiErrorInput = { kind: "not_found", details: null };
+const notFound: ApiErrorOutput = { kind: "not_found" };
+const validation: ApiErrorOutput = { kind: "validation", details: { field: "title" } };
 // @ts-expect-error named payload is required for this discriminator
-const missingDetails: api_ApiError_Output = { kind: "validation" };
+const missingDetails: ApiErrorOutput = { kind: "validation" };
 // @ts-expect-error unit variant omits content in the serialization view
-const outputDetails: api_ApiError_Output = { kind: "not_found", details: null };
+const outputDetails: ApiErrorOutput = { kind: "not_found", details: null };
 // @ts-expect-error unknown variants are not silently accepted
-const unknownVariant: api_ApiError_Output = { kind: "unknown" };
-function message(error: api_ApiError_Output): string {
+const unknownVariant: ApiErrorOutput = { kind: "unknown" };
+function message(error: ApiErrorOutput): string {
   if (error.kind === "validation") return error.details.field;
   // @ts-expect-error discrimination excludes the payload from the unit variant
   error.details;
   return "not found";
 }
 
-const tree: api_Tree_Output = [[], [[], [[]]]];
-const node: api_Node_Of_core_String_End_Output = serializedNode;
-const mutual: api_Left_Output = { right: { left: null } };
+const tree: Tree = [[], [[], [[]]]];
+const node: NodeOfString = serializedNode;
+const mutual: LeftOutput = { right: { left: null } };
 // @ts-expect-error recursive element types remain constrained
-const badTree: api_Tree_Output = ["leaf"];
+const badTree: Tree = ["leaf"];
 // @ts-expect-error generic element type survives recursive references
-const badNode: api_Node_Of_core_String_End_Output = { value: 7, children: [] };
+const badNode: NodeOfString = { value: 7, children: [] };
 // @ts-expect-error recursive output Option fields are required, though nullable
-const missingRecursiveField: api_Left_Output = {};
+const missingRecursiveField: LeftOutput = {};
 
-const userPage: api_Page_Of_api_User_End_Output = { items: [output] };
-const postPage: api_Page_Of_api_Post_End_Output = { items: [{ title: "A post" }] };
+const userPage: PageOfUserOutput = { items: [output] };
+const postPage: PageOfPost = { items: [{ title: "A post" }] };
 // @ts-expect-error concrete generic instantiations do not collapse together
-const wrongPage: api_Page_Of_api_User_End_Output = postPage;
+const wrongPage: PageOfUserOutput = postPage;
 
-const openInput: api_OpenRecord_Input = { label: "hello", extra: { arbitrary: true } };
+const openInput: OpenRecordInput = { label: "hello", extra: { arbitrary: true } };
 // @ts-expect-error the index signature does not weaken known properties
-const badOpen: api_OpenRecord_Input = { label: 3 };
+const badOpen: OpenRecordInput = { label: 3 };
 // @ts-expect-error output does not promise to emit unknown input fields
-const extraOutput: api_OpenRecord_Output = { label: "hello", extra: true };
+const extraOutput: OpenRecordOutput = { label: "hello", extra: true };
 // Structural TypeScript permits extras on non-fresh values. It is not exact-object validation.
-const structuralOutput: api_OpenRecord_Output = openInput;
-const empty: api_Empty_Output = {};
+const structuralOutput: OpenRecordOutput = openInput;
+const empty: Empty = {};
 // @ts-expect-error TS {} would allow this primitive; the exporter avoids that spelling
-const primitiveEmpty: api_Empty_Output = 3;
+const primitiveEmpty: Empty = 3;
 // @ts-expect-error a closed empty object has no properties
-const extraEmpty: api_Empty_Output = { extra: true };
-const unit: api_Unit_Output = null;
+const extraEmpty: Empty = { extra: true };
+const unit: Unit = null;
 // @ts-expect-error Rust unit's JSON representation is null, not undefined
-const undefinedUnit: api_Unit_Output = undefined;
+const undefinedUnit: Unit = undefined;
 
-const unusual: api_Unusual_Output = {
+const unusual: Unusual = {
   "quote\"line\n\\end\u2028": "safe",
   "default": true,
   ["__proto__"]: "a property, not a prototype mutation",
   "kind": "literal\"\\\n\u2029",
 };
 type UnusualChecks = [
-  Expect<Equal<api_Unusual_Output["quote\"line\n\\end\u2028"], string>>,
-  Expect<Equal<api_Unusual_Output["kind"], "literal\"\\\n\u2029">>,
+  Expect<Equal<Unusual["quote\"line\n\\end\u2028"], string>>,
+  Expect<Equal<Unusual["kind"], "literal\"\\\n\u2029">>,
 ];

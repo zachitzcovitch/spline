@@ -19,7 +19,8 @@ its serialized arguments and decoded response shapes using the schema graph.
 ## Explicit entry points and positional calls
 
 ```rust
-#[spline::contract(namespace = "users", module = "users")]
+// users.rs, loaded by `pub mod users;`
+#[spline::contract]
 pub trait Users {
     #[query]
     #[http(get = "/users/{id}")]
@@ -31,10 +32,15 @@ pub trait Users {
 }
 ```
 
-The declaration explicitly names the public `users` companion module. Ordinary
-usage starts with `users::router(...)` or `users::Client::new(...)`; those functions
+The declaration generates support directly in the existing `users` module. Its
+namespace defaults to `users`. Ordinary usage starts with `users::router(...)`
+or `users::Client::new(...)`; those functions
 collect and validate metadata internally. `users::describe()` is the tooling and
 introspection entry point.
+
+Inline `pub mod users { ... }` declarations work identically. The optional
+`module = "requests"` option creates a separate companion, and `namespace = "v1.users"`
+pins operation identities when needed. See [contract identity and options](workspace-contracts.md#identity-and-options).
 
 The TypeScript exporter now preserves authored argument order and positional
 arity, matching the Rust client:
@@ -253,6 +259,13 @@ is constructed. The failure union includes application, framework, HTTP,
 transport, protocol, and encode categories. The default fetch binding uses manual
 redirect handling.
 
+Generated DTOs use clean public names such as `User`, `NewUser`, and `ApiError`.
+Signatures reference those types directly and preserve normal argument names.
+`UsersClient` names the HTTP client and `UsersResult` names its typed results.
+Differing input/output shapes retain directional suffixes. See
+[TypeScript types and editor support](typescript.md) for the naming rules and
+language-service checks.
+
 The emitted structural validator checks JSON-encoded arguments against the authored
 input schema. Response decoding separately defaults to compatible projection of
 known fields; set `responsePolicy: "strict"` in client options to enforce the
@@ -287,8 +300,8 @@ The Node runner executes the generated TypeScript through built-in type strippin
 
 ## Evidence
 
-The Rust suite and blog workflow cover **148 behavior/integration checks**, plus trybuild harnesses
-with **26 compiler-failure fixtures** when HTTP is enabled. The seven live HTTP tests include both
+The Rust suite and blog checks cover **159 behavior/integration checks**, plus trybuild harnesses
+with **27 compiler-failure fixtures** when HTTP is enabled. The seven live HTTP tests include both
 client executables calling one loopback server, Rust/TypeScript path and query
 round trips, request context, declared error statuses, malformed requests,
 protocol failures, transport failures, and native DTO compatibility rejection.
@@ -307,7 +320,7 @@ validation over HTTP.
 The original Serde inspection and wire probes contribute 29 additional behavior
 tests and three of the compiler-failure fixtures, now included in the root suite.
 
-The TypeScript workspaces pass strict compilation with **58 expected-error assertions**.
+The TypeScript workspaces pass strict compilation with **61 expected-error assertions**.
 Runtime Node assertions additionally exercise generated request/response validation,
 typed errors, injectable fetch behavior, and direct JSON body selection. Cargo
 formatting, Clippy with warnings denied, metadata-only feature checking, and

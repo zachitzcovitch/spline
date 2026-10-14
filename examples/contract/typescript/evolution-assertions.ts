@@ -1,5 +1,5 @@
 import { createEvolutionV1Client } from "./evolution-v1.generated";
-import type { evolution_State_Output, evolution_User_Output, EvolutionV1HttpOptions } from "./evolution-v1.generated";
+import type { State, User, EvolutionV1HttpOptions } from "./evolution-v1.generated";
 
 const compatible = createEvolutionV1Client("http://localhost:3000");
 const strict = createEvolutionV1Client("http://localhost:3000", { responsePolicy: "strict" });
@@ -16,9 +16,9 @@ compatible.create({ displayName: "v1", state: "active", typo: true });
 // @ts-expect-error old input enums remain closed
 compatible.create({ displayName: "v1", state: "suspended" });
 // @ts-expect-error response projection does not widen the declared enum
-const unknownState: evolution_State_Output = "suspended";
+const unknownState: State = "suspended";
 
-declare const user: evolution_User_Output;
+declare const user: User;
 // @ts-expect-error projected extra response fields do not become part of the old type
 user.revision;
 // @ts-expect-error nested added fields are projected as well
