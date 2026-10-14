@@ -29,6 +29,9 @@ and application composition from HTTP descriptions and runtime. Typed Tower
 operation services provide a shared execution boundary for in-process and HTTP
 calls, with explicit HTTP APIs under `resource::http`/`api::http`.
 
+[Declared HTTP errors](docs/http-errors.md) now provides opt-in default status
+derives and policy-aware response metadata, shared by routing and export tooling.
+
 ## Purpose
 
 Spline lets an application define its API contract in Rust and derive the pieces
@@ -247,8 +250,11 @@ The implemented HTTP profile defines:
 - **Errors:** typed application-error envelopes with an executable status policy,
   separate from framework and unmarked HTTP failures.
 
-Declarative error/status metadata and OpenAPI export are the next milestones.
-Per-operation response headers such as `Location` and `ETag` remain future work.
+Error types can derive `spline::http::Error` with named status constants. The
+`DeclaredErrors` policy selects these defaults; `::http::describe_with(&policy)`
+records per-status serialized application-error envelopes and headers. Custom
+policies remain opaque unless they declare their static mapping. OpenAPI export
+and per-operation response headers such as `Location` and `ETag` remain future work.
 
 For example, the supported `body = "input"` mapping sends a `NewPost` directly as the
 JSON request body. A successful creation returns a `Post` with status 201. The
@@ -257,8 +263,9 @@ decode the response into its typed result.
 
 The server implementation can continue returning `Result<Post, ApiError>`.
 Status mappings such as a not-found error becoming 404 belong to the HTTP binding.
-An `ErrorPolicy<E>` implementation or closure supplies a 4xx/5xx status today; its
-possible mappings are not yet included in exported metadata.
+An `ErrorPolicy<E>` implementation or closure supplies a 4xx/5xx status. Derived
+defaults provide runtime behavior and metadata from one declaration; a custom
+policy can override them for a particular application.
 
 Binding validation rejects missing or conflicting argument mappings, unsupported
 path/query shapes, route collisions, and inconsistent semantics such as a mutation
@@ -434,12 +441,11 @@ commands. [The changelog](CHANGELOG.md) records the implemented API changes.
 
 ## Follow-on design questions
 
-The [roadmap](ROADMAP.md#next-priorities) orders the next milestones: declarative
-HTTP error/status metadata, OpenAPI export, and preparation for a published release.
+The [roadmap](ROADMAP.md#next-priorities) orders the next milestones: OpenAPI export
+and preparation for a published release.
 
 | Area | Remaining questions |
 | --- | --- |
-| Error/status declarations | How does a separate HTTP policy declaration reference reusable errors and provide both executable behavior and per-status serialized shapes? How are custom dynamic policies documented? |
 | OpenAPI | How should directional schemas, success/error envelopes, and framework responses be represented accurately for the implemented HTTP profile? |
 | Client controls | What per-call cancellation, header, timeout, and deadline controls should generated clients expose? |
 | Broader representations | Which additional Serde shapes, numeric codecs, asymmetric client DTOs, and response headers have concrete use cases and conformance evidence? |

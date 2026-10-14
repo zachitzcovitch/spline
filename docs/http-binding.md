@@ -181,8 +181,12 @@ serialization failures produce a framework 500. A closure implements
 `ErrorPolicy<E>`; a custom policy type can implement the trait for several error
 types when a contract uses different errors per operation.
 
-The status policy is executable server configuration. A future complete OpenAPI
-export will need declarative metadata for the policy's possible status mappings.
+Error types can opt into `#[derive(spline::http::Error)]` with
+`#[http(status = StatusCode::NOT_FOUND)]` on each variant. `DeclaredErrors` selects
+these defaults, and `::http::describe_with(&policy)` collects their per-status
+response shapes. Custom executable policies remain available and opaque unless
+they supply static mappings. See [declared HTTP errors](http-errors.md) for authoring,
+validation, and the metadata foundation for future OpenAPI export.
 
 `users::http::router_with(factory, error_policy)` adds an HTTP request-scoped factory:
 
@@ -321,8 +325,8 @@ The Node runner executes the generated TypeScript through built-in type strippin
 
 ## Evidence
 
-The Rust suite and blog checks cover **170 behavior/integration checks**, plus trybuild harnesses
-with **29 compiler-failure fixtures** when HTTP is enabled. The eight live HTTP tests include both
+The Rust suite and blog checks cover **176 behavior/integration checks**, plus trybuild harnesses
+with **35 compiler-failure fixtures** when HTTP is enabled. The eight live HTTP tests include both
 client executables calling one loopback server, Rust/TypeScript path and query
 round trips, request context, declared error statuses, malformed requests,
 protocol failures, transport failures, and native DTO compatibility rejection.
@@ -344,6 +348,8 @@ tests and three of the compiler-failure fixtures, now included in the root suite
 Typed runtime tests cover readiness, operational failures, backpressure across
 clones, and cancellation. Neutral-only tests verify in-process operation middleware
 and contracts with incomplete optional HTTP mappings.
+Declared-error checks compare real responses with per-status envelope schemas,
+including payload variants, Serde renames, shared statuses, and custom overrides.
 
 The TypeScript workspaces pass strict compilation with **61 expected-error assertions**.
 Runtime Node assertions additionally exercise generated request/response validation,

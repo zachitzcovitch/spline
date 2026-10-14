@@ -208,6 +208,19 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                 Ok(builder.finish()?)
             }
 
+            /// Describe HTTP responses using the same policy selected by the router.
+            pub fn describe_with<P: #error_bounds>(errors: &P)
+                -> ::core::result::Result<__runtime::http::contract::ApplicationDescription, __runtime::http::BuildError>
+            {
+                let mut description = describe()?;
+                #(
+                    for (id, mapping) in #local::http::__error_mappings(errors) {
+                        description.errors(&id, mapping)?;
+                    }
+                )*
+                Ok(description)
+            }
+
             #[derive(Clone, Debug)]
             pub struct Client { #(#groups: #local::http::Client,)* }
 
@@ -248,7 +261,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                 Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, __runtime::http::Fault>> + ::core::marker::Send + 'static,
             {
                 // Validate the entire application before Axum merges any routes.
-                describe()?;
+                describe_with(&errors)?;
                 let factory = ::std::sync::Arc::new(factory);
                 let errors = ::std::sync::Arc::new(errors);
                 let mut router = __runtime::http::axum::Router::new();

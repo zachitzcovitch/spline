@@ -13,6 +13,7 @@ spline-contract.workspace = true
 spline-http-contract.workspace = true
 spline-runtime.workspace = true
 spline-schema.workspace = true
+spline-macros.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 axum.workspace = true

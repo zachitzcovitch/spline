@@ -1,0 +1,5 @@
+error[E0308]: mismatched types
+ --> tests/ui-http/error_numeric_status.rs:3:21
+  |
+3 |     #[http(status = 404)]
+  |                     ^^^ expected `StatusCode`, found integer

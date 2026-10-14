@@ -19,14 +19,14 @@ priorities rather than release-date commitments.
   neutral composition and an in-process adapter alongside HTTP.
 - Neutral service bundles with adapter-owned extension traits for protocol selection
   and request-scoped HTTP factories.
+- [Declared HTTP error statuses](docs/http-errors.md), with named constants on error
+  derives, policy-aware response metadata, and custom policy overrides.
 
 ## Next priorities
 
-1. **Declarative error/status metadata.** Represent application-error status
-   mappings in HTTP binding metadata so runtime behavior and exported documentation agree.
-2. **OpenAPI export.** Export the implemented HTTP profile, directional schemas,
+1. **OpenAPI export.** Export the implemented HTTP profile, directional schemas,
    response envelopes, and error mappings from the application description.
-3. **First published release.** Review public APIs and documentation, verify
+2. **First published release.** Review public APIs and documentation, verify
    package contents/dependency versions, establish a versioning policy, and publish
    a tested set of crates and generated-client guidance.
 

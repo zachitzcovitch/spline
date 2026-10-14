@@ -12,7 +12,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let source = Typescript::new()
-        .export_http_application(&api::http::describe()?, "Blog")?
+        .export_http_application(
+            &api::http::describe_with(&spline::http::DeclaredErrors)?,
+            "Blog",
+        )?
         .source;
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../typescript/generated.ts");
     if mode == "--write" {

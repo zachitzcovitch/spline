@@ -41,6 +41,7 @@ pub struct HttpPlan {
     pub binding: HttpBinding,
     pub path_parameters: Vec<UrlParameter>,
     pub query_parameters: Vec<UrlParameter>,
+    pub errors: crate::ErrorResponses,
     pub(crate) route_key: String,
 }
 
@@ -169,6 +170,7 @@ pub(crate) fn plan(operation: &Operation, binding: HttpBinding, graph: &Graph) -
         binding,
         path_parameters,
         query_parameters,
+        errors: crate::ErrorResponses::Opaque,
         route_key,
     })
 }

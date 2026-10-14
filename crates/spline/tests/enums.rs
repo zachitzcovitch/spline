@@ -21,6 +21,10 @@ fn adjacent_enums_model_unit_and_optional_newtype_content_correctly() {
     }
     let (input, input_graph) = graph::<Event>(Direction::Deserialize);
     let (output, output_graph) = graph::<Event>(Direction::Serialize);
+    assert_eq!(
+        Event::variants(Direction::Deserialize).unwrap(),
+        ["Ready", "Text", "Changed"]
+    );
     let Shape::Union(variants) = body(&input, &input_graph) else {
         panic!("expected union")
     };
@@ -96,6 +100,14 @@ fn internal_enums_honor_field_rules_and_directional_variant_skips() {
     }
     let (input, input_graph) = graph::<Event>(Direction::Deserialize);
     let (output, output_graph) = graph::<Event>(Direction::Serialize);
+    assert_eq!(
+        Event::variants(Direction::Deserialize).unwrap(),
+        ["Ready", "Named"]
+    );
+    assert_eq!(
+        Event::variants(Direction::Serialize).unwrap(),
+        ["Ready", "Named", "OutputOnly"]
+    );
     let value = json!({ "kind": "named" });
     assert!(matches(&input_graph, &input, &value));
     let encoded = to_value(from_value::<Event>(value).unwrap()).unwrap();
@@ -148,6 +160,7 @@ fn whole_type_overrides_are_an_explicit_escape_hatch() {
         Flag(bool),
     }
     let (root, graph) = graph::<Opaque>(Direction::Serialize);
+    assert_eq!(Opaque::variants(Direction::Serialize), None);
     for value in [Opaque::Text("hello".into()), Opaque::Flag(true)] {
         assert!(matches(&graph, &root, &to_value(value).unwrap()));
     }

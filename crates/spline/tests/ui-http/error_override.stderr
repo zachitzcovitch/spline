@@ -1,0 +1,5 @@
+error: variant statuses require derived serialization shapes; use a container #[http(status = ...)] for a whole-type schema override
+ --> tests/ui-http/error_override.rs:3:6
+  |
+3 | enum Failure {
+  |      ^^^^^^^

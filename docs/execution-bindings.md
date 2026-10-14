@@ -192,6 +192,11 @@ neutral description and a separate map of operation IDs to validated HTTP plans.
 transactionally and reject missing bindings, conflicting routes, and unsupported
 argument/body/status combinations.
 
+`::http::describe_with(&policy)` also validates and attaches the selected policy's
+application-error response metadata. Routers use this policy-aware path; ordinary
+`describe()` makes no static error-status claim. [Declared HTTP errors](http-errors.md)
+explains the opt-in error derive, `DeclaredErrors`, and opaque/custom policies.
+
 `spline-http` owns HTTP execution: Axum routing, request context, decoding, response
 envelopes, reqwest calls, and HTTP-specific failures. Factories authenticate/create
 the implementation before argument decoding. The handler then creates the neutral

@@ -1,10 +1,9 @@
 mod auth;
-mod errors;
 mod service;
 
 use std::sync::Arc;
 
-use spline::http::{axum, HttpFactoryExt};
+use spline::http::{axum, DeclaredErrors, HttpFactoryExt};
 use spline_example_blog_contracts::api;
 use tokio::sync::RwLock;
 
@@ -27,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(Arc::new(Session { store, user_id }))
             }
         },
-        errors::ErrorStatuses,
+        DeclaredErrors,
     )?;
 
     // Both resource groups use the same /api prefix and request-scoped session.

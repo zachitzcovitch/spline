@@ -1,0 +1,12 @@
+error: choose a whole-error status or per-variant statuses, not both
+ --> tests/ui-http/error_conflicting_status.rs:4:5
+  |
+4 | /     #[http(status = spline::http::StatusCode::NOT_FOUND)]
+5 | |     Missing,
+  | |___________^
+
+error: duplicate HTTP error status
+  --> tests/ui-http/error_conflicting_status.rs:10:58
+   |
+10 |     #[http(status = spline::http::StatusCode::NOT_FOUND, status = spline::http::StatusCode::CONFLICT)]
+   |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -9,6 +9,7 @@ mod contract;
 mod execution;
 mod expand;
 mod http;
+mod http_error;
 mod model;
 
 use proc_macro::TokenStream;
@@ -17,6 +18,15 @@ use proc_macro::TokenStream;
 pub fn schema(input: TokenStream) -> TokenStream {
     let result = syn::parse(input).and_then(expand::expand);
     result.unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Derive an error type's default HTTP statuses and response metadata.
+#[proc_macro_derive(HttpError, attributes(http, spline, serde))]
+pub fn http_error(input: TokenStream) -> TokenStream {
+    syn::parse(input)
+        .and_then(http_error::expand)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
 }
 
 #[proc_macro_attribute]

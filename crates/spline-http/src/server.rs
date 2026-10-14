@@ -73,6 +73,13 @@ impl IntoResponse for Fault {
 
 pub trait ErrorPolicy<E>: Send + Sync + 'static {
     fn status(&self, error: &E) -> StatusCode;
+
+    /// Static application-error mappings, when known. Must describe all emitted
+    /// application values/statuses for this configuration. Return Opaque when a
+    /// dynamic policy cannot declare its responses exhaustively.
+    fn mapping(&self) -> spline_http_contract::ErrorMapping {
+        spline_http_contract::ErrorMapping::Opaque
+    }
 }
 impl<E, F> ErrorPolicy<E> for F
 where

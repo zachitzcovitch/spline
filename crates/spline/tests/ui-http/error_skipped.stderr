@@ -1,0 +1,5 @@
+error: variant statuses do not support skipped serialized variants; use a whole-error status or custom policy
+ --> tests/ui-http/error_skipped.rs:2:6
+  |
+2 | enum Failure {
+  |      ^^^^^^^

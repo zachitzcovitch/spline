@@ -1233,6 +1233,7 @@ dependencies = [
  "serde_json",
  "spline-contract",
  "spline-http-contract",
+ "spline-macros",
  "spline-runtime",
  "spline-schema",
  "tokio",

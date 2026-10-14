@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: HTTP application error status must be 4xx or 5xx
+ --> tests/ui-http/error_status.rs:5:21
+  |
+5 |     #[http(status = StatusCode::OK)]
+  |                     ^^^^^^^^^^^^^^ evaluation of `_::_` failed here

@@ -273,5 +273,6 @@ lists all generators, including the blog application.
 
 The [HTTP binding](http-binding.md), including [updates and 204 responses](http-updates.md),
 is implemented and verified with both clients against one server. Follow-on profile
-decisions include client call controls, broader response metadata, and declarative
-error-status metadata for specification export.
+decisions include client call controls and broader response metadata. [Declared
+HTTP error/status metadata](http-errors.md) now supplies per-status application-error
+shapes for the future OpenAPI exporter.

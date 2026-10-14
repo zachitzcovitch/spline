@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use spline::http::StatusCode;
 use spline::Schema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Schema)]
@@ -8,9 +9,10 @@ pub struct User {
     pub display_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
+#[derive(Debug, Serialize, Deserialize, Schema, spline::http::Error)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum UserError {
+    #[http(status = StatusCode::NOT_FOUND)]
     NotFound,
 }
 

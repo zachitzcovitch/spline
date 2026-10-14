@@ -105,9 +105,10 @@ error policies, and supported DTO compatibility.
 | Composition | Neutral resource/schema composition; grouped HTTP clients and one router with shared request-scoped services. |
 
 The evaluated numeric JSON profile uses 8/16/32-bit integers. Larger integers and
-floats need an explicit wire representation. Streaming, OpenAPI, and declarative
-error/status mappings are [follow-up work](ROADMAP.md). Each guide documents the
-supported surface and its boundaries.
+floats need an explicit wire representation. Error types can opt into
+[`spline::http::Error`](docs/http-errors.md) to declare default HTTP statuses and
+documented response shapes. Streaming and OpenAPI are [follow-up work](ROADMAP.md).
+Each guide documents the supported surface and its boundaries.
 
 Partial-update DTOs use `Patch<T>` to preserve omission separately from a value.
 For example, `Patch<Option<String>>` distinguishes an unchanged bio from clearing
@@ -255,6 +256,8 @@ same machine and toolchain.
   crate boundaries, verification, and current scope.
 - [First HTTP binding](docs/http-binding.md): authoring, server/client examples,
   wire behavior, request context, and conformance checks.
+- [Declared HTTP errors](docs/http-errors.md): derived default statuses, policy-aware
+  response metadata, and custom policy overrides.
 - [Updates and no-content responses](docs/http-updates.md): PUT/PATCH/DELETE,
   explicit missing/null/value semantics, and 204 handling.
 - [Contract evolution](docs/contract-evolution.md): additive changes, response

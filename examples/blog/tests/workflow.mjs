@@ -83,7 +83,20 @@ test("the blog server and both README clients work across package boundaries", {
       body: JSON.stringify({ title: "  ", body: "A title is required" }),
     });
     assert.equal(response.status, 422);
+    assert.equal(response.headers.get("x-spline-error"), "application");
     assert.deepEqual(await response.json(), { kind: "application", value: { kind: "invalid_title" } });
+
+    // The derived defaults preserve the same status/envelope across both resources.
+    for (const [path, method, status, kind] of [
+      ["/users/missing", "GET", 404, "not_found"],
+      ["/posts/missing", "GET", 404, "not_found"],
+      ["/posts/post_1/publish", "POST", 403, "forbidden"],
+    ]) {
+      const response = await request(path, { method, headers: { authorization: "Bearer bob-token" } });
+      assert.equal(response.status, status);
+      assert.equal(response.headers.get("x-spline-error"), "application");
+      assert.deepEqual(await response.json(), { kind: "application", value: { kind } });
+    }
   } finally {
     lines.close();
     server.kill("SIGKILL");

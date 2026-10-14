@@ -90,6 +90,8 @@ impl fmt::Display for DefinitionId {
 pub struct Definition {
     pub shape: Shape,
     pub documentation: String,
+    /// Source variant names in union-alternative order, when known.
+    pub variants: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -30,6 +30,13 @@ release yet; the workspace version is a development version.
   application adapters preserve concrete service/policy bounds and shared state.
 - Adapter entry points use `shared(implementation)` for a reusable instance and
   `contract()` for factory-supplied implementations, clarifying their lifetimes.
+- An opt-in `spline::http::Error` derive with named `StatusCode` constants and
+  compile-time status validation. `DeclaredErrors` selects the derived defaults.
+- Policy-aware `::http::describe_with(&policy)` descriptions with per-status
+  serialized application-error envelopes, headers, and content types. Custom
+  policies remain supported and opaque unless they declare their response mapping.
+- Neutral source-variant schema identities, preserving associations through Serde
+  renames/tagging without adding HTTP fields to the schema or contract model.
 
 ### Maintenance
 
@@ -63,3 +70,5 @@ release yet; the workspace version is a development version.
   operation services can be attached through `resource::http::operation::router`.
 - Neutral TypeScript export retains the JSON unit shape; only HTTP-bound export
   gives 204 operations a `void` result.
+- The blog declares default statuses on its public error types and shares them
+  between server routing and export tooling through `DeclaredErrors`.

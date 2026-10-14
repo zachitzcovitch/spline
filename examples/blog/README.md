@@ -22,7 +22,6 @@ examples/blog/
 │   └── src/
 │       ├── main.rs         # Session factory and HTTP startup
 │       ├── auth.rs         # Request authentication
-│       ├── errors.rs       # Application error statuses
 │       └── service/
 │           ├── mod.rs      # Shared Store and request-scoped Session
 │           ├── users.rs    # impl Users for Session
@@ -133,13 +132,12 @@ unmatched route; an unavailable server gives a transport failure.
 | --- | --- |
 | [contracts/src/lib.rs](contracts/src/lib.rs) | Public exports and the composed `api` module. |
 | [contracts/src/users.rs](contracts/src/users.rs) | The user DTO, error, and `Users` trait. |
-| [contracts/src/posts.rs](contracts/src/posts.rs) | Post DTOs, errors, and the `Posts` trait. |
+| [contracts/src/posts.rs](contracts/src/posts.rs) | Post DTOs, errors with default HTTP statuses, and the `Posts` trait. |
 | [server/src/main.rs](server/src/main.rs) | Shared store, request-scoped session factory, and Axum startup. |
 | [server/src/auth.rs](server/src/auth.rs) | Turning a request header into the session's user ID. |
 | [server/src/service/mod.rs](server/src/service/mod.rs) | Shared storage and the request-scoped `Session`. |
 | [server/src/service/users.rs](server/src/service/users.rs) | The user resource implementation. |
 | [server/src/service/posts.rs](server/src/service/posts.rs) | The post resource implementation. |
-| [server/src/errors.rs](server/src/errors.rs) | Mapping each declared error to an HTTP status. |
 | [rust-client/src/main.rs](rust-client/src/main.rs) | CLI entry point, generated Rust calls, typed errors, and client configuration. |
 | [typescript/client.ts](typescript/client.ts) | The matching workflow, client configuration, and result helper. |
 | [contracts/examples/export.rs](contracts/examples/export.rs) | Generating a TypeScript client from the shared contract. |
@@ -237,6 +235,7 @@ The server selects the HTTP adapter through its extension trait:
 
 ```rust
 use spline::http::HttpFactoryExt;
+use spline::http::DeclaredErrors;
 
 let routes = api::contract().http_with(
     move |context| {
@@ -246,7 +245,7 @@ let routes = api::contract().http_with(
             Ok(Arc::new(Session { store, user_id }))
         }
     },
-    errors::ErrorStatuses,
+    DeclaredErrors,
 )?;
 ```
 
@@ -262,7 +261,27 @@ shared implementation, the corresponding flow is
 `api::shared(implementation).http(error_statuses)?` with `HttpExt`. Direct typed
 calls use `.in_process()?` with `spline::runtime::InProcessExt`.
 
-`ErrorStatuses` implements `ErrorPolicy<UserError>` and `ErrorPolicy<PostError>`:
+Both error types derive `spline::http::Error` and declare named statuses on their
+variants. For example, `posts.rs` contains:
+
+```rust
+use spline::http::StatusCode;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, spline::Schema, spline::http::Error)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PostError {
+    #[http(status = StatusCode::NOT_FOUND)]
+    NotFound,
+    #[http(status = StatusCode::FORBIDDEN)]
+    Forbidden,
+    #[http(status = StatusCode::UNPROCESSABLE_ENTITY)]
+    InvalidTitle,
+}
+```
+
+`DeclaredErrors` selects those defaults for every resource and supplies the same
+mapping to export tooling. Custom policies can override defaults when an
+application needs different behavior; see [declared HTTP errors](../../docs/http-errors.md).
 
 | Failure | HTTP status | Client category |
 | --- | --- | --- |
@@ -358,16 +377,16 @@ npm run check --workspace spline-blog-client
 npm run test:blog
 ```
 
-The exporter calls `api::http::describe()` and
+The exporter calls `api::http::describe_with(&DeclaredErrors)` and
 `Typescript::export_http_application(..., "Blog")`, producing `createBlogClient`,
 public DTO types, `BlogClient`/`BlogResult`, and the `BlogOperations`/`BlogCalls`
 type maps. Edit the
 Rust contract to change that generated file. Ordinary server/client startup
 collects its metadata internally.
 
-`api::describe()` describes the neutral application; selecting `::http::describe()`
-validates route/body/status mappings and supplies the binding metadata to the HTTP
-exporter. See [execution and bindings](../../docs/execution-bindings.md) for the
+`api::describe()` describes the neutral application; selecting `::http::describe_with`
+validates routes, body/success mappings, and the selected error policy's per-status
+response metadata for export. See [execution and bindings](../../docs/execution-bindings.md) for the
 in-process adapter and typed operation middleware.
 
 The Cargo example target is named `blog-export` to give it a unique executable

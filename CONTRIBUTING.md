@@ -107,6 +107,10 @@ Its TypeScript language-service check also verifies signature help, narrowed hov
 and DTO property completion. Preserve that editor-facing surface when changing
 names or generated signatures; see [docs/typescript.md](docs/typescript.md).
 
+Declared-error behavior is covered by `crates/spline/tests/http_errors.rs` and the
+HTTP compiler fixtures. Keep real statuses and serialized response metadata aligned;
+see [docs/http-errors.md](docs/http-errors.md) for derived defaults and custom policies.
+
 ## Where changes belong
 
 - `spline-schema`: directional shapes, registration, and field semantics.

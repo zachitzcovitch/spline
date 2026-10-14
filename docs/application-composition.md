@@ -103,6 +103,9 @@ operation dispatch. Authentication and shared state remain outside serialized DT
 One error policy is shared across the routes. A function/closure works when all
 operations use the same application error; a policy struct can implement
 `ErrorPolicy<UserError>` and `ErrorPolicy<PostError>` for different resource errors.
+For error types deriving `spline::http::Error`, the reusable `DeclaredErrors` policy
+selects their defaults across all resources. `api::http::describe_with(&policy)`
+collects the selected policy's response metadata; see [declared errors](http-errors.md).
 The service, factory, and policy do not need `Clone`: the generated router shares
 them through `Arc`. Each operation keeps its own success and error types.
 
@@ -224,10 +227,10 @@ both clients against the same authenticated server, including custom `publish`,
 shared user changes visible through posts, errors, 204, nested URLs, response
 policy, and construction failures. TypeScript also has static negative assertions.
 
-Verification covers the Rust suite and blog checks (170 behavior/integration checks
-and 29 compiler-failure fixtures), strict TypeScript checks (61 expected-error
-assertions), Clippy with warnings denied, formatting, neutral facade/dependency
-checking, and generated-artifact freshness commands.
+The [HTTP guide's evidence section](http-binding.md#evidence) records the expanded
+Rust suite and blog checks, compiler-failure fixtures, and strict TypeScript
+assertions. Verification also covers Clippy with warnings denied, formatting,
+neutral facade/dependency checks, and generated-artifact freshness commands.
 
 ```sh
 cargo test --locked -p spline-example-contract --test application

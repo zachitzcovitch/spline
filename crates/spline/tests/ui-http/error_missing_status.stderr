@@ -1,0 +1,11 @@
+error: each error variant requires #[http(status = StatusCode::...)]
+ --> tests/ui-http/error_missing_status.rs:3:5
+  |
+3 |     Missing,
+  |     ^^^^^^^
+
+error: an error struct requires a container #[http(status = StatusCode::...)]
+ --> tests/ui-http/error_missing_status.rs:7:8
+  |
+7 | struct StructFailure;
+  |        ^^^^^^^^^^^^^

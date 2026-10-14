@@ -205,6 +205,7 @@ pub fn generate(
     let mut routes = Vec::new();
     let mut policies = Vec::new();
     let mut bindings = Vec::new();
+    let mut error_mappings = Vec::new();
     let mut no_content = Vec::new();
     let mut operation_routers = Vec::new();
     for method in methods {
@@ -238,6 +239,12 @@ pub fn generate(
         };
         let metadata = method.binding.metadata(runtime);
         bindings.push(quote! { ( <super::#name::Operation as #runtime::runtime::Operation>::id(), #metadata ) });
+        error_mappings.push(quote! {
+            (
+                <super::#name::Operation as #runtime::runtime::Operation>::id(),
+                <P as #runtime::http::ErrorPolicy<super::super::#error>>::mapping(errors),
+            )
+        });
         if method.binding.status == 204 {
             no_content.push(quote_spanned! {method.output_span=> #runtime::__private::assert_no_content::<super::super::#output>(); });
         }
@@ -303,8 +310,9 @@ pub fn generate(
                     S::Error: Into<#runtime::runtime::BoxError>,
                     P: #runtime::http::ErrorPolicy<super::super::super::#error>,
                 {
-                    let description = super::describe()?;
+                    let mut description = super::describe()?;
                     let id = <super::super::#name::Operation as #runtime::runtime::Operation>::id();
+                    description.errors(&id, <P as #runtime::http::ErrorPolicy<super::super::super::#error>>::mapping(&errors))?;
                     let plan = ::std::sync::Arc::new(description.plans()[&id].clone());
                     let path = plan.binding.path.clone();
                     let service = ::std::sync::Arc::new(service);
@@ -360,6 +368,20 @@ pub fn generate(
             let mut builder = #runtime::http::contract::ContractBuilder::new(super::describe()?);
             for (id, binding) in __bindings() { builder.bind(&id, binding)?; }
             Ok(builder.finish()?)
+        }
+        /// Describe the binding with the selected policy's application-error responses.
+        pub fn describe_with<P: __ErrorPolicy>(errors: &P)
+            -> ::core::result::Result<#runtime::http::contract::ContractDescription, #runtime::http::BuildError>
+        {
+            let mut description = describe()?;
+            for (id, mapping) in __error_mappings(errors) { description.errors(&id, mapping)?; }
+            Ok(description)
+        }
+        #[doc(hidden)]
+        pub fn __error_mappings<P: __ErrorPolicy>(errors: &P)
+            -> ::std::vec::Vec<(::std::string::String, #runtime::http::contract::ErrorMapping)>
+        {
+            ::std::vec![#(#error_mappings),*]
         }
         #[doc(hidden)]
         pub fn __bindings() -> ::std::vec::Vec<(::std::string::String, #runtime::http::contract::HttpBinding)> {
@@ -426,7 +448,7 @@ pub fn generate(
             F: ::core::ops::Fn(#runtime::http::RequestContext) -> Fut + ::core::marker::Send + ::core::marker::Sync + 'static,
             Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, #runtime::http::Fault>> + ::core::marker::Send + 'static,
         {
-            let __spline_description = describe()?;
+            let __spline_description = describe_with(&*__spline_errors)?;
             #[allow(unused_mut)]
             let mut __spline_router = #runtime::http::axum::Router::new();
             #(#routes)*

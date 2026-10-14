@@ -319,3 +319,28 @@ fn generic_field_builder_does_not_guess_an_option_projection() {
     ));
     assert!(registry.finish().unwrap().definitions().is_empty());
 }
+
+#[test]
+fn invalid_variant_associations_fail_without_committing_schema_state() {
+    struct InvalidVariants;
+    impl Schema for InvalidVariants {
+        fn info() -> TypeInfo {
+            TypeInfo::named("test.InvalidVariants")
+        }
+        fn describe(_: &mut Context<'_>) -> Result<Shape> {
+            Ok(Shape::Union(vec![Shape::String]))
+        }
+        fn variants(_: Direction) -> Option<&'static [&'static str]> {
+            Some(&["A", "B"])
+        }
+    }
+    let mut registry = Registry::new();
+    registry.register::<String>(Direction::Serialize).unwrap();
+    let before = registry.clone().finish().unwrap();
+    assert!(registry
+        .register::<InvalidVariants>(Direction::Serialize)
+        .unwrap_err()
+        .to_string()
+        .contains("variant identities"));
+    assert_eq!(registry.finish().unwrap(), before);
+}

@@ -102,6 +102,19 @@ impl Registry {
         if let Some(error) = &self.failure {
             return Err(error.clone());
         }
+        let variants = T::variants(direction);
+        if let Some(names) = variants {
+            let unique: BTreeSet<_> = names.iter().collect();
+            if definition.is_none()
+                || unique.len() != names.len()
+                || names.iter().any(|name| name.is_empty())
+                || !matches!(&body, Shape::Union(shapes) if shapes.len() == names.len())
+            {
+                return Err(Error::InvalidShape(
+                    "variant identities require a named union with one distinct name per alternative".into(),
+                ));
+            }
+        }
         let root = match definition {
             Some(id) => {
                 self.definitions.insert(
@@ -109,6 +122,8 @@ impl Registry {
                     Definition {
                         shape: body,
                         documentation: info.documentation,
+                        variants: variants
+                            .map(|names| names.iter().map(|name| (*name).into()).collect()),
                     },
                 );
                 Shape::Ref(id)

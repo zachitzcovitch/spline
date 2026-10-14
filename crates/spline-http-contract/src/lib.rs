@@ -9,7 +9,9 @@ use std::fmt;
 use spline_contract as core;
 use spline_schema::Graph;
 
+mod errors;
 mod plan;
+pub use errors::{ErrorMapping, ErrorResponse, ErrorResponses, ERROR_HEADER};
 pub use plan::{HttpBinding, HttpMethod, HttpPlan, Scalar, UrlParameter};
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -46,6 +48,23 @@ impl ContractDescription {
     pub fn plans(&self) -> &BTreeMap<String, HttpPlan> {
         &self.plans
     }
+
+    /// Attach a selected policy's application responses transactionally.
+    pub fn errors(&mut self, id: &str, mapping: ErrorMapping) -> Result<()> {
+        let operation = self
+            .contract
+            .operations()
+            .values()
+            .find(|op| op.id == id)
+            .ok_or_else(|| Error::Binding(format!("unknown operation {id}")))?;
+        let responses = errors::responses(mapping, &operation.error, self.contract.schemas())
+            .map_err(|error| match error {
+                Error::Binding(message) => Error::Binding(format!("{id}: {message}")),
+                error => error,
+            })?;
+        self.plans.get_mut(id).expect("sealed binding").errors = responses;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,6 +78,22 @@ impl ApplicationDescription {
     }
     pub fn plans(&self) -> &BTreeMap<String, HttpPlan> {
         &self.plans
+    }
+
+    /// Attach a selected policy's application responses transactionally.
+    pub fn errors(&mut self, id: &str, mapping: ErrorMapping) -> Result<()> {
+        let operation = self
+            .application
+            .operations()
+            .find(|op| op.id == id)
+            .ok_or_else(|| Error::Binding(format!("unknown operation {id}")))?;
+        let responses = errors::responses(mapping, &operation.error, self.application.schemas())
+            .map_err(|error| match error {
+                Error::Binding(message) => Error::Binding(format!("{id}: {message}")),
+                error => error,
+            })?;
+        self.plans.get_mut(id).expect("sealed binding").errors = responses;
+        Ok(())
     }
 }
 

@@ -22,6 +22,7 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
         .clone()
         .unwrap_or_else(|| syn::parse_quote!(::spline));
     let mut bodies = Vec::new();
+    let mut variant_names = Vec::new();
     let mut used_types = Vec::new();
     let mut missing = quote!(#runtime::MissingField::Rejected);
     for mode in [Mode::Deserialize, Mode::Serialize] {
@@ -36,6 +37,20 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
             continue;
         }
         let container = adapter::parse(&input, mode)?;
+        if options.wire(mode).is_none() {
+            if let (syn::Data::Enum(source), Data::Enum(variants)) = (&input.data, &container.data)
+            {
+                let names: Vec<_> = source
+                    .variants
+                    .iter()
+                    .zip(variants)
+                    .filter(|(_, variant)| !variant.skipped)
+                    .map(|(source, _)| source.ident.to_string().trim_start_matches("r#").to_owned())
+                    .collect();
+                variant_names
+                    .push(quote!(#direction => ::core::option::Option::Some(&[#(#names),*])));
+            }
+        }
         if mode == Mode::Deserialize {
             missing = missing_expression(&container, &options, &runtime)?;
         }
@@ -81,6 +96,8 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
         .map(syn::LitStr::value)
         .collect::<Vec<_>>()
         .join("\n");
+    let unknown_variants =
+        (variant_names.len() < 2).then(|| quote!(_ => ::core::option::Option::None,));
 
     Ok(quote! {
         #[automatically_derived]
@@ -101,6 +118,13 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
 
             fn missing_field() -> #runtime::MissingField {
                 #missing
+            }
+
+            fn variants(direction: #runtime::Direction) -> ::core::option::Option<&'static [&'static str]> {
+                match direction {
+                    #(#variant_names,)*
+                    #unknown_variants
+                }
             }
         }
     })

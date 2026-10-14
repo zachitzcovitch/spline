@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use spline::http::StatusCode;
 use spline::Schema;
 
 use crate::User;
@@ -21,11 +22,14 @@ pub struct NewPost {
     pub body: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema)]
+#[derive(Debug, Serialize, Deserialize, Schema, spline::http::Error)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PostError {
+    #[http(status = StatusCode::NOT_FOUND)]
     NotFound,
+    #[http(status = StatusCode::FORBIDDEN)]
     Forbidden,
+    #[http(status = StatusCode::UNPROCESSABLE_ENTITY)]
     InvalidTitle,
 }
 

@@ -62,6 +62,13 @@ pub trait Schema: 'static {
     fn info() -> TypeInfo;
     fn describe(cx: &mut Context<'_>) -> Result<Shape>;
 
+    /// Source variant names corresponding to the alternatives of a named union.
+    /// These are Rust identities, independent of directional Serde wire names.
+    /// Overrides and handwritten schemas need not claim a variant association.
+    fn variants(_direction: Direction) -> Option<&'static [&'static str]> {
+        None
+    }
+
     /// Query missing-field behavior without constructing generic names.
     /// Transparent recursive derives override this; the default preserves
     /// existing handwritten descriptions that declare the fact in info().

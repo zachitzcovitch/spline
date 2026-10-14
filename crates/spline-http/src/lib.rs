@@ -4,22 +4,26 @@
 
 mod client;
 mod compatibility;
+mod errors;
 mod extensions;
 mod response;
 pub mod server;
 
 pub use axum;
+pub use axum::http::StatusCode;
 pub use client::Client;
 pub use compatibility::verify_serde;
+pub use errors::{DeclaredErrors, Error};
 pub use extensions::{HttpExt, HttpFactoryBinding, HttpFactoryExt, HttpServiceBinding};
 pub use reqwest;
 pub use response::ResponsePolicy;
 pub use server::{ErrorPolicy, Fault, RequestContext};
 pub use spline_http_contract as contract;
+pub use spline_macros::HttpError as Error;
 
 use std::fmt;
 
-pub const ERROR_HEADER: &str = "x-spline-error";
+pub use spline_http_contract::ERROR_HEADER;
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 
 mod sealed {
