@@ -122,7 +122,7 @@ impl required_input::Users for RequiresApproval {
 }
 
 fn new_router() -> axum::Router {
-    let router = v2::users::router(New, |_: &v2::ApiError| StatusCode::NOT_FOUND).unwrap();
+    let router = v2::users::http::router(New, |_: &v2::ApiError| StatusCode::NOT_FOUND).unwrap();
     let router = router.route(
         "/evolution/users/bad/{case}",
         axum::routing::get(
@@ -154,7 +154,7 @@ fn new_router() -> axum::Router {
 #[tokio::test]
 async fn old_native_client_accepts_additive_responses_and_optional_inputs() {
     let server = serve(new_router()).await;
-    let client = v1::users::Client::new(&server.base).unwrap();
+    let client = v1::users::http::Client::new(&server.base).unwrap();
     let user = client.get("existing".into()).await.unwrap();
     assert_eq!(user.profile.display_name, "New");
     assert_eq!(user.history[0].display_name, "New");
@@ -182,7 +182,7 @@ async fn old_native_client_accepts_additive_responses_and_optional_inputs() {
 #[tokio::test]
 async fn strict_policy_rejects_additions_but_still_accepts_the_original_server() {
     let new = serve(new_router()).await;
-    let strict = v1::users::Client::new(&new.base)
+    let strict = v1::users::http::Client::new(&new.base)
         .unwrap()
         .with_response_policy(ResponsePolicy::Strict);
     for id in ["existing", "existing-error"] {
@@ -196,8 +196,9 @@ async fn strict_policy_rejects_additions_but_still_accepts_the_original_server()
         Err(CallError::Protocol(_))
     ));
     let old =
-        serve(v1::users::router(Old, |_: &v1::ApiError| StatusCode::NOT_FOUND).unwrap()).await;
-    let strict = v1::users::Client::new(&old.base)
+        serve(v1::users::http::router(Old, |_: &v1::ApiError| StatusCode::NOT_FOUND).unwrap())
+            .await;
+    let strict = v1::users::http::Client::new(&old.base)
         .unwrap()
         .with_response_policy(ResponsePolicy::Strict);
     assert_eq!(
@@ -209,7 +210,7 @@ async fn strict_policy_rejects_additions_but_still_accepts_the_original_server()
 #[tokio::test]
 async fn new_variants_and_invalid_known_fields_remain_protocol_failures() {
     let server = serve(new_router()).await;
-    let client = v1::users::Client::new(&server.base).unwrap();
+    let client = v1::users::http::Client::new(&server.base).unwrap();
     for id in ["new-state", "new-error"] {
         assert!(matches!(
             client.get(id.into()).await,
@@ -240,7 +241,7 @@ async fn new_variants_and_invalid_known_fields_remain_protocol_failures() {
             }),
         );
         let bad = serve(bad).await;
-        let client = v1::users::Client::new(&bad.base).unwrap();
+        let client = v1::users::http::Client::new(&bad.base).unwrap();
         assert!(
             matches!(client.get("test".into()).await, Err(CallError::Protocol(_))),
             "{case}"
@@ -251,11 +252,13 @@ async fn new_variants_and_invalid_known_fields_remain_protocol_failures() {
 #[tokio::test]
 async fn required_input_additions_break_old_requests_and_unknown_inputs_stay_rejected() {
     let required = serve(
-        required_input::users::router(RequiresApproval, |_: &v2::ApiError| StatusCode::BAD_REQUEST)
-            .unwrap(),
+        required_input::users::http::router(RequiresApproval, |_: &v2::ApiError| {
+            StatusCode::BAD_REQUEST
+        })
+        .unwrap(),
     )
     .await;
-    let client = v1::users::Client::new(&required.base).unwrap();
+    let client = v1::users::http::Client::new(&required.base).unwrap();
     assert!(matches!(
         client
             .create(v1::Create {
@@ -287,10 +290,13 @@ async fn required_input_additions_break_old_requests_and_unknown_inputs_stay_rej
 async fn generated_v1_typescript_client_uses_the_same_evolution_policy() {
     let new = serve(new_router()).await;
     let old =
-        serve(v1::users::router(Old, |_: &v1::ApiError| StatusCode::NOT_FOUND).unwrap()).await;
+        serve(v1::users::http::router(Old, |_: &v1::ApiError| StatusCode::NOT_FOUND).unwrap())
+            .await;
     let required = serve(
-        required_input::users::router(RequiresApproval, |_: &v2::ApiError| StatusCode::BAD_REQUEST)
-            .unwrap(),
+        required_input::users::http::router(RequiresApproval, |_: &v2::ApiError| {
+            StatusCode::BAD_REQUEST
+        })
+        .unwrap(),
     )
     .await;
     let output = tokio::time::timeout(

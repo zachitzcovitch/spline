@@ -21,6 +21,15 @@ release yet; the workspace version is a development version.
   guidance, GitHub issue/PR templates, and MIT OR Apache-2.0 licensing.
 - Reproducible metadata, TypeScript-export, loopback HTTP, and isolated TypeScript
   client benchmarks with fixture checks in CI and documented timing boundaries.
+- Protocol-neutral typed Tower operation services and grouped in-process clients,
+  including readiness, shared concurrency/backpressure, and cancellation checks.
+- A lightweight `spline-http-contract` crate for HTTP descriptions and validation,
+  separate from neutral contracts and the Axum/reqwest runtime.
+- Neutral definition/service-bundle values and adapter-owned extension traits:
+  `.http(policy)`, `.http_with(factory, policy)`, and `.in_process()`. Resource and
+  application adapters preserve concrete service/policy bounds and shared state.
+- Adapter entry points use `shared(implementation)` for a reusable instance and
+  `contract()` for factory-supplied implementations, clarifying their lifetimes.
 
 ### Maintenance
 
@@ -47,3 +56,10 @@ release yet; the workspace version is a development version.
   The blog tutorial uses normal `users.rs`/`posts.rs` resource modules with no options.
 - Generated operation arguments retain documentation on their schema fields while
   consuming parameter doc attributes before lowering to Rust function signatures.
+- HTTP entry points and client/export configuration now use explicit `::http`
+  modules. `describe()` and `spline::api!` compose neutral operations independently
+  of HTTP routing; bound descriptions contain a separate HTTP plan map.
+- HTTP dispatch invokes the same typed Tower adapters used in process. Configured
+  operation services can be attached through `resource::http::operation::router`.
+- Neutral TypeScript export retains the JSON unit shape; only HTTP-bound export
+  gives 204 operations a `void` result.

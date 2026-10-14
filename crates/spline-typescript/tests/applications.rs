@@ -1,7 +1,5 @@
-use spline_contract::{
-    http::{HttpBinding, HttpMethod},
-    ApplicationBuilder, ApplicationDescription, OperationKind,
-};
+use spline_contract::{ApplicationBuilder, ApplicationDescription, OperationKind};
+use spline_http_contract::{ApplicationBuilder as HttpBuilder, HttpBinding, HttpMethod};
 use spline_schema::{
     Context, DefinitionId, Direction, Object, Schema, Shape, TypeInfo, UnknownFields,
 };
@@ -29,7 +27,7 @@ impl Schema for Input {
     }
 }
 
-fn application(resources: &[(&str, &str)], bound: bool) -> ApplicationDescription {
+fn application(resources: &[(&str, &str)]) -> ApplicationDescription {
     let mut application = ApplicationBuilder::new("Application docs */ remain escaped");
     for (group, namespace) in resources {
         application
@@ -40,17 +38,6 @@ fn application(resources: &[(&str, &str)], bound: bool) -> ApplicationDescriptio
                     OperationKind::Query,
                     "Operation docs",
                 )?;
-                if bound {
-                    resource.http(
-                        "get",
-                        HttpBinding {
-                            method: HttpMethod::Get,
-                            path: format!("/{group}"),
-                            body: None,
-                            success_status: 200,
-                        },
-                    )?;
-                }
                 Ok(())
             })
             .unwrap();
@@ -58,19 +45,41 @@ fn application(resources: &[(&str, &str)], bound: bool) -> ApplicationDescriptio
     application.finish().unwrap()
 }
 
+fn http(application: ApplicationDescription) -> spline_http_contract::ApplicationDescription {
+    let mut builder = HttpBuilder::new(application.clone());
+    for (group, resource) in application.resources() {
+        builder
+            .bind(
+                &resource.operations()["get"].id,
+                HttpBinding {
+                    method: HttpMethod::Get,
+                    path: format!("/{group}"),
+                    body: None,
+                    success_status: 200,
+                },
+            )
+            .unwrap();
+    }
+    builder.finish().unwrap()
+}
+
 #[test]
 fn grouped_exports_are_deterministic_and_share_one_schema_and_runtime() {
     let exporter = Typescript::new();
-    let first = application(&[("users", "v1.users"), ("posts", "v1.posts")], true);
-    let reversed = application(&[("posts", "v1.posts"), ("users", "v1.users")], true);
+    let first = application(&[("users", "v1.users"), ("posts", "v1.posts")]);
+    let reversed = application(&[("posts", "v1.posts"), ("users", "v1.users")]);
     assert_eq!(
         exporter.export_application(&first, "Api").unwrap(),
         exporter.export_application(&reversed, "Api").unwrap()
     );
-    let artifact = exporter.export_http_application(&first, "Api").unwrap();
+    let artifact = exporter
+        .export_http_application(&http(first), "Api")
+        .unwrap();
     assert_eq!(
         artifact,
-        exporter.export_http_application(&reversed, "Api").unwrap()
+        exporter
+            .export_http_application(&http(reversed), "Api")
+            .unwrap()
     );
     assert_eq!(artifact.source.matches("export type Shared =").count(), 1);
     assert_eq!(artifact.source.matches("const call = async").count(), 1);
@@ -83,7 +92,7 @@ fn grouped_exports_are_deterministic_and_share_one_schema_and_runtime() {
 
 #[test]
 fn application_symbols_and_root_aliases_are_checked_together() {
-    let application = application(&[("users", "v1.users"), ("posts", "v1.posts")], true);
+    let application = http(application(&[("users", "v1.users"), ("posts", "v1.posts")]));
     let id = DefinitionId {
         name: "test.Shared".into(),
         direction: Direction::Serialize,
@@ -111,7 +120,7 @@ fn application_symbols_and_root_aliases_are_checked_together() {
             "{symbol}"
         );
     }
-    let ambiguous = self::application(&[("first", "a.b"), ("second", "a_b")], true);
+    let ambiguous = http(self::application(&[("first", "a.b"), ("second", "a_b")]));
     // Logical identities remain distinct even when legacy underscore flattening
     // would have produced colliding operation aliases.
     let source = Typescript::new()
@@ -124,23 +133,22 @@ fn application_symbols_and_root_aliases_are_checked_together() {
 
 #[test]
 fn transport_neutral_applications_export_signatures_but_require_bindings_to_execute() {
-    let application = application(&[("people", "v1.users")], false);
+    let application = application(&[("people", "v1.users")]);
     assert!(Typescript::new()
         .export_application(&application, "Api")
         .is_ok());
-    assert!(
-        matches!(Typescript::new().export_http_application(&application, "Api"), Err(Error::MissingHttpBinding(id)) if id == "v1.users.get")
-    );
+    assert!(HttpBuilder::new(application)
+        .finish()
+        .unwrap_err()
+        .to_string()
+        .contains("v1.users.get has no HTTP binding"));
 }
 
 #[test]
 fn group_names_are_quoted_and_computed_not_interpreted_as_javascript_prototypes() {
-    let application = application(
-        &[("__proto__", "v1.users"), ("constructor", "v1.posts")],
-        true,
-    );
+    let application = application(&[("__proto__", "v1.users"), ("constructor", "v1.posts")]);
     let source = Typescript::new()
-        .export_http_application(&application, "Api")
+        .export_http_application(&http(application), "Api")
         .unwrap()
         .source;
     assert!(source.contains("[\"__proto__\"]: {"));

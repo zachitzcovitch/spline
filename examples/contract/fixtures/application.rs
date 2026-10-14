@@ -94,7 +94,7 @@ spline::api! {
 
 pub fn typescript() -> Result<String, Box<dyn std::error::Error>> {
     Ok(spline_typescript::Typescript::new()
-        .export_http_application(&api::describe()?, "Api")?
+        .export_http_application(&api::http::describe()?, "Api")?
         .source)
 }
 

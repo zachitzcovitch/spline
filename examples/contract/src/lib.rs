@@ -199,7 +199,7 @@ pub fn error_status(error: &ApiError) -> spline::http::axum::http::StatusCode {
 }
 
 pub fn typescript() -> Result<String, Box<dyn std::error::Error>> {
-    let description = users::describe()?;
+    let description = users::http::describe()?;
     Ok(spline_typescript::Typescript::new()
         .export_http_client(&description, "Users")?
         .source)
@@ -246,10 +246,7 @@ mod tests {
         );
         assert_eq!(description.operations()["get"].id, "users.get");
         assert_eq!(
-            description.operations()["delete"]
-                .http
-                .as_ref()
-                .unwrap()
+            users::http::describe().unwrap().plans()["users.delete"]
                 .binding
                 .success_status,
             204

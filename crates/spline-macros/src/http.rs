@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Verb {
@@ -165,11 +165,11 @@ impl Binding {
 
     pub fn metadata(&self, runtime: &syn::Path) -> TokenStream {
         let method = match self.verb {
-            Verb::Get => quote!(#runtime::contract::http::HttpMethod::Get),
-            Verb::Post => quote!(#runtime::contract::http::HttpMethod::Post),
-            Verb::Put => quote!(#runtime::contract::http::HttpMethod::Put),
-            Verb::Patch => quote!(#runtime::contract::http::HttpMethod::Patch),
-            Verb::Delete => quote!(#runtime::contract::http::HttpMethod::Delete),
+            Verb::Get => quote!(#runtime::http::contract::HttpMethod::Get),
+            Verb::Post => quote!(#runtime::http::contract::HttpMethod::Post),
+            Verb::Put => quote!(#runtime::http::contract::HttpMethod::Put),
+            Verb::Patch => quote!(#runtime::http::contract::HttpMethod::Patch),
+            Verb::Delete => quote!(#runtime::http::contract::HttpMethod::Delete),
         };
         let path = &self.path;
         let body = match &self.body {
@@ -177,7 +177,7 @@ impl Binding {
             None => quote!(::core::option::Option::None),
         };
         let status = self.status;
-        quote!(#runtime::contract::http::HttpBinding {
+        quote!(#runtime::http::contract::HttpBinding {
             method: #method, path: ::std::string::String::from(#path), body: #body, success_status: #status,
         })
     }
@@ -189,6 +189,7 @@ pub struct Method {
     pub fields: Vec<syn::Ident>,
     pub types: Vec<syn::Ident>,
     pub output: syn::Ident,
+    pub output_span: proc_macro2::Span,
     pub error: syn::Ident,
     pub binding: Binding,
 }
@@ -203,6 +204,9 @@ pub fn generate(
     let mut verify = Vec::new();
     let mut routes = Vec::new();
     let mut policies = Vec::new();
+    let mut bindings = Vec::new();
+    let mut no_content = Vec::new();
+    let mut operation_routers = Vec::new();
     for method in methods {
         let name = &method.name;
         if [
@@ -230,21 +234,26 @@ pub fn generate(
             let id = format!("{}.{}", namespace.value(), wire_name.value());
             quote!(#id)
         } else {
-            quote!(&::std::format!("{}.{}", self::__spline_namespace(), #wire_name))
+            quote!(&::std::format!("{}.{}", super::__spline_namespace(), #wire_name))
         };
+        let metadata = method.binding.metadata(runtime);
+        bindings.push(quote! { ( <super::#name::Operation as #runtime::runtime::Operation>::id(), #metadata ) });
+        if method.binding.status == 204 {
+            no_content.push(quote_spanned! {method.output_span=> #runtime::__private::assert_no_content::<super::super::#output>(); });
+        }
         verify.push(quote! {
-            #runtime::http::verify_serde::<#name::Input>()?;
-            #runtime::http::verify_serde::<super::#output>()?;
-            #runtime::http::verify_serde::<super::#error>()?;
+            #runtime::http::verify_serde::<super::#name::Input>()?;
+            #runtime::http::verify_serde::<super::super::#output>()?;
+            #runtime::http::verify_serde::<super::super::#error>()?;
         });
         client_methods.push(quote! {
-            pub async fn #name(&self, #(#fields: super::#types),*)
-                -> ::core::result::Result<super::#output, #runtime::http::CallError<super::#error>>
+            pub async fn #name(&self, #(#fields: super::super::#types),*)
+                -> ::core::result::Result<super::super::#output, #runtime::http::CallError<super::super::#error>>
             {
-                self.inner.call(#id, #name::Input { #(#fields),* }).await
+                self.inner.call(#id, super::#name::Input { #(#fields),* }).await
             }
         });
-        policies.push(quote!(#runtime::http::ErrorPolicy<super::#error>));
+        policies.push(quote!(#runtime::http::ErrorPolicy<super::super::#error>));
         let route_method = match method.binding.verb {
             Verb::Get => quote!(#runtime::http::axum::routing::get),
             Verb::Post => quote!(#runtime::http::axum::routing::post),
@@ -253,8 +262,9 @@ pub fn generate(
             Verb::Delete => quote!(#runtime::http::axum::routing::delete),
         };
         routes.push(quote! {
+            let __spline_id = <super::#name::Operation as #runtime::runtime::Operation>::id();
             let __spline_plan = ::std::sync::Arc::new(
-                __spline_description.operations()[#wire_name].http.clone().expect("macro declared HTTP binding")
+                __spline_description.plans()[&__spline_id].clone()
             );
             let __spline_path = __spline_plan.binding.path.clone();
             let __spline_route_factory = ::std::sync::Arc::clone(&__spline_factory);
@@ -270,18 +280,93 @@ pub fn generate(
                             Ok(service) => service,
                             Err(error) => return #runtime::http::axum::response::IntoResponse::into_response(error),
                         };
-                        let __spline_input = match #runtime::http::server::decode::<#name::Input>(__spline_request, &plan).await {
+                        let __spline_input = match #runtime::http::server::decode::<super::#name::Input>(__spline_request, &plan).await {
                             Ok(input) => input,
                             Err(error) => return #runtime::http::axum::response::IntoResponse::into_response(error),
                         };
-                        let result = super::#trait_name::#name(&*service, #(__spline_input.#fields),*).await;
-                        #runtime::http::server::respond(result, plan.binding.success_status, &*errors)
+                        let result = #runtime::runtime::invoke(super::#name::Service::new(service), __spline_input).await;
+                        #runtime::http::server::respond_call(result, plan.binding.success_status, &*errors)
                     }
                 }
             ));
         });
+        operation_routers.push(quote! {
+            /// Bind a configured typed Tower service to this operation's HTTP route.
+            pub mod #name {
+                use super::__spline_runtime;
+                pub fn router<S, P>(service: S, errors: P) -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
+                where
+                    S: #runtime::runtime::tower::Service<super::super::#name::Input,
+                        Response = ::core::result::Result<super::super::super::#output, super::super::super::#error>>
+                        + Clone + Send + Sync + 'static,
+                    S::Future: Send,
+                    S::Error: Into<#runtime::runtime::BoxError>,
+                    P: #runtime::http::ErrorPolicy<super::super::super::#error>,
+                {
+                    let description = super::describe()?;
+                    let id = <super::super::#name::Operation as #runtime::runtime::Operation>::id();
+                    let plan = ::std::sync::Arc::new(description.plans()[&id].clone());
+                    let path = plan.binding.path.clone();
+                    let service = ::std::sync::Arc::new(service);
+                    let errors = ::std::sync::Arc::new(errors);
+                    Ok(#runtime::http::axum::Router::new().route(&path, #route_method(
+                        move |request: #runtime::http::axum::extract::Request| {
+                            let service = (*service).clone();
+                            let plan = ::std::sync::Arc::clone(&plan);
+                            let errors = ::std::sync::Arc::clone(&errors);
+                            async move {
+                                let input = match #runtime::http::server::decode::<super::super::#name::Input>(request, &plan).await {
+                                    Ok(input) => input,
+                                    Err(error) => return #runtime::http::axum::response::IntoResponse::into_response(error),
+                                };
+                                let result = #runtime::runtime::invoke(service, input).await;
+                                #runtime::http::server::respond_call(result, plan.binding.success_status, &*errors)
+                            }
+                        }
+                    )))
+                }
+            }
+        });
     }
     Ok(quote! {
+        use super::__spline_runtime;
+
+        impl<S, P> #runtime::http::HttpServiceBinding<S, P> for super::Definition
+        where S: super::super::#trait_name + 'static, P: __ErrorPolicy {
+            fn router_shared(service: ::std::sync::Arc<S>, errors: P)
+                -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
+            {
+                router_with(move |_| {
+                    let service = ::std::sync::Arc::clone(&service);
+                    async move { Ok(service) }
+                }, errors)
+            }
+        }
+        impl<S, P> #runtime::http::HttpFactoryBinding<S, P> for super::Definition
+        where S: super::super::#trait_name + 'static, P: __ErrorPolicy {
+            fn router_with<F, Fut>(factory: F, errors: P)
+                -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
+            where
+                F: Fn(#runtime::http::RequestContext) -> Fut + Send + Sync + 'static,
+                Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, #runtime::http::Fault>> + Send + 'static,
+            {
+                router_with(factory, errors)
+            }
+        }
+
+        /// Select and validate this contract's HTTP binding.
+        pub fn describe() -> ::core::result::Result<#runtime::http::contract::ContractDescription, #runtime::http::BuildError> {
+            #(#no_content)*
+            let mut builder = #runtime::http::contract::ContractBuilder::new(super::describe()?);
+            for (id, binding) in __bindings() { builder.bind(&id, binding)?; }
+            Ok(builder.finish()?)
+        }
+        #[doc(hidden)]
+        pub fn __bindings() -> ::std::vec::Vec<(::std::string::String, #runtime::http::contract::HttpBinding)> {
+            #(#no_content)*
+            ::std::vec![#(#bindings),*]
+        }
+
         #[derive(Clone, Debug)]
         pub struct Client { inner: #runtime::http::Client }
 
@@ -306,19 +391,13 @@ pub fn generate(
             #(#client_methods)*
         }
 
-        // Generated composition bounds; implementations still target the authored
-        // resource trait and the ordinary ErrorPolicy implementations.
         #[doc(hidden)]
-        #[allow(private_bounds)]
-        pub trait __Service: super::#trait_name {}
-        impl<S: super::#trait_name> __Service for S {}
-        #[doc(hidden)]
-        pub trait __ErrorPolicy: #(#policies)+* {}
-        impl<P: #(#policies)+*> __ErrorPolicy for P {}
+        pub trait __ErrorPolicy: Send + Sync + 'static #(+ #policies)* {}
+        impl<P: Send + Sync + 'static #(+ #policies)*> __ErrorPolicy for P {}
 
         pub fn router<S, P>(service: S, errors: P)
             -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
-        where S: super::#trait_name + 'static, P: #(#policies)+* {
+        where S: super::super::#trait_name + 'static, P: __ErrorPolicy {
             let service = ::std::sync::Arc::new(service);
             router_with(move |_| {
                 let service = ::std::sync::Arc::clone(&service);
@@ -329,8 +408,8 @@ pub fn generate(
         pub fn router_with<S, P, F, Fut>(factory: F, errors: P)
             -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
         where
-            S: super::#trait_name + 'static,
-            P: #(#policies)+*,
+            S: super::super::#trait_name + 'static,
+            P: __ErrorPolicy,
             F: ::core::ops::Fn(#runtime::http::RequestContext) -> Fut + ::core::marker::Send + ::core::marker::Sync + 'static,
             Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, #runtime::http::Fault>> + ::core::marker::Send + 'static,
         {
@@ -342,15 +421,17 @@ pub fn generate(
             __spline_factory: ::std::sync::Arc<F>, __spline_errors: ::std::sync::Arc<P>,
         ) -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
         where
-            S: super::#trait_name + 'static,
-            P: #(#policies)+*,
+            S: super::super::#trait_name + 'static,
+            P: __ErrorPolicy,
             F: ::core::ops::Fn(#runtime::http::RequestContext) -> Fut + ::core::marker::Send + ::core::marker::Sync + 'static,
             Fut: ::core::future::Future<Output = ::core::result::Result<::std::sync::Arc<S>, #runtime::http::Fault>> + ::core::marker::Send + 'static,
         {
             let __spline_description = describe()?;
+            #[allow(unused_mut)]
             let mut __spline_router = #runtime::http::axum::Router::new();
             #(#routes)*
             Ok(__spline_router)
         }
+        #(#operation_routers)*
     })
 }

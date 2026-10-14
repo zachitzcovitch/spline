@@ -9,9 +9,3 @@ error: mutations cannot be bound to GET
    |
 11 |     #[http(get = "/test")]
    |                  ^^^^^^^
-
-error: HTTP contracts require a binding on every operation
-  --> tests/ui/http_invalid.rs:16:7
-   |
-16 | trait Partial {
-   |       ^^^^^^^

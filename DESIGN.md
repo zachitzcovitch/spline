@@ -23,6 +23,11 @@ cross-resource schema/route validation. The [blog tutorial](examples/blog/README
 demonstrates the application-facing API through separate contract, server, and
 Rust client crates plus a TypeScript package, sharing the root workspace and lockfiles.
 
+[Execution and bindings](docs/execution-bindings.md) now separates neutral contracts
+and application composition from HTTP descriptions and runtime. Typed Tower
+operation services provide a shared execution boundary for in-process and HTTP
+calls, with explicit HTTP APIs under `resource::http`/`api::http`.
+
 ## Purpose
 
 Spline lets an application define its API contract in Rust and derive the pieces

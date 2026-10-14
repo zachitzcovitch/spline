@@ -4,7 +4,7 @@ mod service;
 
 use std::sync::Arc;
 
-use spline::http::axum;
+use spline::http::{axum, HttpFactoryExt};
 use spline_example_blog_contracts::api;
 use tokio::sync::RwLock;
 
@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let store = Arc::new(RwLock::new(Store::seeded()));
-    let routes = api::router_with(
+    let routes = api::contract().http_with(
         move |context| {
             let store = Arc::clone(&store);
             async move {

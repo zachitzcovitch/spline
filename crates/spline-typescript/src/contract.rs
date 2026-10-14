@@ -22,6 +22,7 @@ impl Typescript {
             &[(None, contract.resource())],
             contract.documentation(),
             name,
+            &BTreeSet::new(),
         )
     }
 
@@ -37,6 +38,7 @@ impl Typescript {
             &application_resources(application),
             application.documentation(),
             name,
+            &BTreeSet::new(),
         )
     }
 
@@ -46,6 +48,7 @@ impl Typescript {
         resources: &[(Option<&str>, &ResourceDescription)],
         documentation: &str,
         name: &str,
+        void_outputs: &BTreeSet<String>,
     ) -> Result<Artifact, Error> {
         validate::symbol(name)?;
         let calls = format!("{name}Calls");
@@ -83,7 +86,7 @@ impl Typescript {
                 render::string(&operation.id),
                 render::string(kind),
                 render::shape(input_shape(operation, schemas)?, &artifact.symbols, 1)?,
-                output(operation, &artifact.symbols)?,
+                output(operation, &artifact.symbols, void_outputs)?,
                 render::shape(&operation.error, &artifact.symbols, 1)?
             )
             .unwrap();
@@ -112,7 +115,7 @@ impl Typescript {
                     artifact.source,
                     "{indent}{}({parameters}): Promise<{result}<{}, {}, Failure>>;",
                     render::property(&operation.name),
-                    output(operation, &artifact.symbols)?,
+                    output(operation, &artifact.symbols, void_outputs)?,
                     render::shape(&operation.error, &artifact.symbols, depth)?
                 )
                 .unwrap();
@@ -182,12 +185,9 @@ pub(crate) fn parameters(
 pub(crate) fn output(
     operation: &spline_contract::Operation,
     symbols: &std::collections::BTreeMap<DefinitionId, String>,
+    void_outputs: &BTreeSet<String>,
 ) -> Result<String, Error> {
-    if operation
-        .http
-        .as_ref()
-        .is_some_and(|plan| plan.binding.success_status == 204)
-    {
+    if void_outputs.contains(&operation.id) {
         Ok("void".into())
     } else {
         render::shape(&operation.output, symbols, 1)

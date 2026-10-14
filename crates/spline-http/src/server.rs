@@ -6,7 +6,7 @@ use axum::http::{header, Extensions, HeaderMap, Method, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{Map, Value};
-use spline_contract::http::{HttpPlan, Scalar};
+use spline_http_contract::{HttpPlan, Scalar};
 
 use crate::{json_content_type, ERROR_HEADER, MAX_BODY_BYTES};
 
@@ -119,6 +119,23 @@ pub fn respond<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
                 Ok(body) => json_response(status, body, Some("application")),
                 Err(_) => Fault::internal().into_response(),
             }
+        }
+    }
+}
+
+/// Translate a neutral Tower invocation into this binding's response envelopes.
+pub fn respond_call<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
+    result: Result<T, spline_runtime::CallError<E>>,
+    success: u16,
+    policy: &P,
+) -> Response {
+    match result {
+        Ok(value) => respond(Ok::<_, E>(value), success, policy),
+        Err(spline_runtime::CallError::Application(error)) => {
+            respond(Err::<T, _>(error), success, policy)
+        }
+        Err(spline_runtime::CallError::Service(_)) => {
+            Fault::new(500, "service_failure", "operation service failed").into_response()
         }
     }
 }

@@ -66,7 +66,7 @@ async fn run(base_url: &str) -> Result<()> {
 
 // -------- Client configuration --------
 
-fn create_client(base_url: &str, token: &str) -> Result<api::Client> {
+fn create_client(base_url: &str, token: &str) -> Result<api::http::Client> {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::AUTHORIZATION,
@@ -77,5 +77,5 @@ fn create_client(base_url: &str, token: &str) -> Result<api::Client> {
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(10))
         .build()?;
-    Ok(api::Client::with_http(base_url, http)?)
+    Ok(api::http::Client::with_http(base_url, http)?)
 }

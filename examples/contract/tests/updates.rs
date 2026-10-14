@@ -6,9 +6,8 @@ use spline::{
     http::{self, axum, reqwest, CallError},
     Patch,
 };
-use spline_example_contract::{
-    error_status, users, DemoUsers, NewUser, ReplaceUser, UserId, UserPatch,
-};
+use spline_example_contract::users::http as users;
+use spline_example_contract::{error_status, DemoUsers, NewUser, ReplaceUser, UserId, UserPatch};
 
 struct Running {
     base: String,

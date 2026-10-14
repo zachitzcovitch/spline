@@ -12,8 +12,9 @@ a development dependency of this benchmark package only.
 | `schema/cold_post` | Register the blog `Post` and shared `User`, finish/drop the graph. | None; a fresh registry is constructed each iteration. |
 | `schema/cold_recursive_tree` | Register and finish/drop a recursive definition graph. | None. This measures schema registration, not traversal of tree values. |
 | `schema/cached_post` | Register an already known root in a populated registry. | Initial registration. The registry's transactional cloning/checking is still measured. |
-| `metadata/blog` | Describe the real blog application: two resources, four operations. | None. |
-| `metadata/shared_dtos/{1,10,100}` | Build synthetic applications with increasing operation counts and shared DTOs. | None. This isolates operation-count scaling, not schema-count scaling. |
+| `metadata/neutral_blog` | Describe the neutral blog application: two resources, four operations. | None. |
+| `metadata/http_blog` | Describe the blog and validate its separate HTTP bindings. | None. |
+| `metadata/neutral_shared_dtos/{1,10,100}` | Build neutral synthetic applications with increasing operation counts and shared DTOs. | None. This isolates operation-count scaling, not schema-count scaling. |
 | `typescript/export_http/{blog,100_resources}` | Render types, plans, and the fetch runtime into one source string. | Contract description and exporter configuration; no filesystem writes. |
 | `http/loopback_get_post/{spline,reqwest_serde}/{128,16384}` | One sequential GET, server response serialization, HTTP, and typed response decoding. | Router/client construction, Tokio startup, and initial connection establishment. |
 | Node `spline_{compatible,strict}/{128,16384}` | Generated TS request construction, a fresh synthetic fetch response, parsing, validation/projection. | Generated module loading, client construction, fixture serialization. |
@@ -24,6 +25,11 @@ throughput uses the complete serialized JSON size. The native HTTP fixture uses
 the blog contracts with a fixed read-only service on an ephemeral loopback port,
 two Tokio workers, no TLS/authentication, and a reused reqwest connection pool.
 The fixture's post cloning and server encoding are part of the measurement.
+HTTP dispatch goes through the generated typed Tower operation adapter.
+
+The neutral metadata cases have new benchmark IDs because the earlier
+`metadata/blog`/`metadata/shared_dtos` cases included HTTP planning in the core
+description. Old measurements of those cases have a different timed boundary.
 
 The reqwest comparison talks to the **same Spline server** and decodes the same
 Rust DTO, but does not perform Spline response-schema checks. It provides context

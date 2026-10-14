@@ -15,11 +15,15 @@ priorities rather than release-date commitments.
 - Multi-resource applications, shared request context, and grouped clients.
 - A [multi-crate blog tutorial](examples/blog/README.md) and cross-language CI.
 - [Local performance benchmarks](benchmarks/README.md) for metadata, export, and clients.
+- [Typed Tower execution and explicit bindings](docs/execution-bindings.md), with
+  neutral composition and an in-process adapter alongside HTTP.
+- Neutral service bundles with adapter-owned extension traits for protocol selection
+  and request-scoped HTTP factories.
 
 ## Next priorities
 
 1. **Declarative error/status metadata.** Represent application-error status
-   mappings in the contract so runtime behavior and exported documentation agree.
+   mappings in HTTP binding metadata so runtime behavior and exported documentation agree.
 2. **OpenAPI export.** Export the implemented HTTP profile, directional schemas,
    response envelopes, and error mappings from the application description.
 3. **First published release.** Review public APIs and documentation, verify

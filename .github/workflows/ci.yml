@@ -34,6 +34,10 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Check metadata-only facade
         run: cargo check --locked -p spline --no-default-features
+      - name: Check neutral dependency boundary
+        run: npm run check:neutral
+      - name: Run neutral typed execution
+        run: cargo run --locked -p spline --no-default-features --example neutral
       - name: Run Rust and cross-language HTTP tests
         run: cargo test --locked --workspace
       - name: Run multi-crate blog workflow

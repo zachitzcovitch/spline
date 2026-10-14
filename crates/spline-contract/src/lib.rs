@@ -3,13 +3,12 @@
 
 #![forbid(unsafe_code)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use spline_schema::{Direction, Graph, Presence, Registry, Schema, Shape};
 
 mod application;
-pub mod http;
 
 pub use application::{ApplicationBuilder, ApplicationDescription};
 
@@ -33,7 +32,6 @@ pub struct Operation {
     pub arguments: Vec<Argument>,
     pub output: Shape,
     pub error: Shape,
-    pub http: Option<http::HttpPlan>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -132,7 +130,7 @@ impl ContractBuilder {
         let output = candidate.register::<Output>(Direction::Serialize)?;
         let error = candidate.register::<ApplicationError>(Direction::Serialize)?;
         let graph = candidate.clone().finish()?;
-        let arguments = match http::resolve(&input, &graph)? {
+        let arguments = match resolve_input(&input, &graph)? {
             Shape::Object(object) => object
                 .fields
                 .iter()
@@ -161,36 +159,9 @@ impl ContractBuilder {
                 arguments,
                 output,
                 error,
-                http: None,
             },
         );
         self.schemas = candidate;
-        Ok(())
-    }
-
-    pub fn http(&mut self, operation: &str, binding: http::HttpBinding) -> Result<()> {
-        let target = self
-            .operations
-            .get(operation)
-            .ok_or_else(|| Error::Http(format!("unknown operation {operation}")))?;
-        if target.http.is_some() {
-            return Err(Error::Http(format!("duplicate binding for {operation}")));
-        }
-        let graph = self.schemas.clone().finish()?;
-        let plan = http::plan(target, binding, &graph)?;
-        for existing in self
-            .operations
-            .values()
-            .filter_map(|operation| operation.http.as_ref())
-        {
-            if http::conflicts(existing, &plan) {
-                return Err(Error::Http(format!(
-                    "conflicting HTTP route {}",
-                    plan.binding.path
-                )));
-            }
-        }
-        self.operations.get_mut(operation).unwrap().http = Some(plan);
         Ok(())
     }
 
@@ -225,6 +196,24 @@ fn identifier(value: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+fn resolve_input<'a>(mut shape: &'a Shape, graph: &'a Graph) -> Result<&'a Shape> {
+    let mut visited = BTreeSet::new();
+    while let Shape::Ref(id) = shape {
+        if !visited.insert(id) {
+            return Err(spline_schema::Error::InvalidShape(
+                "cyclic alias in operation input".into(),
+            )
+            .into());
+        }
+        shape = &graph
+            .definitions()
+            .get(id)
+            .ok_or_else(|| spline_schema::Error::UnresolvedReference(id.clone()))?
+            .shape;
+    }
+    Ok(shape)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     InvalidIdentifier(String),
@@ -233,7 +222,6 @@ pub enum Error {
     DuplicateNamespace(String),
     EmptyContract,
     EmptyApplication,
-    Http(String),
     Schema(spline_schema::Error),
 }
 
@@ -254,7 +242,6 @@ impl fmt::Display for Error {
             Self::EmptyApplication => {
                 f.write_str("an application must contain at least one resource")
             }
-            Self::Http(message) => write!(f, "invalid HTTP binding: {message}"),
             Self::Schema(error) => error.fmt(f),
         }
     }

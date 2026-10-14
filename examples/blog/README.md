@@ -41,7 +41,8 @@ examples/blog/
 ```
 
 Both Rust applications declare a path dependency on `../contracts`. The contract
-crate contains the DTOs, traits, and generated HTTP entry points:
+crate contains the DTOs, traits, neutral descriptions, and typed operation services.
+Its explicit `http` modules supply the selected HTTP adapters:
 
 ```text
 server ──────→ contracts ←────── rust-client
@@ -180,10 +181,15 @@ pub trait Posts {
 }
 ```
 
-Spline exposes `posts::Client`, `posts::router`, and `posts::describe` directly in
+Spline exposes `posts::describe` and typed operation services directly in
 that existing module. Its default namespace is `posts`, giving identities such as
 `posts.create`. The same pattern works with an inline `pub mod posts { ... }` in
 one file.
+
+HTTP is selected through `posts::http::Client`, `posts::http::router`, and
+`posts::http::describe`. `posts::in_process::Client` uses the same implementation
+and typed Tower services with direct Rust values. The HTTP annotations describe
+the optional binding; the operation description and application composition are neutral.
 
 The declaration records the operation's types, mutation kind, HTTP path, body mapping, and
 success status. Calling `create(new_post)` sends the `NewPost` JSON directly as
@@ -227,10 +233,12 @@ user ID for the current request.
 The shared types live in `service/mod.rs`; `service/users.rs` and
 `service/posts.rs` implement the corresponding contract traits on that session.
 
-The server wires it up once:
+The server selects the HTTP adapter through its extension trait:
 
 ```rust
-let routes = api::router_with(
+use spline::http::HttpFactoryExt;
+
+let routes = api::contract().http_with(
     move |context| {
         let store = Arc::clone(&store);
         async move {
@@ -247,6 +255,13 @@ operation. `auth::authenticate` returns a user ID or a framework `Fault` with
 status 401. Application authentication can use this same boundary to verify a
 session or obtain a principal from middleware extensions.
 
+`api::contract()` supplies the neutral contract without an implementation.
+Importing `HttpFactoryExt` and calling `http_with` selects HTTP and gives the
+factory its inferred `RequestContext` type. For a single
+shared implementation, the corresponding flow is
+`api::shared(implementation).http(error_statuses)?` with `HttpExt`. Direct typed
+calls use `.in_process()?` with `spline::runtime::InProcessExt`.
+
 `ErrorStatuses` implements `ErrorPolicy<UserError>` and `ErrorPolicy<PostError>`:
 
 | Failure | HTTP status | Client category |
@@ -260,7 +275,7 @@ The schema checks that a title is a string. The server applies the business rule
 that its trimmed content must be nonempty. Mutations hold the write lock while
 checking ownership and updating state.
 
-`api::router_with` returns an Axum router. `main.rs` nests it under `/api`, which
+`http_with` returns an Axum router. `main.rs` nests it under `/api`, which
 is why that prefix belongs in both clients' base URLs.
 
 ## 3. Call it from either language
@@ -343,12 +358,17 @@ npm run check --workspace spline-blog-client
 npm run test:blog
 ```
 
-The exporter calls `api::describe()` and
+The exporter calls `api::http::describe()` and
 `Typescript::export_http_application(..., "Blog")`, producing `createBlogClient`,
 public DTO types, `BlogClient`/`BlogResult`, and the `BlogOperations`/`BlogCalls`
 type maps. Edit the
 Rust contract to change that generated file. Ordinary server/client startup
 collects its metadata internally.
+
+`api::describe()` describes the neutral application; selecting `::http::describe()`
+validates route/body/status mappings and supplies the binding metadata to the HTTP
+exporter. See [execution and bindings](../../docs/execution-bindings.md) for the
+in-process adapter and typed operation middleware.
 
 The Cargo example target is named `blog-export` to give it a unique executable
 name within the shared workspace; its source is `contracts/examples/export.rs`.

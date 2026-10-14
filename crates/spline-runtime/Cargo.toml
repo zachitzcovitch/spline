@@ -1,0 +1,17 @@
+[package]
+name = "spline-runtime"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Protocol-neutral typed Tower execution for Spline operations"
+
+[dependencies]
+tower.workspace = true
+spline-contract.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+tower = { workspace = true, features = ["limit", "timeout"] }

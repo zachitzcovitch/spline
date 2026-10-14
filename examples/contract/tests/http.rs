@@ -7,7 +7,8 @@ use spline::{
     http::{self, axum, reqwest, CallError},
     Schema,
 };
-use spline_example_contract::{error_status, users, ApiError, DemoUsers, NewUser, UserId};
+use spline_example_contract::users::http as users;
+use spline_example_contract::{error_status, ApiError, DemoUsers, NewUser, UserId};
 
 struct Running {
     base: String,
@@ -101,7 +102,9 @@ impl Echo for EchoService {
 async fn rust_and_generated_typescript_clients_call_the_same_server() {
     let router = users::router(DemoUsers::default(), error_status)
         .unwrap()
-        .merge(echo::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST).unwrap());
+        .merge(
+            echo::http::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST).unwrap(),
+        );
     let server = serve(router).await;
     let client = users::Client::new(&server.base).unwrap();
     assert_eq!(
@@ -158,7 +161,7 @@ async fn rust_and_generated_typescript_clients_call_the_same_server() {
     std::fs::create_dir_all(&directory).unwrap();
     std::fs::write(directory.join("package.json"), "{\"type\":\"module\"}").unwrap();
     let generated = spline_typescript::Typescript::new()
-        .export_http_client(&echo::describe().unwrap(), "Echo")
+        .export_http_client(&echo::http::describe().unwrap(), "Echo")
         .unwrap()
         .source;
     let echo_path = directory.join("echo.ts");
@@ -270,9 +273,10 @@ async fn malformed_requests_are_structured_framework_errors() {
 
 #[tokio::test]
 async fn encoded_paths_scalar_queries_and_base_prefixes_round_trip() {
-    let router = echo::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST).unwrap();
+    let router =
+        echo::http::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST).unwrap();
     let server = serve(axum::Router::new().nest("/v1", router)).await;
-    let client = echo::Client::new(&format!("{}/v1/", server.base)).unwrap();
+    let client = echo::http::Client::new(&format!("{}/v1/", server.base)).unwrap();
     assert!(client.health().await.is_ok());
     assert!(client.no_content().await.is_ok());
     assert!(client.command(false).await.is_ok());
@@ -437,7 +441,7 @@ pub trait Broken {
 
 #[test]
 fn native_client_checks_shared_dto_compatibility_and_base_url() {
-    assert!(broken::Client::new("http://localhost")
+    assert!(broken::http::Client::new("http://localhost")
         .unwrap_err()
         .to_string()
         .contains("incompatible"));
@@ -452,4 +456,35 @@ fn native_client_checks_shared_dto_compatibility_and_base_url() {
     ] {
         assert!(users::Client::new(base).is_err());
     }
+}
+
+#[tokio::test]
+async fn http_accepts_the_same_typed_operation_middleware_and_maps_service_failures() {
+    use spline::runtime::tower::{self, ServiceExt};
+    let service = spline_example_contract::users::get::Service::new(Arc::new(DemoUsers::default()))
+        .map_request(|mut input: spline_example_contract::users::get::Input| {
+            input.id = UserId("user_1".into());
+            input
+        });
+    let server = serve(users::get::router(service, error_status).unwrap()).await;
+    assert_eq!(
+        users::Client::new(&server.base)
+            .unwrap()
+            .get(UserId("missing".into()))
+            .await
+            .unwrap()
+            .display_name,
+        "Zach"
+    );
+
+    let failed = tower::service_fn(|_: spline_example_contract::users::get::Input| async {
+        Err::<Result<spline_example_contract::User, ApiError>, _>(std::io::Error::other(
+            "middleware failed",
+        ))
+    });
+    let server = serve(users::get::router(failed, error_status).unwrap()).await;
+    assert!(
+        matches!(users::Client::new(&server.base).unwrap().get(UserId("user_1".into())).await,
+        Err(CallError::Framework(http::Fault { status: 500, code, .. })) if code == "service_failure")
+    );
 }

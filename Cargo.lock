@@ -1159,7 +1159,9 @@ dependencies = [
  "spline-contract",
  "spline-http",
  "spline-macros",
+ "spline-runtime",
  "spline-schema",
+ "tokio",
  "trybuild",
 ]
 
@@ -1230,9 +1232,19 @@ dependencies = [
  "serde",
  "serde_json",
  "spline-contract",
+ "spline-http-contract",
+ "spline-runtime",
  "spline-schema",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "spline-http-contract"
+version = "0.1.0"
+dependencies = [
+ "spline-contract",
+ "spline-schema",
 ]
 
 [[package]]
@@ -1243,6 +1255,15 @@ dependencies = [
  "quote",
  "serde_derive_internals",
  "syn 3.0.3",
+]
+
+[[package]]
+name = "spline-runtime"
+version = "0.1.0"
+dependencies = [
+ "spline-contract",
+ "tokio",
+ "tower",
 ]
 
 [[package]]
@@ -1266,6 +1287,7 @@ dependencies = [
  "serde_json",
  "spline",
  "spline-contract",
+ "spline-http-contract",
  "spline-schema",
 ]
 
@@ -1422,6 +1444,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-util"
+version = "0.7.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "toml"
 version = "1.1.8+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1471,8 +1506,10 @@ dependencies = [
  "pin-project-lite",
  "sync_wrapper",
  "tokio",
+ "tokio-util",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

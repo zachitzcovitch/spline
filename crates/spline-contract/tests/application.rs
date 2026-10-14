@@ -1,7 +1,4 @@
-use spline_contract::{
-    http::{HttpBinding, HttpMethod},
-    ApplicationBuilder, ContractBuilder, Error, OperationKind,
-};
+use spline_contract::{ApplicationBuilder, ContractBuilder, Error, OperationKind};
 use spline_schema::{Context, Field, Object, Schema, Shape, TypeInfo, UnknownFields};
 
 struct Shared;
@@ -123,53 +120,6 @@ fn invalid_empty_and_duplicate_resources_are_rejected() {
         Err(Error::DuplicateNamespace(_))
     ));
     assert_eq!(builder.finish().unwrap().resources().len(), 1);
-}
-
-fn route(
-    resource: &mut ContractBuilder,
-    method: HttpMethod,
-    path: &str,
-) -> spline_contract::Result<()> {
-    operation(resource)?;
-    resource.http(
-        "get",
-        HttpBinding {
-            method,
-            path: path.into(),
-            body: None,
-            success_status: 200,
-        },
-    )
-}
-
-#[test]
-fn route_conflicts_cross_resources_and_report_both_operation_ids() {
-    let mut builder = ApplicationBuilder::new("");
-    builder
-        .resource("users", "users", "", |r| {
-            route(r, HttpMethod::Get, "/items/{id}")
-        })
-        .unwrap();
-    for (method, path) in [
-        (HttpMethod::Get, "/items/{id}"),
-        (HttpMethod::Post, "/items/{key}"),
-    ] {
-        let error = builder
-            .resource("posts", "posts", "", |r| route(r, method, path))
-            .unwrap_err()
-            .to_string();
-        assert!(
-            error.contains("users.get") && error.contains("posts.get"),
-            "{error}"
-        );
-    }
-    // Same spelling, distinct method is legal; a failed merge leaves no residue.
-    builder
-        .resource("posts", "posts", "", |r| {
-            route(r, HttpMethod::Post, "/items/{id}")
-        })
-        .unwrap();
-    assert_eq!(builder.finish().unwrap().resources().len(), 2);
 }
 
 #[test]

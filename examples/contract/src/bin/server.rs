@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:3000".into());
     let listener = tokio::net::TcpListener::bind(&address).await?;
-    let router = users::router(DemoUsers::default(), error_status)?;
+    let router = users::http::router(DemoUsers::default(), error_status)?;
     println!("Listening on http://{}", listener.local_addr()?);
     axum::serve(listener, router).await?;
     Ok(())

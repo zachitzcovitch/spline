@@ -7,7 +7,8 @@ This directory includes the CRUD example and deeper protocol conformance fixture
 and a shared in-memory Rust implementation of the generated server trait. The
 explicit `module = "users"` declaration names the public companion namespace.
 
-`users::describe()` builds the metadata for export tooling. The generator emits
+`users::describe()` describes the neutral contract; `users::http::describe()` selects
+the HTTP binding for export tooling. The generator emits
 [typescript/generated.ts](typescript/generated.ts), including wire types,
 `UsersOperations`, positional `UsersCalls` signatures, and `createUsersClient`.
 

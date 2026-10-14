@@ -90,6 +90,7 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
     let mut registrations = Vec::new();
     let mut assertions = Vec::new();
     let mut http_methods = Vec::new();
+    let mut execution_methods = Vec::new();
     let mut operation_modules = Vec::new();
 
     for trait_item in &mut item.items {
@@ -108,6 +109,15 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             "__spline_runtime",
             "__register_operations",
             "__spline_namespace",
+            "http",
+            "in_process",
+            "Operation",
+            "Service",
+            "Definition",
+            "Services",
+            "new",
+            "clone",
+            "__from_shared",
         ]
         .contains(&rust_name.as_str())
         {
@@ -220,13 +230,30 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
         if let Some(binding) = &http {
             binding.validate(kind, &field_names)?;
         }
-        let input_derives = if http.is_some() {
-            quote!(#runtime::__private::serde::Deserialize, #runtime::__private::serde::Serialize)
+        let input_declaration = if http.is_some() {
+            quote! {
+                #runtime::__private::http_input! {
+                    #[derive(#runtime::__private::serde::Deserialize, #runtime::__private::serde::Serialize)]
+                    #[serde(crate = #serde_path, deny_unknown_fields)]
+                    pub struct Input { #(#fields,)* },
+                    #[derive(#runtime::__private::serde::Deserialize)]
+                    #[serde(crate = #serde_path, deny_unknown_fields)]
+                    pub struct Input { #(#fields,)* }
+                }
+            }
         } else {
-            quote!(#runtime::__private::serde::Deserialize)
+            quote! {
+                #[derive(#runtime::__private::serde::Deserialize)]
+                #[serde(crate = #serde_path, deny_unknown_fields)]
+                pub struct Input { #(#fields,)* }
+            }
         };
         let disabled_output = if http.is_some() {
-            quote!()
+            quote! {
+                if __spline_cx.direction() == #runtime::Direction::Serialize && !#runtime::__private::HTTP_ENABLED {
+                    return Err(#runtime::Error::Unsupported(::std::string::String::from("Serialize Schema is disabled for this type")));
+                }
+            }
         } else {
             quote! {
                 if __spline_cx.direction() == #runtime::Direction::Serialize {
@@ -237,13 +264,23 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             }
         };
         let wire_name = &name;
+        let execution_method = crate::execution::Method {
+            name: method_name.clone(),
+            wire_name: name.clone(),
+            fields: field_names.clone(),
+            types: field_types.clone(),
+            output: output_alias.clone(),
+            error: error_alias.clone(),
+            query: kind,
+        };
+        let operation_service =
+            crate::execution::operation(&execution_method, &runtime, trait_name);
+        execution_methods.push(execution_method);
         requests.push(quote! {
             #[allow(non_snake_case)]
             pub mod #method_name {
                 use super::__spline_runtime;
-                #[derive(#input_derives)]
-                #[serde(crate = #serde_path, deny_unknown_fields)]
-                pub struct Input { #(#fields,)* }
+                #input_declaration
 
                 impl #runtime::Schema for Input {
                     fn info() -> #runtime::TypeInfo {
@@ -261,6 +298,7 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
                         }))
                     }
                 }
+                #operation_service
             }
         });
         operation_modules.push(method_name.clone());
@@ -281,19 +319,13 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             )?;
         });
         if let Some(binding) = http {
-            if binding.status == 204 {
-                assertions.push(quote_spanned! {output.span()=>
-                    #runtime::__private::assert_no_content::<super::#output_alias>();
-                });
-            }
-            let metadata = binding.metadata(&runtime);
-            registrations.push(quote! { __spline_builder.http(#name, #metadata)?; });
             http_methods.push(crate::http::Method {
                 name: method_name.clone(),
                 wire_name: name,
                 fields: field_names,
                 types: field_types,
                 output: output_alias,
+                output_span: output.span(),
                 error: error_alias,
                 binding,
             });
@@ -322,17 +354,8 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
     item.supertraits
         .push(syn::parse_quote!(::core::marker::Sync));
     item.colon_token = Some(Default::default());
-    let http_code = if http_methods.is_empty() {
-        quote!()
-    } else {
-        if http_methods.len() != requests.len() {
-            return Err(syn::Error::new_spanned(
-                trait_name,
-                "HTTP contracts require a binding on every operation",
-            ));
-        }
-        crate::http::generate(&http_methods, &runtime, trait_name, namespace.as_ref())?
-    };
+    let http_code = crate::http::generate(&http_methods, &runtime, trait_name, namespace.as_ref())?;
+    let execution_code = crate::execution::resource(&execution_methods, &runtime, trait_name);
     let support = quote! {
         use super::#runtime_alias as __spline_runtime;
         fn __spline_namespace() -> &'static str { #namespace_value }
@@ -356,27 +379,24 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             #(#registrations)*
             Ok(())
         }
-        #http_code
+        #execution_code
+        #runtime::__private::http! { pub mod http { #http_code } }
     };
     let generated = if let Some(module) = module {
         quote! { #visibility mod #module { #support } }
     } else {
         let hidden = format_ident!("__Spline_{}_Contract", trait_name);
         let mut exports = operation_modules;
-        let support_names = if http_methods.is_empty() {
-            vec!["describe", "register"]
-        } else {
-            vec![
-                "describe",
-                "register",
-                "Client",
-                "router",
-                "router_with",
-                "__router_with",
-                "__Service",
-                "__ErrorPolicy",
-            ]
-        };
+        let support_names = vec![
+            "describe",
+            "register",
+            "contract",
+            "shared",
+            "Definition",
+            "Services",
+            "in_process",
+            "__Service",
+        ];
         for name in support_names {
             // One import brings both type and value namespaces into scope. An
             // operation module named `register` can coexist with register().
@@ -390,6 +410,9 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             #[doc(inline)]
             #[allow(unused_imports)]
             #visibility use #hidden::{#(#exports),*};
+            #source_runtime::__private::http! {
+                #visibility use #hidden::http;
+            }
         }
     };
     Ok(quote! {

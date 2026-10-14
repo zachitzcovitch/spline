@@ -10,6 +10,8 @@ description = "HTTP/JSON binding runtime for Spline, using Axum and reqwest"
 
 [dependencies]
 spline-contract.workspace = true
+spline-http-contract.workspace = true
+spline-runtime.workspace = true
 spline-schema.workspace = true
 serde.workspace = true
 serde_json.workspace = true

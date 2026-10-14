@@ -47,7 +47,9 @@ DTOs use Serde and `#[derive(spline::Schema)]`. The macro generates:
 
 - An implementable `Users: Send + Sync` trait with `Send` operation futures.
 - Typed argument structs and HTTP support in the existing `users` module.
-- `users::router(service, error_status)` and `users::Client::new(base_url)`.
+- Typed Tower operation services and `users::in_process::Client` for direct calls.
+- `users::http::router(service, error_status)` and `users::http::Client::new(base_url)`
+  when HTTP is selected.
 - `users::describe()` for export tooling and introspection. Server/client setup
   collects the metadata internally.
 
@@ -59,7 +61,7 @@ when needed. The [blog tutorial](examples/blog/README.md) demonstrates the defau
 Export the metadata:
 
 ```rust
-let contract = users::describe()?;
+let contract = users::http::describe()?;
 let artifact = spline_typescript::Typescript::new()
     .export_http_client(&contract, "Users")?;
 ```
@@ -69,7 +71,7 @@ The [generated TypeScript](examples/contract/typescript/generated.ts) includes
 preserve authored positional parameters:
 
 ```rust
-let client = users::Client::new("http://localhost:3000")?;
+let client = users::http::Client::new("http://localhost:3000")?;
 let user = client.get(UserId("user_1".into())).await?;
 ```
 
@@ -128,17 +130,29 @@ spline::api! {
     }
 }
 
-let router = api::router_with(session_factory, error_policy)?;
-let client = api::Client::new("http://localhost:3000")?;
+use spline::http::HttpFactoryExt;
+let router = api::contract().http_with(session_factory, error_policy)?;
+let client = api::http::Client::new("http://localhost:3000")?;
 let user = client.users().get(id).await?;
 ```
 
-`Typescript::export_http_application(&api::describe()?, "Api")` generates one
+`Typescript::export_http_application(&api::http::describe()?, "Api")` generates one
 `createApiClient` factory with `client.users.get(id)` and `client.posts.create(input)`.
-Resources share configuration and schemas; application construction validates
-namespaces, schema identities, and route conflicts across the full API. See
+Resources share configuration and schemas. Neutral composition validates
+namespaces and schema identities; HTTP selection validates routes across the API. See
 [application composition](docs/application-composition.md) for shared authentication,
 state, error policies, and executable Rust/TypeScript fixtures.
+
+`api::describe()` remains neutral. `api::in_process::Client::new(implementation)?`
+uses the same typed Tower operation services with direct Rust values. HTTP route,
+body, and status validation occurs in the separately selected HTTP binding. See
+[execution and bindings](docs/execution-bindings.md) for Tower middleware, readiness,
+and protocol boundaries.
+
+For shared implementations, import `spline::http::HttpExt` and select HTTP with
+`api::shared(implementation).http(error_policy)?`. Import
+`spline::runtime::InProcessExt` to select `.in_process()?` on that same neutral
+bundle. Adapter-specific methods become available through the corresponding trait.
 
 ## Workspace
 
@@ -150,6 +164,8 @@ state, error policies, and executable Rust/TypeScript fixtures.
 | `spline-macros` | Schema derive and contract attribute; private Serde adapter. |
 | `spline-typescript` | Deterministic wire types and operation signatures. |
 | `spline-http` | Axum dispatch support, HTTP errors, and the reqwest client runtime. |
+| `spline-http-contract` | Lightweight HTTP binding descriptions and validation. |
+| `spline-runtime` | Protocol-neutral typed Tower execution and service failures. |
 
 `examples/blog` is the guided multi-crate application tutorial. `examples/contract` contains
 the CRUD example and protocol/evolution/composition conformance fixtures. Packages
@@ -200,6 +216,8 @@ cargo test --locked --workspace
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo check --locked -p spline --no-default-features
+npm run check:neutral
+cargo run --locked -p spline --no-default-features --example neutral
 cargo run --locked -p spline-typescript --example export -- --check
 cargo run --locked -p spline-example-contract -- --check
 cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
@@ -243,6 +261,8 @@ same machine and toolchain.
   shared state/authentication, and whole-application validation.
 - [TypeScript types and editor support](docs/typescript.md): readable public names,
   direct signatures, directional differences, and collision overrides.
+- [Execution and bindings](docs/execution-bindings.md): neutral composition, typed
+  Tower services, in-process calls, and explicit HTTP selection.
 - [Overall design](DESIGN.md): agreed direction and the broader roadmap.
 - [Research index](research/README.md): the experiments and source reviews behind
    the implementation, including where their code and tests now live.

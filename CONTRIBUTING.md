@@ -39,6 +39,8 @@ Cargo and npm lockfiles are checked in so local and CI dependencies agree.
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo check --locked -p spline --no-default-features
+npm run check:neutral
+cargo run --locked -p spline --no-default-features --example neutral
 cargo test --locked --workspace
 cargo run --locked -p spline-typescript --example export -- --check
 cargo run --locked -p spline-example-contract -- --check
@@ -108,15 +110,18 @@ names or generated signatures; see [docs/typescript.md](docs/typescript.md).
 ## Where changes belong
 
 - `spline-schema`: directional shapes, registration, and field semantics.
-- `spline-contract`: operation identities, argument order, and binding metadata.
+- `spline-contract`: neutral operation identities, argument order, and composition.
+- `spline-http-contract`: HTTP binding descriptions and planning/route validation.
+- `spline-runtime`: neutral definitions/bundles, typed Tower invocation, and in-process extensions.
 - `spline-macros`: schema/contract authoring and generated Rust; Serde's internal
   API stays behind the private adapter.
 - `spline`: application-facing re-exports and macro conformance tests.
-- `spline-http`: HTTP encoding, Axum/reqwest integration, and client errors.
+- `spline-http`: HTTP extensions, encoding, Axum/reqwest integration, and client errors.
 - `spline-typescript`: deterministic type/client export and TypeScript fixtures.
 - `examples/contract`: runnable server and clients, including end-to-end tests.
 - `examples/blog`: guided Users/Posts tutorial and its end-to-end smoke test.
 - `benchmarks`: Criterion metadata/export/HTTP benchmarks and a Node client harness.
+- `scripts/check-neutral.mjs`: guards the default facade's no-HTTP dependency boundary.
 
 Update the relevant guide in `docs/` when changing public behavior. Use the
 [research index](research/README.md) to understand the decisions behind the

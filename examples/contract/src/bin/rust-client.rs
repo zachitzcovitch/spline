@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let base = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "http://127.0.0.1:3000".into());
-    let client = users::Client::new(&base)?;
+    let client = users::http::Client::new(&base)?;
     let user = client.get(UserId("user_1".into())).await?;
     println!("Found {}", user.display_name);
     let created = client

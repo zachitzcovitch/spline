@@ -6,7 +6,8 @@
   "scripts": {
     "check": "npm run check --workspaces",
     "test:blog": "node --test examples/blog/tests/*.mjs",
-    "bench:typescript": "node benchmarks/typescript.mjs"
+    "bench:typescript": "node benchmarks/typescript.mjs",
+    "check:neutral": "node scripts/check-neutral.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

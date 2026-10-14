@@ -4,15 +4,18 @@
 
 mod client;
 mod compatibility;
+mod extensions;
 mod response;
 pub mod server;
 
 pub use axum;
 pub use client::Client;
 pub use compatibility::verify_serde;
+pub use extensions::{HttpExt, HttpFactoryBinding, HttpFactoryExt, HttpServiceBinding};
 pub use reqwest;
 pub use response::ResponsePolicy;
 pub use server::{ErrorPolicy, Fault, RequestContext};
+pub use spline_http_contract as contract;
 
 use std::fmt;
 
@@ -32,6 +35,7 @@ impl NoContent for () {}
 #[derive(Debug)]
 pub enum BuildError {
     Contract(spline_contract::Error),
+    Binding(spline_http_contract::Error),
     Schema(spline_schema::Error),
     Configuration(String),
 }
@@ -39,6 +43,11 @@ pub enum BuildError {
 impl From<spline_contract::Error> for BuildError {
     fn from(value: spline_contract::Error) -> Self {
         Self::Contract(value)
+    }
+}
+impl From<spline_http_contract::Error> for BuildError {
+    fn from(value: spline_http_contract::Error) -> Self {
+        Self::Binding(value)
     }
 }
 impl From<spline_schema::Error> for BuildError {
@@ -50,6 +59,7 @@ impl fmt::Display for BuildError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Contract(e) => e.fmt(f),
+            Self::Binding(e) => e.fmt(f),
             Self::Schema(e) => e.fmt(f),
             Self::Configuration(message) => f.write_str(message),
         }

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use spline_schema::{Graph, Registry};
 
-use crate::{http, identifier, ContractBuilder, Error, Operation, ResourceDescription, Result};
+use crate::{identifier, ContractBuilder, Error, Operation, ResourceDescription, Result};
 
 /// Resource groups and one shared, direction-aware graph. Group names are client
 /// accessors; namespaces remain the source of stable operation identities.
@@ -72,27 +72,6 @@ impl ApplicationBuilder {
         candidate.schemas = self.schemas.clone();
         register(&mut candidate)?;
         let (resource, schemas) = candidate.into_parts()?;
-        for operation in resource.operations().values() {
-            let Some(plan) = &operation.http else {
-                continue;
-            };
-            for existing in self
-                .resources
-                .values()
-                .flat_map(|r| r.operations().values())
-            {
-                if existing
-                    .http
-                    .as_ref()
-                    .is_some_and(|other| http::conflicts(other, plan))
-                {
-                    return Err(Error::Http(format!(
-                        "conflicting HTTP routes for {} and {}: {}",
-                        existing.id, operation.id, plan.binding.path,
-                    )));
-                }
-            }
-        }
         self.resources.insert(group.into(), resource);
         self.schemas = schemas;
         Ok(())

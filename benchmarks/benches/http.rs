@@ -64,7 +64,7 @@ fn http(c: &mut Criterion) {
         let (base, task) = runtime.block_on(async {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let base = format!("http://{}", listener.local_addr().unwrap());
-            let router = api::router(Service(Arc::new(post)), Errors).unwrap();
+            let router = api::http::router(Service(Arc::new(post)), Errors).unwrap();
             let task = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
             (base, task)
         });
@@ -74,7 +74,7 @@ fn http(c: &mut Criterion) {
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap();
-        let client = api::Client::with_http(&base, transport.clone()).unwrap();
+        let client = api::http::Client::with_http(&base, transport.clone()).unwrap();
         let url = format!("{base}/posts/post_1");
 
         // Check the fixture and establish reusable connections before measurement.

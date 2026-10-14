@@ -27,14 +27,17 @@ compare its TypeScript artifact with a fresh export.
 spline                         user-facing facade
 ├── spline-schema              Schema, registry, directional graph
 ├── spline-contract            operation metadata; depends on spline-schema
+├── spline-runtime             typed Tower services and invocation
 ├── spline-macros              proc macros; private Serde-internals adapter
 └── serde                      generated request decoding / output trait checks
 
 spline-http                    optional facade feature; Axum + reqwest + JSON
+└── spline-http-contract        separate HTTP descriptions and validation
 
 spline-typescript
 ├── spline-schema
-└── spline-contract
+├── spline-contract
+└── spline-http-contract        std-only binding metadata, not HTTP runtime
 ```
 
 The schema, contract metadata, and exporter normal dependency trees have no
@@ -75,8 +78,8 @@ fn get(&self, id: UserId)
 
 Implementations can continue using `async fn`. A compiler-failure fixture proves
 that holding an `Rc` across an await cannot satisfy the generated future bound.
-This is static trait dispatch; trait objects and server dispatch adapters are
-separate work.
+Generated per-operation Tower services adapt this static trait dispatch. They
+are shared by the in-process and HTTP bindings; see [execution and bindings](execution-bindings.md).
 
 ### Generated resource support
 
@@ -86,21 +89,31 @@ in `users.rs`, loaded by `pub mod users;`, exposes:
 ```text
 users
 ├── Users
-├── get::Input { id: UserId }
-├── create::Input { input: NewUser }
+├── contract() -> Definition
+├── shared(implementation) -> Services<S>
+├── get::{Input, Operation, Service<S>}
+├── create::{Input, Operation, Service<S>}
+├── in_process::Client<S>
+├── http::{Client, router, router_with, describe}   # optional HTTP feature
 ├── describe() -> Result<ContractDescription, contract::Error>
 └── register(&mut ApplicationBuilder, group) -> Result<(), contract::Error>
 ```
 
 Input wrappers derive `Deserialize` and implement a deserialize-only `Schema`, reject
-unknown named arguments, and expose public fields for a future dispatcher. A
+unknown named arguments, and expose public fields for typed dispatch. A
 zero-argument operation gets an empty named input object. Multiple arguments are
 fields of one object; optional argument types follow the established Serde
 missing-field rules.
 
 HTTP-bound contracts additionally generate input serialization and both schema
-directions for the native client. Their resource module exposes `Client`,
-`router`, and `router_with`; normal server/client setup collects metadata internally.
+directions for the native HTTP client when the feature is enabled. Their `http`
+module exposes `Client`, `router`, `router_with`, and a separate bound description.
+Neutral `describe()` and `in_process` remain usable without HTTP.
+
+The definition and bundle are neutral values. `HttpExt`, `HttpFactoryExt`, and
+`InProcessExt` provide adapter selection on them, with generated bridges retaining
+the resource's concrete implementation and error-policy bounds. See
+[extension selection](execution-bindings.md#neutral-bundles-and-protocol-extensions).
 
 Generated inputs must be `DeserializeOwned + Send`; success and application-error
 types must be `Serialize + Send`. All referenced wire types need schema
@@ -166,7 +179,7 @@ An operation records:
 - Fully qualified ID, local name, and original Rust method name.
 - Query/mutation kind and documentation.
 - Input, success, and application-error shapes.
-- Authored argument order, plus a validated HTTP plan when a binding is declared.
+- Authored argument order. HTTP plans belong to a separate binding description.
 
 The input is registered in the `Deserialize` direction. Success and error types
 are registered in the `Serialize` direction. Shared definitions are collected in

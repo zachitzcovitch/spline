@@ -4,9 +4,9 @@ use std::sync::Arc;
 use reqwest::header;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
-use spline_contract::{
-    http::{HttpMethod, HttpPlan, Scalar},
-    ApplicationDescription, ContractDescription, Operation,
+use spline_contract::Operation;
+use spline_http_contract::{
+    ApplicationDescription, ContractDescription, HttpMethod, HttpPlan, Scalar,
 };
 use spline_schema::{Graph, Shape};
 
@@ -48,8 +48,9 @@ impl Client {
     ) -> Result<Self, BuildError> {
         Self::build(
             base,
-            contract.schemas(),
-            contract.operations().values(),
+            contract.contract().schemas(),
+            contract.contract().operations().values(),
+            contract.plans(),
             http,
         )
     }
@@ -66,13 +67,20 @@ impl Client {
         application: &ApplicationDescription,
         http: reqwest::Client,
     ) -> Result<Self, BuildError> {
-        Self::build(base, application.schemas(), application.operations(), http)
+        Self::build(
+            base,
+            application.application().schemas(),
+            application.application().operations(),
+            application.plans(),
+            http,
+        )
     }
 
     fn build<'a>(
         base: &str,
         schemas: &Graph,
         operations: impl Iterator<Item = &'a Operation>,
+        bindings: &BTreeMap<String, HttpPlan>,
         http: reqwest::Client,
     ) -> Result<Self, BuildError> {
         let base =
@@ -90,14 +98,13 @@ impl Client {
         }
         let plans = operations
             .map(|operation| {
-                operation
-                    .http
-                    .clone()
+                bindings
+                    .get(&operation.id)
                     .map(|http| {
                         (
                             operation.id.clone(),
                             CallPlan {
-                                http,
+                                http: http.clone(),
                                 output: operation.output.clone(),
                                 error: operation.error.clone(),
                             },

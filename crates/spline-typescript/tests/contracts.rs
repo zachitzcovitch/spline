@@ -1,4 +1,5 @@
 use spline_contract::{ContractBuilder, OperationKind};
+use spline_http_contract::{ContractBuilder as HttpBuilder, HttpBinding, HttpMethod};
 use spline_schema::{Context, DefinitionId, Direction, Name, Schema, Shape, TypeInfo};
 use spline_typescript::{Error, Typescript};
 
@@ -62,11 +63,12 @@ fn keyword_and_runtime_shadowing_parameters_receive_local_safe_names() {
     builder
         .operation::<Input, (), ()>("inspect", "inspect", OperationKind::Query, "")
         .unwrap();
+    let mut builder = HttpBuilder::new(builder.finish().unwrap());
     builder
-        .http(
-            "inspect",
-            spline_contract::http::HttpBinding {
-                method: spline_contract::http::HttpMethod::Get,
+        .bind(
+            "safe.inspect",
+            HttpBinding {
+                method: HttpMethod::Get,
                 path: "/safe".into(),
                 body: None,
                 success_status: 200,
@@ -103,11 +105,12 @@ fn http_runtime_insertion_does_not_rewrite_user_literals_as_template_markers() {
     builder
         .operation::<Input, String, String>("send", "send", OperationKind::Mutation, "")
         .unwrap();
+    let mut builder = HttpBuilder::new(builder.finish().unwrap());
     builder
-        .http(
-            "send",
-            spline_contract::http::HttpBinding {
-                method: spline_contract::http::HttpMethod::Post,
+        .bind(
+            "marker.send",
+            HttpBinding {
+                method: HttpMethod::Post,
                 path: "/marker".into(),
                 body: Some("value".into()),
                 success_status: 200,
@@ -214,10 +217,21 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         .operation::<Empty, (), Value>("delete", "delete", OperationKind::Mutation, "")
         .unwrap();
     builder
-        .http(
-            "delete",
-            spline_contract::http::HttpBinding {
-                method: spline_contract::http::HttpMethod::Delete,
+        .operation::<Empty, (), String>("json", "json", OperationKind::Query, "")
+        .unwrap();
+    let neutral = builder.finish().unwrap();
+    assert_eq!(neutral.operations()["delete"].output, Shape::Null);
+    let neutral_source = Typescript::new()
+        .export_contract(&neutral, "Empty")
+        .unwrap()
+        .source;
+    assert!(neutral_source.contains("delete(): Promise<EmptyResult<null, Value, Failure>>"));
+    let mut builder = HttpBuilder::new(neutral);
+    builder
+        .bind(
+            "empty.delete",
+            HttpBinding {
+                method: HttpMethod::Delete,
                 path: "/empty".into(),
                 body: None,
                 success_status: 204,
@@ -225,13 +239,10 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         )
         .unwrap();
     builder
-        .operation::<Empty, (), String>("json", "json", OperationKind::Query, "")
-        .unwrap();
-    builder
-        .http(
-            "json",
-            spline_contract::http::HttpBinding {
-                method: spline_contract::http::HttpMethod::Get,
+        .bind(
+            "empty.json",
+            HttpBinding {
+                method: HttpMethod::Get,
                 path: "/json".into(),
                 body: None,
                 success_status: 200,
@@ -239,7 +250,6 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         )
         .unwrap();
     let description = builder.finish().unwrap();
-    assert_eq!(description.operations()["delete"].output, Shape::Null);
     let source = Typescript::new()
         .export_http_client(&description, "Empty")
         .unwrap()

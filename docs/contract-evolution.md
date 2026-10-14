@@ -25,8 +25,8 @@ tolerance does not rewrite schema definitions or widen generated static types.
 ```rust
 use spline::http::ResponsePolicy;
 
-let client = users::Client::new(base_url)?; // compatible
-let strict = users::Client::new(base_url)?
+let client = users::http::Client::new(base_url)?; // compatible
+let strict = users::http::Client::new(base_url)?
     .with_response_policy(ResponsePolicy::Strict);
 ```
 

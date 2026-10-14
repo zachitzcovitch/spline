@@ -2,11 +2,9 @@ use std::hint::black_box;
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use spline::http::contract::{HttpBinding, HttpMethod};
 use spline::{
-    contract::{
-        http::{HttpBinding, HttpMethod},
-        ApplicationBuilder, ApplicationDescription, OperationKind,
-    },
+    contract::{ApplicationBuilder, ApplicationDescription, OperationKind},
     Direction, Registry, Schema,
 };
 use spline_example_blog_contracts::{api, users, Post, PostError};
@@ -34,16 +32,26 @@ fn application(resources: usize) -> ApplicationDescription {
                     OperationKind::Query,
                     "",
                 )?;
-                resource.http(
-                    "get",
-                    HttpBinding {
-                        method: HttpMethod::Get,
-                        path: format!("/resources/{index}/{{id}}"),
-                        body: None,
-                        success_status: 200,
-                    },
-                )
+                Ok(())
             })
+            .unwrap();
+    }
+    builder.finish().unwrap()
+}
+
+fn http_application(resources: usize) -> spline::http::contract::ApplicationDescription {
+    let mut builder = spline::http::contract::ApplicationBuilder::new(application(resources));
+    for index in 0..resources {
+        builder
+            .bind(
+                &format!("bench.resource_{index}.get"),
+                HttpBinding {
+                    method: HttpMethod::Get,
+                    path: format!("/resources/{index}/{{id}}"),
+                    body: None,
+                    success_status: 200,
+                },
+            )
             .unwrap();
     }
     builder.finish().unwrap()
@@ -76,11 +84,14 @@ fn metadata(c: &mut Criterion) {
 
     let blog = api::describe().unwrap();
     assert_eq!(blog.operations().count(), 4);
-    c.bench_function("metadata/blog", |b| {
+    c.bench_function("metadata/neutral_blog", |b| {
         b.iter(|| black_box(api::describe().unwrap()))
     });
 
-    let mut group = c.benchmark_group("metadata/shared_dtos");
+    c.bench_function("metadata/http_blog", |b| {
+        b.iter(|| black_box(api::http::describe().unwrap()))
+    });
+    let mut group = c.benchmark_group("metadata/neutral_shared_dtos");
     for size in [1, 10, 100] {
         assert_eq!(application(size).resources().len(), size);
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, size| {
@@ -91,16 +102,17 @@ fn metadata(c: &mut Criterion) {
 
     // Descriptions and exporter configuration are prepared outside the timed loop.
     let exporter = Typescript::new();
+    let blog_http = api::http::describe().unwrap();
     assert_eq!(
         exporter
-            .export_http_application(&blog, "Blog")
+            .export_http_application(&blog_http, "Blog")
             .unwrap()
             .source,
         include_str!("../../examples/blog/typescript/generated.ts"),
     );
-    let large = application(100);
+    let large = http_application(100);
     let mut group = c.benchmark_group("typescript/export_http");
-    for (name, description) in [("blog", &blog), ("100_resources", &large)] {
+    for (name, description) in [("blog", &blog_http), ("100_resources", &large)] {
         group.bench_function(name, |b| {
             b.iter(|| {
                 black_box(

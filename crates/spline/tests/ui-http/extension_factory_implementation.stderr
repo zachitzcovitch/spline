@@ -1,0 +1,29 @@
+error[E0277]: the trait bound `(): Users` is not satisfied
+  --> tests/ui-http/extension_factory_implementation.rs:13:31
+   |
+13 |     let _ = users::contract().http_with(
+   |                               ^^^^^^^^^ the trait `Users` is not implemented for `()`
+   |
+help: this trait has no implementations, consider adding one
+  --> tests/ui-http/extension_factory_implementation.rs:3:5
+   |
+ 3 | /     pub trait Users {
+ 4 | |         #[query]
+ 5 | |         #[http(get = "/health")]
+ 6 | |         async fn health(&self) -> Result<(), ()>;
+ 7 | |     }
+   | |_____^
+note: required for `__Spline_Users_Contract::Definition` to implement `HttpFactoryBinding<(), _>`
+  --> tests/ui-http/extension_factory_implementation.rs:2:5
+   |
+ 2 |     #[spline::contract]
+   |     ^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `http_with`
+  --> $WORKSPACE/crates/spline-http/src/extensions.rs
+   |
+   |     fn http_with<S, P, F, Fut>(self, factory: F, errors: P) -> Result<Router, BuildError>
+   |        --------- required by a bound in this associated function
+   |     where
+   |         Self: HttpFactoryBinding<S, P>,
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `HttpFactoryExt::http_with`
+   = note: this error originates in the attribute macro `spline::contract` (in Nightly builds, run with -Z macro-backtrace for more info)

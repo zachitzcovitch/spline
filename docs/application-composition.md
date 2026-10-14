@@ -2,7 +2,8 @@
 
 Spline can combine resource contracts into one application router and grouped
 Rust/TypeScript clients. Enable the facade's `http` feature for the generated
-execution API. The lower-level application metadata builder is transport-neutral.
+HTTP execution API. `api::describe()` and the in-process adapter remain neutral;
+HTTP selection is explicit under `api::http`.
 
 ## Declare the application
 
@@ -27,7 +28,7 @@ For a renamed facade, put `crate = "renamed_facade";` before the module declarat
 
 File-based and inline Rust modules both work. Contracts with an explicit
 `module = "requests"` companion can be listed in the same application alongside
-same-module contracts; both expose the same registration, router, and client APIs.
+same-module contracts; both expose neutral registration and explicit binding modules.
 
 Group names determine client accessors. A contract namespace still determines
 operation identity: grouping the `app.users` contract as `people` yields
@@ -39,11 +40,30 @@ The generated module exposes:
 
 | Entry point | Purpose |
 | --- | --- |
-| `api::router(service, errors)` | Share one implementation across all resource routes. |
-| `api::router_with(factory, errors)` | Create a request-scoped implementation through one shared factory. |
-| `api::Client::new(base_url)` | Build a grouped native client using one reqwest transport. |
-| `api::Client::with_http(base_url, http)` | Share a configured reqwest transport across groups. |
+| `api::http::router(service, errors)` | Share one implementation across all HTTP routes. |
+| `api::http::router_with(factory, errors)` | Create a request-scoped implementation through one HTTP factory. |
+| `api::http::Client::new(base_url)` | Build a grouped native HTTP client. |
+| `api::http::Client::with_http(base_url, http)` | Share a configured reqwest transport across groups. |
 | `api::describe()` | Collect validated application metadata for export/introspection. |
+| `api::http::describe()` | Select and validate HTTP bindings over that description. |
+| `api::in_process::Client::new(service)` | Grouped typed calls without transport/serialization. |
+| `api::shared(implementation)` | Reuse one implementation across calls. |
+| `api::contract()` | Select an adapter whose factory supplies implementations. |
+
+Select an adapter through its extension trait:
+
+```rust
+use spline::http::HttpExt;
+use spline::runtime::InProcessExt;
+
+let bundle = api::shared(implementation);
+let local = bundle.clone().in_process()?;
+let routes = bundle.http(error_statuses)?;
+```
+
+The cloned bundle shares its implementation across adapters without requiring the
+implementation itself to be `Clone`. The extension traits are owned by their
+adapters, and selection preserves each contract's concrete bounds.
 
 ## Shared state and authentication
 
@@ -52,7 +72,9 @@ directly or delegate to resource-specific implementations. For request-scoped
 authentication, use a lightweight session implementing those traits:
 
 ```rust
-let router = api::router_with(
+use spline::http::HttpFactoryExt;
+
+let router = api::contract().http_with(
     move |context| {
         let database = database.clone();
         async move {
@@ -100,7 +122,7 @@ not invoke a resource factory.
 Rust:
 
 ```rust
-let client = api::Client::with_http("http://localhost:3000/api", configured_http)?;
+let client = api::http::Client::with_http("http://localhost:3000/api", configured_http)?;
 let user = client.users().get("alice".into()).await?;
 let post = client.posts().create(NewPost { title: "Hello".into() }).await?;
 let published = client.posts().publish(post.id).await?;
@@ -117,7 +139,7 @@ Generate one TypeScript module:
 
 ```rust
 let artifact = spline_typescript::Typescript::new()
-    .export_http_application(&api::describe()?, "Api")?;
+    .export_http_application(&api::http::describe()?, "Api")?;
 ```
 
 ```typescript
@@ -170,19 +192,24 @@ Construction rejects:
 - Duplicate namespaces, even under different client group names.
 - Different Rust types claiming the same logical schema identity and direction,
   even if their descriptions have identical shapes. Shared Rust DTOs are reused.
-- Duplicate method/path routes across resources, or conflicting parameter names
+- For HTTP selection, duplicate method/path routes across resources, or conflicting parameter names
   for the same route pattern. Different verbs on exactly the same path are allowed.
 
-Resource registration is transactional. A failed schema, operation, or route check
+Resource registration is transactional. A failed schema or operation check
 leaves the builder usable without partially registered definitions. Reversing
 resource declaration order produces equal metadata and byte-identical exports.
 TypeScript export checks public DTO and utility names across the whole application.
 Short-name collisions require an explicit exporter override. Full logical operation
 and runtime-schema identities retain their original names.
 
-Application router construction runs these checks before merging any resource
-routers. Routes merged manually outside the declared application are governed by
-Axum's own conflict checks.
+Neutral composition checks identities and schemas. The separate HTTP binding
+description checks routes, body mappings, statuses, and complete bindings before
+router construction merges resource routers. A route conflict does not invalidate
+the neutral application or its in-process execution. Routes merged manually outside
+the declared HTTP application are governed by Axum's own conflict checks.
+
+Both adapters use typed Tower operation services. See [execution and bindings](execution-bindings.md)
+for customized middleware, readiness, service failures, and in-process calls.
 
 ## Tutorial and executable evidence
 
@@ -197,8 +224,8 @@ both clients against the same authenticated server, including custom `publish`,
 shared user changes visible through posts, errors, 204, nested URLs, response
 policy, and construction failures. TypeScript also has static negative assertions.
 
-Verification covers the Rust suite and blog checks (159 behavior/integration checks
-and 27 compiler-failure fixtures), strict TypeScript checks (61 expected-error
+Verification covers the Rust suite and blog checks (170 behavior/integration checks
+and 29 compiler-failure fixtures), strict TypeScript checks (61 expected-error
 assertions), Clippy with warnings denied, formatting, metadata-only feature
 checking, and generated-artifact freshness commands.
 

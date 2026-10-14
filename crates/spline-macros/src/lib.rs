@@ -6,6 +6,7 @@ mod adapter;
 mod api;
 mod attrs;
 mod contract;
+mod execution;
 mod expand;
 mod http;
 mod model;

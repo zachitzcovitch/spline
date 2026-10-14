@@ -16,9 +16,11 @@ http = ["dep:spline-http"]
 spline-schema.workspace = true
 spline-contract.workspace = true
 spline-macros.workspace = true
+spline-runtime.workspace = true
 serde.workspace = true
 spline-http = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
 trybuild.workspace = true
+tokio.workspace = true

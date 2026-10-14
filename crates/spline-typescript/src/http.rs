@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 use std::fmt::Write;
 
-use spline_contract::{
-    http::HttpMethod, ApplicationDescription, ContractDescription, ResourceDescription,
-};
+use spline_contract::ResourceDescription;
+use spline_http_contract::{ApplicationDescription, ContractDescription, HttpMethod, HttpPlan};
 use spline_schema::{Graph, Presence, Shape, UnknownFields};
+use std::collections::BTreeMap;
 
 use crate::{contract, render, Artifact, Error, Typescript};
 
@@ -15,10 +15,11 @@ impl Typescript {
         name: &str,
     ) -> Result<Artifact, Error> {
         self.export_http_resources(
-            contract.schemas(),
-            &[(None, contract.resource())],
-            contract.documentation(),
+            contract.contract().schemas(),
+            &[(None, contract.contract().resource())],
+            contract.contract().documentation(),
             name,
+            contract.plans(),
         )
     }
 
@@ -30,10 +31,11 @@ impl Typescript {
         name: &str,
     ) -> Result<Artifact, Error> {
         self.export_http_resources(
-            application.schemas(),
-            &contract::application_resources(application),
-            application.documentation(),
+            application.application().schemas(),
+            &contract::application_resources(application.application()),
+            application.application().documentation(),
             name,
+            application.plans(),
         )
     }
 
@@ -43,8 +45,15 @@ impl Typescript {
         resources: &[(Option<&str>, &ResourceDescription)],
         documentation: &str,
         name: &str,
+        plans: &BTreeMap<String, HttpPlan>,
     ) -> Result<Artifact, Error> {
-        let mut artifact = self.export_resources(schemas, resources, documentation, name)?;
+        let void_outputs = plans
+            .iter()
+            .filter(|(_, plan)| plan.binding.success_status == 204)
+            .map(|(id, _)| id.clone())
+            .collect();
+        let mut artifact =
+            self.export_resources(schemas, resources, documentation, name, &void_outputs)?;
         let occupied: BTreeSet<_> = artifact.symbols.values().cloned().collect();
         for symbol in [
             format!("{name}HttpFailure"),
@@ -76,9 +85,8 @@ impl Typescript {
                 writeln!(methods, "    [{}]: {{", render::string(group)).unwrap();
             }
             for operation in resource.operations().values() {
-                let plan = operation
-                    .http
-                    .as_ref()
+                let plan = plans
+                    .get(&operation.id)
                     .ok_or_else(|| Error::MissingHttpBinding(operation.id.clone()))?;
                 let method = match plan.binding.method {
                     HttpMethod::Get => "GET",
@@ -114,7 +122,7 @@ impl Typescript {
                     .collect::<Vec<_>>()
                     .join(", ");
                 writeln!(methods, "{indent}[{}]: ({parameters}) => call<{}, {}>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
-                render::string(&operation.name), contract::output(operation, &artifact.symbols)?, render::shape(&operation.error, &artifact.symbols, 1)?,
+                render::string(&operation.name), contract::output(operation, &artifact.symbols, &void_outputs)?, render::shape(&operation.error, &artifact.symbols, 1)?,
                 render::string(&plan.binding.path), plan.binding.success_status,
                 wire(&operation.input), wire(&operation.output), wire(&operation.error),
             ).unwrap();

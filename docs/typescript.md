@@ -73,7 +73,7 @@ let exporter = Typescript::new().name(
     },
     "BillingUser",
 );
-let artifact = exporter.export_http_application(&api::describe()?, "Api")?;
+let artifact = exporter.export_http_application(&api::http::describe()?, "Api")?;
 ```
 
 Overrides are direction-specific and update references as well as declarations.

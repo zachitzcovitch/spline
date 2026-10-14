@@ -1,6 +1,7 @@
 //! HTTP-specific metadata; the contract's identities and DTO shapes stay neutral.
 
-use crate::{Error, Operation, OperationKind, Result};
+use crate::{Error, Result};
+use spline_contract::{Operation, OperationKind};
 use spline_schema::{Graph, Shape};
 use std::collections::BTreeSet;
 
@@ -47,19 +48,19 @@ pub(crate) fn resolve<'a>(mut shape: &'a Shape, graph: &'a Graph) -> Result<&'a 
     let mut visited = BTreeSet::new();
     while let Shape::Ref(id) = shape {
         if !visited.insert(id) {
-            return Err(Error::Http("cyclic alias in binding input".into()));
+            return Err(Error::Binding("cyclic alias in binding input".into()));
         }
         shape = &graph
             .definitions()
             .get(id)
-            .ok_or_else(|| Error::Http(format!("missing schema {id}")))?
+            .ok_or_else(|| Error::Binding(format!("missing schema {id}")))?
             .shape;
     }
     Ok(shape)
 }
 
 pub(crate) fn plan(operation: &Operation, binding: HttpBinding, graph: &Graph) -> Result<HttpPlan> {
-    let fail = |message: &str| Error::Http(format!("{}: {message}", operation.id));
+    let fail = |message: &str| Error::Binding(format!("{}: {message}", operation.id));
     if !matches!(resolve(&operation.input, graph)?, Shape::Object(_)) {
         return Err(fail("HTTP operations require a named input object"));
     }
@@ -98,7 +99,7 @@ pub(crate) fn plan(operation: &Operation, binding: HttpBinding, graph: &Graph) -
         for segment in binding.path.split('/').skip(1) {
             route_key.push('/');
             if let Some(name) = segment.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
-                if !super::identifier(name) || !names.insert(name.to_owned()) {
+                if !crate::identifier(name) || !names.insert(name.to_owned()) {
                     return Err(fail("path placeholders must be distinct argument names"));
                 }
                 route_key.push_str("{}");
@@ -180,7 +181,7 @@ fn scalar(
     Ok(match shape {
         Shape::Ref(id) => {
             if !visited.insert(id.clone()) {
-                return Err(Error::Http("recursive URL argument".into()));
+                return Err(Error::Binding("recursive URL argument".into()));
             }
             let result = scalar(&graph.definitions()[id].shape, graph, visited)?;
             visited.remove(id);
@@ -204,7 +205,7 @@ fn scalar(
                 nullable |= null;
                 if let Some(kind) = kind {
                     if result.is_some_and(|previous| previous != kind) {
-                        return Err(Error::Http("mixed scalar URL union".into()));
+                        return Err(Error::Binding("mixed scalar URL union".into()));
                     }
                     result = Some(kind);
                 }
@@ -212,7 +213,7 @@ fn scalar(
             (result, nullable)
         }
         _ => {
-            return Err(Error::Http(
+            return Err(Error::Binding(
                 "URL arguments must be strings, booleans, or supported integers".into(),
             ))
         }

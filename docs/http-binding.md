@@ -33,10 +33,11 @@ pub trait Users {
 ```
 
 The declaration generates support directly in the existing `users` module. Its
-namespace defaults to `users`. Ordinary usage starts with `users::router(...)`
-or `users::Client::new(...)`; those functions
+namespace defaults to `users`. HTTP usage starts with `users::http::router(...)`
+or `users::http::Client::new(...)`; those functions
 collect and validate metadata internally. `users::describe()` is the tooling and
-introspection entry point.
+introspection entry point for the neutral contract; `users::http::describe()` selects
+and validates its separate HTTP mapping.
 
 Inline `pub mod users { ... }` declarations work identically. The optional
 `module = "requests"` option creates a separate companion, and `namespace = "v1.users"`
@@ -81,7 +82,9 @@ or `204` (default 200).
 GET is permitted only for queries and has no body. POST can bind either kind,
 including read-only searches. PUT/PATCH/DELETE must be mutations; PUT and PATCH
 require a body mapping, and DELETE is bodyless in this profile. Every operation
-in an HTTP-annotated contract needs a binding. The base `spline` crate remains
+in a selected HTTP contract needs a binding. Incomplete mappings do not invalidate
+neutral composition or in-process calls; selecting `::http::describe()` returns a
+missing-binding error. The base `spline` crate remains
 usable without its optional `http` feature for schema/metadata-only contracts.
 
 Path/query arguments support strings, booleans, the evaluated fixed-width integer
@@ -157,9 +160,20 @@ additional status codes, and per-operation response headers remain follow-on wor
 Enable `spline`'s `http` Cargo feature, then:
 
 ```rust
-let router = users::router(DemoUsers::default(), error_status)?;
+let router = users::http::router(DemoUsers::default(), error_status)?;
 axum::serve(listener, router).await?;
 ```
+
+The protocol-owned extension form is:
+
+```rust
+use spline::http::HttpExt;
+let router = users::shared(DemoUsers::default()).http(error_status)?;
+```
+
+For a request-scoped implementation, import `HttpFactoryExt` and call
+`users::contract().http_with(factory, error_status)?`. The factory's context type
+is inferred at the HTTP method, keeping neutral bundles independent of headers/URIs.
 
 For the example, `error_status(&ApiError)` returns 404 for `NotFound` and 422 for
 `InvalidName`. The policy must return a 4xx/5xx status. Invalid policies and response
@@ -170,7 +184,7 @@ types when a contract uses different errors per operation.
 The status policy is executable server configuration. A future complete OpenAPI
 export will need declarative metadata for the policy's possible status mappings.
 
-`users::router_with(factory, error_policy)` adds a request-scoped service factory:
+`users::http::router_with(factory, error_policy)` adds an HTTP request-scoped factory:
 
 ```text
 Fn(RequestContext)
@@ -188,14 +202,14 @@ Both entry points return an ordinary Axum `Router`, supporting its Tower layers
 and route nesting. Tests cover headers, middleware extensions, factory rejection,
 and a client configured to satisfy that request-scoped policy.
 
-For several resources, `api::router_with` shares this factory and error policy
+For several resources, `api::http::router_with` shares this factory and error policy
 across the whole application. The returned session implements each resource trait.
 See [shared state and authentication](application-composition.md#shared-state-and-authentication).
 
 ## Rust client
 
 ```rust
-let client = users::Client::new("http://127.0.0.1:3000")?;
+let client = users::http::Client::new("http://127.0.0.1:3000")?;
 let user = client.get(UserId("user_1".into())).await?;
 let created = client.create(new_user).await?;
 ```
@@ -240,6 +254,13 @@ The exporter has separate entry points:
 - `export_http_client(...)`: those declarations plus an executable fetch client.
 - `export_application(...)` / `export_http_application(...)`: shared types and
   grouped signatures/executable clients for several resources.
+
+HTTP exporters receive the bound description from `::http::describe()`. Neutral
+exporters receive `::describe()`. HTTP metadata and validation live in the lightweight
+`spline-http-contract` crate, while Axum/reqwest execution remains in `spline-http`.
+Dispatch invokes the same typed Tower services used in process. See
+[execution and bindings](execution-bindings.md) for the protocol boundary and
+per-operation HTTP routers over configured middleware.
 
 ```typescript
 const client = createUsersClient("http://127.0.0.1:3000", {
@@ -300,8 +321,8 @@ The Node runner executes the generated TypeScript through built-in type strippin
 
 ## Evidence
 
-The Rust suite and blog checks cover **159 behavior/integration checks**, plus trybuild harnesses
-with **27 compiler-failure fixtures** when HTTP is enabled. The seven live HTTP tests include both
+The Rust suite and blog checks cover **170 behavior/integration checks**, plus trybuild harnesses
+with **29 compiler-failure fixtures** when HTTP is enabled. The eight live HTTP tests include both
 client executables calling one loopback server, Rust/TypeScript path and query
 round trips, request context, declared error statuses, malformed requests,
 protocol failures, transport failures, and native DTO compatibility rejection.
@@ -309,9 +330,10 @@ Six additional evolution tests compare original/newer servers using clients buil
 from a fixed older contract, including live TypeScript execution.
 Four resource-update tests cover PUT/PATCH/DELETE, atomic application validation,
 and bodyless responses, alongside the generic `Patch<T>` tests.
-Five application-composition tests exercise grouped clients, shared authentication
+Nine application-composition tests exercise grouped clients, shared authentication
 and state, resource-specific errors, common response policies, and construction
-failures. Five core application-builder and four exporter tests cover shared
+failures, mixed binding composition, and in-process execution. Four core
+application-builder tests, separate HTTP binding tests, and four exporter tests cover shared
 schema ownership, rollback, cross-resource routes, deterministic output, and naming.
 The [blog tutorial](../examples/blog/README.md) adds a separate `npm run test:blog`
 smoke test. It builds the server and Rust client crates, launches the actual server
@@ -319,6 +341,9 @@ and both client entry points, then verifies their persisted effects and applicat
 validation over HTTP.
 The original Serde inspection and wire probes contribute 29 additional behavior
 tests and three of the compiler-failure fixtures, now included in the root suite.
+Typed runtime tests cover readiness, operational failures, backpressure across
+clones, and cancellation. Neutral-only tests verify in-process operation middleware
+and contracts with incomplete optional HTTP mappings.
 
 The TypeScript workspaces pass strict compilation with **61 expected-error assertions**.
 Runtime Node assertions additionally exercise generated request/response validation,

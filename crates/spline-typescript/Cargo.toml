@@ -11,6 +11,7 @@ description = "Deterministic TypeScript types and executable HTTP clients for Sp
 [dependencies]
 spline-schema.workspace = true
 spline-contract.workspace = true
+spline-http-contract.workspace = true
 
 [dev-dependencies]
 spline.workspace = true

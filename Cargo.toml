@@ -24,6 +24,9 @@ spline-contract = { path = "crates/spline-contract" }
 spline-macros = { path = "crates/spline-macros" }
 spline-typescript = { path = "crates/spline-typescript" }
 spline-http = { path = "crates/spline-http" }
+spline-http-contract = { path = "crates/spline-http-contract" }
+spline-runtime = { path = "crates/spline-runtime" }
+tower = { version = "=0.5.3", default-features = false, features = ["util"] }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
 reqwest = { version = "=0.12.28", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "sync", "time", "process"] }

@@ -188,6 +188,6 @@ pub mod required_input {
 
 pub fn typescript() -> Result<String, Box<dyn std::error::Error>> {
     Ok(spline_typescript::Typescript::new()
-        .export_http_client(&v1::users::describe()?, "EvolutionV1")?
+        .export_http_client(&v1::users::http::describe()?, "EvolutionV1")?
         .source)
 }

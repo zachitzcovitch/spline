@@ -8,7 +8,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use application::{api, Database, Errors, NewPost, PostError, Session, User, UserError};
+use application::api::http as api;
+use application::{Database, Errors, NewPost, PostError, Session, User, UserError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use spline::{
@@ -254,11 +255,11 @@ fn application_collisions_fail_before_router_merge_or_client_construction() {
         principal: "alice".into(),
     };
     for error in [
-        bad_routes::describe().unwrap_err().to_string(),
-        bad_routes::router(session(), Errors)
+        bad_routes::http::describe().unwrap_err().to_string(),
+        bad_routes::http::router(session(), Errors)
             .unwrap_err()
             .to_string(),
-        bad_routes::Client::new("http://localhost")
+        bad_routes::http::Client::new("http://localhost")
             .unwrap_err()
             .to_string(),
     ] {
@@ -273,14 +274,18 @@ fn application_collisions_fail_before_router_merge_or_client_construction() {
             spline::Error::NameCollision { .. }
         ))
     ));
-    assert!(bad_schemas::router(session(), Errors).is_err());
-    assert!(bad_schemas::Client::new("http://localhost").is_err());
+    assert!(
+        bad_routes::describe().is_ok(),
+        "neutral composition does not validate HTTP routes"
+    );
+    assert!(bad_schemas::http::router(session(), Errors).is_err());
+    assert!(bad_schemas::http::Client::new("http://localhost").is_err());
     assert!(matches!(
         bad_namespaces::describe(),
         Err(spline::contract::Error::DuplicateNamespace(_))
     ));
-    assert!(bad_namespaces::router(session(), Errors).is_err());
-    assert!(bad_namespaces::Client::new("http://localhost").is_err());
+    assert!(bad_namespaces::http::router(session(), Errors).is_err());
+    assert!(bad_namespaces::http::Client::new("http://localhost").is_err());
 }
 
 mod relative_paths {
@@ -300,8 +305,8 @@ async fn renamed_groups_relative_paths_and_shared_service_constructor_work() {
         database: Database::default(),
         principal: "alice".into(),
     };
-    let server = serve(relative_paths::grouped::router(session, Errors).unwrap()).await;
-    let client = relative_paths::grouped::Client::new(&server.base).unwrap();
+    let server = serve(relative_paths::grouped::http::router(session, Errors).unwrap()).await;
+    let client = relative_paths::grouped::http::Client::new(&server.base).unwrap();
     assert!(client.people().get("alice".into()).await.is_ok());
     assert!(client
         .articles()
@@ -316,7 +321,10 @@ async fn renamed_groups_relative_paths_and_shared_service_constructor_work() {
         description.resources()["articles"].operations()["publish"].id,
         "app.posts.publish"
     );
-    assert_eq!(description.schemas(), api::describe().unwrap().schemas());
+    assert_eq!(
+        description.schemas(),
+        application::api::describe().unwrap().schemas()
+    );
 }
 
 #[test]
@@ -363,14 +371,14 @@ async fn same_module_http_resources_work_directly_and_compose_with_explicit_comp
         database: Database::default(),
         principal: "alice".into(),
     };
-    let server = serve(mixed::router(session, Errors).unwrap()).await;
-    let direct = checks::Client::new(&server.base).unwrap();
+    let server = serve(mixed::http::router(session, Errors).unwrap()).await;
+    let direct = checks::http::Client::new(&server.base).unwrap();
     assert_eq!(direct.lookup("alice".into()).await.unwrap().id, "alice");
     assert!(matches!(
         direct.lookup("missing".into()).await,
         Err(CallError::Application(UserError::NotFound))
     ));
-    let client = mixed::Client::new(&server.base).unwrap();
+    let client = mixed::http::Client::new(&server.base).unwrap();
     assert_eq!(
         client.checks().lookup("bob".into()).await.unwrap().id,
         "bob"
@@ -379,9 +387,174 @@ async fn same_module_http_resources_work_directly_and_compose_with_explicit_comp
     let description = checks::describe().unwrap();
     assert_eq!(description.operations()["get"].id, "checks.get");
     let source = spline_typescript::Typescript::new()
-        .export_http_application(&mixed::describe().unwrap(), "Mixed")
+        .export_http_application(&mixed::http::describe().unwrap(), "Mixed")
         .unwrap()
         .source;
     assert!(source.contains("\"checks.get\""));
     assert!(source.contains("\"app.users.get\""));
+}
+
+#[tokio::test]
+async fn the_same_application_executes_in_process_through_typed_tower_services() {
+    use spline::runtime::InProcessExt;
+    let session = Session {
+        database: Database::default(),
+        principal: "alice".into(),
+    };
+    let client = application::api::shared(session).in_process().unwrap();
+    let user = client.users().get("alice".into()).await.unwrap();
+    let post = client
+        .posts()
+        .create(NewPost {
+            title: "In process".into(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(post.author, user);
+    assert!(
+        client
+            .posts()
+            .publish(post.id.clone())
+            .await
+            .unwrap()
+            .published
+    );
+    client.posts().delete(post.id.clone()).await.unwrap();
+    assert!(matches!(
+        client.posts().get(post.id).await,
+        Err(spline::runtime::CallError::Application(PostError::NotFound))
+    ));
+}
+
+#[tokio::test]
+async fn protocol_extensions_share_a_nonclone_implementation_and_validate_only_when_selected() {
+    use spline::{http::HttpExt, runtime::InProcessExt};
+    let session = Session {
+        database: Database::default(),
+        principal: "alice".into(),
+    };
+    let bundle = application::api::shared(session);
+    let local = bundle.clone().in_process().unwrap();
+    let renamed = local
+        .users()
+        .rename("Shared through extensions".into())
+        .await
+        .unwrap();
+    let server = serve(bundle.http(Errors).unwrap()).await;
+    let client = api::Client::new(&server.base).unwrap();
+    assert_eq!(client.users().get("alice".into()).await.unwrap(), renamed);
+    let post = client
+        .posts()
+        .create(NewPost {
+            title: "Shared state".into(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(local.posts().get(post.id).await.unwrap().author, renamed);
+
+    let session = Session {
+        database: Database::default(),
+        principal: "alice".into(),
+    };
+    let bundle = bad_routes::shared(session);
+    assert!(
+        bundle.clone().in_process().is_ok(),
+        "packing and neutral selection do not validate HTTP routes"
+    );
+    assert!(bundle
+        .http(Errors)
+        .unwrap_err()
+        .to_string()
+        .contains("conflicting HTTP routes"));
+
+    let session = Session {
+        database: Database::default(),
+        principal: "alice".into(),
+    };
+    let server = serve(application::users::shared(session).http(Errors).unwrap()).await;
+    assert_eq!(
+        application::users::http::Client::new(&server.base)
+            .unwrap()
+            .get("bob".into())
+            .await
+            .unwrap()
+            .id,
+        "bob"
+    );
+}
+
+#[tokio::test]
+async fn factory_extensions_infer_http_context_and_run_authentication_before_decoding() {
+    use spline::http::HttpFactoryExt;
+    let count = Arc::new(AtomicUsize::new(0));
+    let database = Database::default();
+    let observed = count.clone();
+    let router = application::api::contract()
+        .http_with(
+            move |context| {
+                let database = database.clone();
+                let observed = observed.clone();
+                async move {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                    if context
+                        .headers
+                        .get("authorization")
+                        .and_then(|value| value.to_str().ok())
+                        != Some("Bearer alice")
+                    {
+                        return Err(Fault::new(401, "unauthorized", "token required"));
+                    }
+                    Ok(Arc::new(Session {
+                        database,
+                        principal: "alice".into(),
+                    }))
+                }
+            },
+            Errors,
+        )
+        .unwrap();
+    let server = serve(router).await;
+    let response = reqwest::Client::new()
+        .post(format!("{}/posts", server.base))
+        .header("content-type", "application/json")
+        .body("{")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 401);
+    let client = authenticated_client(&server.base, "alice");
+    assert_eq!(
+        client.users().get("alice".into()).await.unwrap().id,
+        "alice"
+    );
+    assert_eq!(
+        count.load(Ordering::SeqCst),
+        2,
+        "one factory call per matched request"
+    );
+
+    let session = Arc::new(Session {
+        database: Database::default(),
+        principal: "alice".into(),
+    });
+    let router = application::users::contract()
+        .http_with(
+            move |context| {
+                assert_eq!(context.method, axum::http::Method::GET);
+                let session = session.clone();
+                async move { Ok(session) }
+            },
+            Errors,
+        )
+        .unwrap();
+    let server = serve(router).await;
+    assert_eq!(
+        application::users::http::Client::new(&server.base)
+            .unwrap()
+            .get("bob".into())
+            .await
+            .unwrap()
+            .id,
+        "bob"
+    );
 }

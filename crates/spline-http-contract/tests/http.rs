@@ -1,7 +1,5 @@
-use spline_contract::{
-    http::{HttpBinding, HttpMethod, Scalar},
-    ContractBuilder, Error, OperationKind,
-};
+use spline_contract::{ContractBuilder as NeutralBuilder, OperationKind};
+use spline_http_contract::{ContractBuilder, Error, HttpBinding, HttpMethod, Scalar};
 use spline_schema::{Context, Field, Object, Presence, Schema, Shape, TypeInfo, UnknownFields};
 
 struct Input;
@@ -49,19 +47,19 @@ fn binding(path: &str) -> HttpBinding {
 }
 
 fn builder() -> ContractBuilder {
-    let mut builder = ContractBuilder::new("test", "").unwrap();
+    let mut builder = NeutralBuilder::new("test", "").unwrap();
     builder
         .operation::<Input, String, String>("first", "first", OperationKind::Mutation, "")
         .unwrap();
-    builder
+    ContractBuilder::new(builder.finish().unwrap())
 }
 
 #[test]
 fn binding_plans_preserve_authored_order_and_classify_url_arguments() {
     let mut builder = builder();
-    builder.http("first", binding("/items/{id}")).unwrap();
+    builder.bind("test.first", binding("/items/{id}")).unwrap();
     let description = builder.finish().unwrap();
-    let operation = &description.operations()["first"];
+    let operation = &description.contract().operations()["first"];
     assert_eq!(
         operation
             .arguments
@@ -70,7 +68,7 @@ fn binding_plans_preserve_authored_order_and_classify_url_arguments() {
             .collect::<Vec<_>>(),
         ["id", "count", "note", "input"]
     );
-    let plan = operation.http.as_ref().unwrap();
+    let plan = &description.plans()["test.first"];
     assert_eq!(plan.path_parameters[0].name, "id");
     assert_eq!(plan.path_parameters[0].scalar, Scalar::String);
     assert_eq!(plan.query_parameters[0].name, "count");
@@ -96,66 +94,66 @@ fn invalid_bindings_fail_without_mutating_the_descriptor() {
         "/items?x=1",
     ] {
         assert!(matches!(
-            builder.http("first", binding(path)),
-            Err(Error::Http(_))
+            builder.bind("test.first", binding(path)),
+            Err(Error::Binding(_))
         ));
     }
     let mut wrong_body = binding("/items/{id}");
     wrong_body.body = Some("id".into());
-    assert!(builder.http("first", wrong_body).is_err());
+    assert!(builder.bind("test.first", wrong_body).is_err());
     let mut unmapped = binding("/items/{id}");
     unmapped.body = None;
-    assert!(builder.http("first", unmapped).is_err()); // object-valued URL argument
+    assert!(builder.bind("test.first", unmapped).is_err()); // object-valued URL argument
     let mut get_mutation = binding("/items/{id}");
     get_mutation.method = HttpMethod::Get;
     get_mutation.body = None;
-    assert!(builder.http("first", get_mutation).is_err());
-    builder.http("first", binding("/items/{id}")).unwrap();
-    assert!(builder.http("first", binding("/other/{id}")).is_err());
+    assert!(builder.bind("test.first", get_mutation).is_err());
+    builder.bind("test.first", binding("/items/{id}")).unwrap();
+    assert!(builder.bind("test.first", binding("/other/{id}")).is_err());
+    assert_eq!(builder.finish().unwrap().plans().len(), 1);
 }
 
 #[test]
 fn ambiguous_dynamic_routes_are_rejected_before_axum_registration() {
-    let mut builder = builder();
-    builder
+    let mut neutral = NeutralBuilder::new("test", "").unwrap();
+    neutral
+        .operation::<Input, String, String>("first", "first", OperationKind::Mutation, "")
+        .unwrap();
+    neutral
         .operation::<Input, String, String>("second", "second", OperationKind::Mutation, "")
         .unwrap();
-    builder.http("first", binding("/items/{id}")).unwrap();
-    assert!(builder.http("second", binding("/items/{count}")).is_err());
-    assert!(builder.http("second", binding("/items/{id}")).is_err());
+    let mut builder = ContractBuilder::new(neutral.finish().unwrap());
+    builder.bind("test.first", binding("/items/{id}")).unwrap();
+    assert!(builder
+        .bind("test.second", binding("/items/{count}"))
+        .is_err());
+    assert!(builder.bind("test.second", binding("/items/{id}")).is_err());
 }
 
 #[test]
 fn new_verbs_share_a_route_and_validate_their_request_body_profile() {
-    let mut builder = ContractBuilder::new("test", "").unwrap();
-    for (name, method) in [("replace", HttpMethod::Put), ("update", HttpMethod::Patch)] {
-        builder
+    let mut neutral = NeutralBuilder::new("test", "").unwrap();
+    for name in ["replace", "update"] {
+        neutral
             .operation::<Input, String, String>(name, name, OperationKind::Mutation, "")
             .unwrap();
+    }
+    let mut builder = ContractBuilder::new(neutral.finish().unwrap());
+    for (name, method) in [("replace", HttpMethod::Put), ("update", HttpMethod::Patch)] {
         let mut plan = binding("/items/{id}");
         plan.method = method;
         let mut missing_body = plan.clone();
         missing_body.body = None;
-        assert!(builder.http(name, missing_body).is_err());
-        builder.http(name, plan).unwrap();
+        assert!(builder.bind(&format!("test.{name}"), missing_body).is_err());
+        builder.bind(&format!("test.{name}"), plan).unwrap();
     }
     let description = builder.finish().unwrap();
     assert_eq!(
-        description.operations()["replace"]
-            .http
-            .as_ref()
-            .unwrap()
-            .binding
-            .method,
+        description.plans()["test.replace"].binding.method,
         HttpMethod::Put
     );
     assert_eq!(
-        description.operations()["update"]
-            .http
-            .as_ref()
-            .unwrap()
-            .binding
-            .method,
+        description.plans()["test.update"].binding.method,
         HttpMethod::Patch
     );
 }
@@ -180,24 +178,36 @@ fn no_content_requires_a_null_output_and_delete_is_bodyless() {
         body: None,
         success_status: 204,
     };
-    let mut builder = ContractBuilder::new("test", "").unwrap();
-    builder
+    let mut neutral = NeutralBuilder::new("test", "").unwrap();
+    neutral
         .operation::<Id, String, String>("invalid", "invalid", OperationKind::Mutation, "")
         .unwrap();
+    neutral
+        .operation::<Id, (), String>("delete", "delete", OperationKind::Mutation, "")
+        .unwrap();
+    neutral
+        .operation::<Id, (), String>("read", "read", OperationKind::Query, "")
+        .unwrap();
+    let mut builder = ContractBuilder::new(neutral.finish().unwrap());
     assert!(builder
-        .http("invalid", binding.clone())
+        .bind("test.invalid", binding.clone())
         .unwrap_err()
         .to_string()
         .contains("204 requires"));
-    builder
-        .operation::<Id, (), String>("delete", "delete", OperationKind::Mutation, "")
-        .unwrap();
     let mut body = binding.clone();
     body.body = Some("id".into());
-    assert!(builder.http("delete", body).is_err());
-    builder.http("delete", binding.clone()).unwrap();
-    builder
-        .operation::<Id, (), String>("read", "read", OperationKind::Query, "")
-        .unwrap();
-    assert!(builder.http("read", binding).is_err());
+    assert!(builder.bind("test.delete", body).is_err());
+    builder.bind("test.delete", binding.clone()).unwrap();
+    assert!(builder.bind("test.read", binding).is_err());
+}
+
+#[test]
+fn missing_and_unknown_bindings_are_rejected_when_selecting_http() {
+    let mut builder = builder();
+    assert!(builder.bind("other.first", binding("/items/{id}")).is_err());
+    assert!(builder
+        .finish()
+        .unwrap_err()
+        .to_string()
+        .contains("test.first has no HTTP binding"));
 }
