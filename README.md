@@ -103,11 +103,13 @@ error policies, and supported DTO compatibility.
 | Clients | Positional calls, typed errors, shared configuration, compatible or strict response decoding. |
 | Execution | Typed Tower operation services and positional in-process Rust clients. |
 | Composition | Neutral resource/schema composition; grouped HTTP clients and one router with shared request-scoped services. |
+| OpenAPI | Deterministic OpenAPI 3.1.2 documents with directional components, error responses, and explicit server/authentication metadata. |
 
 The evaluated numeric JSON profile uses 8/16/32-bit integers. Larger integers and
 floats need an explicit wire representation. Error types can opt into
 [`spline::http::Error`](docs/http-errors.md) to declare default HTTP statuses and
-documented response shapes. Streaming and OpenAPI are [follow-up work](ROADMAP.md).
+documented response shapes. [OpenAPI export](docs/openapi.md) consumes those same
+bound descriptions. Streaming is [follow-up work](ROADMAP.md).
 Each guide documents the supported surface and its boundaries.
 
 Partial-update DTOs use `Patch<T>` to preserve omission separately from a value.
@@ -157,6 +159,22 @@ For shared implementations, import `spline::http::HttpExt` and select HTTP with
 `spline::runtime::InProcessExt` to select `.in_process()?` on that same neutral
 bundle. Adapter-specific methods become available through the corresponding trait.
 
+## Export OpenAPI
+
+The tooling crate consumes the same policy-aware HTTP description:
+
+```rust
+let document = spline_openapi::OpenApi::new("Blog API", "0.1.0")
+    .server("/api")
+    .bearer_auth("bearerAuth")
+    .export_application(&api::http::describe_with(&spline::http::DeclaredErrors)?)?;
+std::fs::write("openapi.json", document.to_pretty_json()?)?;
+```
+
+The [blog document](examples/blog/openapi.json) and [CRUD document](examples/contract/openapi.json)
+are checked in and independently validated. See [OpenAPI export](docs/openapi.md)
+for component names, error fallbacks, and development-only exporter setup.
+
 ## Workspace
 
 | Crate | Responsibility |
@@ -166,6 +184,7 @@ bundle. Adapter-specific methods become available through the corresponding trai
 | `spline-contract` | Operation metadata and transactional contract construction. |
 | `spline-macros` | Schema derive and contract attribute; private Serde adapter. |
 | `spline-typescript` | Deterministic wire types and operation signatures. |
+| `spline-openapi` | OpenAPI 3.1.2 documents from selected HTTP descriptions. |
 | `spline-http` | Axum dispatch support, HTTP errors, and the reqwest client runtime. |
 | `spline-http-contract` | Lightweight HTTP binding descriptions and validation. |
 | `spline-runtime` | Protocol-neutral typed Tower execution and service failures. |
@@ -215,6 +234,7 @@ draft, handle a typed authorization error, and publish the post. See the
 From the repository root:
 
 ```sh
+npm ci --ignore-scripts --no-audit --no-fund
 cargo test --locked --workspace
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -224,8 +244,9 @@ cargo run --locked -p spline --no-default-features --example neutral
 cargo run --locked -p spline-typescript --example export -- --check
 cargo run --locked -p spline-example-contract -- --check
 cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
-npm ci --ignore-scripts --no-audit --no-fund
+cargo run --locked -p spline-example-contract --example contract-openapi -- --check
 npm run check
+npm run check:openapi
 npm run test:blog
 ```
 
@@ -258,6 +279,8 @@ same machine and toolchain.
   wire behavior, request context, and conformance checks.
 - [Declared HTTP errors](docs/http-errors.md): derived default statuses, policy-aware
   response metadata, and custom policy overrides.
+- [OpenAPI export](docs/openapi.md): inspectable documents, directional schemas,
+  shared error statuses, deployment metadata, and independent validation.
 - [Updates and no-content responses](docs/http-updates.md): PUT/PATCH/DELETE,
   explicit missing/null/value semantics, and 204 handling.
 - [Contract evolution](docs/contract-evolution.md): additive changes, response

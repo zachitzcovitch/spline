@@ -7,6 +7,30 @@ use spline_schema::{Field, Graph, Object, Shape, UnknownFields};
 use crate::{Error, Result};
 
 pub const ERROR_HEADER: &str = "x-spline-error";
+pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+
+/// The serialized framework fault; its HTTP status is not part of the JSON body.
+pub fn framework_error_schema() -> Shape {
+    Shape::Object(Object {
+        fields: vec![
+            Field::required("kind", Shape::Literal("framework".into())),
+            Field::required("code", Shape::String),
+            Field::required("message", Shape::String),
+        ],
+        unknown_fields: UnknownFields::Reject,
+    })
+}
+
+/// The serialized application-error envelope, independent of its selected status.
+pub fn application_error_schema(value: Shape) -> Shape {
+    Shape::Object(Object {
+        fields: vec![
+            Field::required("kind", Shape::Literal("application".into())),
+            Field::required("value", value),
+        ],
+        unknown_fields: UnknownFields::Reject,
+    })
+}
 
 /// A policy's declared status mapping. Opaque policies make no static status claim.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -109,13 +133,7 @@ pub(crate) fn responses(
                 (
                     status,
                     ErrorResponse {
-                        body: Shape::Object(Object {
-                            fields: vec![
-                                Field::required("kind", Shape::Literal("application".into())),
-                                Field::required("value", value),
-                            ],
-                            unknown_fields: UnknownFields::Reject,
-                        }),
+                        body: application_error_schema(value),
                         content_type: "application/json",
                         headers: BTreeMap::from([(ERROR_HEADER.into(), "application".into())]),
                     },

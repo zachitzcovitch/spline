@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use spline_schema::{DefinitionId, Direction, Graph, Name, Shape};
+use spline_schema::{DefinitionId, Direction, Graph, Name};
 
 use crate::Error;
 
@@ -24,11 +24,9 @@ pub(crate) fn assign(
         let both = selected.contains(&other);
         let shared = both
             && overrides.get(id) == overrides.get(&other)
-            && equivalent(
+            && graph.equivalent(
                 &graph.definitions()[id].shape,
                 &graph.definitions()[&other].shape,
-                graph,
-                &mut BTreeSet::new(),
             );
         let symbol = overrides.get(id).cloned().unwrap_or_else(|| {
             let base = component(&id.name);
@@ -69,47 +67,5 @@ fn component(name: &Name) -> String {
                 .collect::<Vec<_>>()
                 .join("And")
         )
-    }
-}
-
-/// Compare both directions through references, including mutual recursion.
-/// Only the same logical type can share a name. Presence, field names, numeric
-/// ranges, and unknown-field rules must agree; documentation is not type shape.
-fn equivalent(
-    left: &Shape,
-    right: &Shape,
-    graph: &Graph,
-    visited: &mut BTreeSet<(DefinitionId, DefinitionId)>,
-) -> bool {
-    match (left, right) {
-        (Shape::Ref(a), Shape::Ref(b)) => {
-            a.name == b.name
-                && (!visited.insert((a.clone(), b.clone()))
-                    || equivalent(
-                        &graph.definitions()[a].shape,
-                        &graph.definitions()[b].shape,
-                        graph,
-                        visited,
-                    ))
-        }
-        (Shape::Array(a), Shape::Array(b)) | (Shape::Map(a), Shape::Map(b)) => {
-            equivalent(a, b, graph, visited)
-        }
-        (Shape::Tuple(a), Shape::Tuple(b)) | (Shape::Union(a), Shape::Union(b)) => {
-            a.len() == b.len()
-                && a.iter()
-                    .zip(b)
-                    .all(|(a, b)| equivalent(a, b, graph, visited))
-        }
-        (Shape::Object(a), Shape::Object(b)) => {
-            a.unknown_fields == b.unknown_fields
-                && a.fields.len() == b.fields.len()
-                && a.fields.iter().zip(&b.fields).all(|(a, b)| {
-                    a.name == b.name
-                        && a.presence == b.presence
-                        && equivalent(&a.shape, &b.shape, graph, visited)
-                })
-        }
-        _ => left == right,
     }
 }

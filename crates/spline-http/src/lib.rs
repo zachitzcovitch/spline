@@ -23,8 +23,7 @@ pub use spline_macros::HttpError as Error;
 
 use std::fmt;
 
-pub use spline_http_contract::ERROR_HEADER;
-pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+pub use spline_http_contract::{ERROR_HEADER, MAX_BODY_BYTES};
 
 mod sealed {
     pub trait Unit {}

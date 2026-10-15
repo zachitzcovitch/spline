@@ -16,7 +16,7 @@ examples/blog/
 │   │   ├── lib.rs          # Public exports and api! composition
 │   │   ├── users.rs        # User DTO, error, Users trait, and generated support
 │   │   └── posts.rs        # Post DTOs, errors, Posts trait, and generated support
-│   └── examples/export.rs  # TypeScript generation
+│   └── examples/export.rs  # TypeScript and OpenAPI generation
 ├── server/
 │   ├── Cargo.toml
 │   └── src/
@@ -36,6 +36,7 @@ examples/blog/
 ├── tests/
 │   ├── workflow.mjs        # Builds and exercises the actual applications
 │   └── typescript-editor.mjs # Checks signatures, hovers, and completion
+├── openapi.json            # Generated HTTP API document
 └── README.md
 ```
 
@@ -55,7 +56,7 @@ server ──────→ contracts ←────── rust-client
 The three crates are members of the repository's **root Cargo workspace**, sharing
 its `Cargo.toml` and `Cargo.lock`. The TypeScript package belongs to the root npm
 workspace and shares `package-lock.json`. The exporter uses `spline-typescript`
-as a development dependency of the contracts crate; application builds depend on
+and `spline-openapi` as development dependencies of the contracts crate; application builds depend on
 the contracts' normal dependencies (`spline` with HTTP support and Serde).
 
 ## Run the application
@@ -140,7 +141,8 @@ unmatched route; an unavailable server gives a transport failure.
 | [server/src/service/posts.rs](server/src/service/posts.rs) | The post resource implementation. |
 | [rust-client/src/main.rs](rust-client/src/main.rs) | CLI entry point, generated Rust calls, typed errors, and client configuration. |
 | [typescript/client.ts](typescript/client.ts) | The matching workflow, client configuration, and result helper. |
-| [contracts/examples/export.rs](contracts/examples/export.rs) | Generating a TypeScript client from the shared contract. |
+| [contracts/examples/export.rs](contracts/examples/export.rs) | Generating TypeScript and OpenAPI from the shared contract. |
+| [openapi.json](openapi.json) | Paths, directional schemas, declared errors, and bearer authentication. |
 
 Server implementation lives in the server crate. Both Rust applications import
 `spline_example_blog_contracts`, and TypeScript imports
@@ -374,6 +376,7 @@ After changing DTOs or operations in `contracts/src/users.rs` or
 ```sh
 cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write
 npm run check --workspace spline-blog-client
+npm run check:openapi
 npm run test:blog
 ```
 
@@ -383,6 +386,12 @@ public DTO types, `BlogClient`/`BlogResult`, and the `BlogOperations`/`BlogCalls
 type maps. Edit the
 Rust contract to change that generated file. Ordinary server/client startup
 collects its metadata internally.
+
+The same command generates [openapi.json](openapi.json) with
+`OpenApi::new("Blog API", "0.1.0").server("/api").bearer_auth("bearerAuth")`.
+The API's mount and bearer requirement are explicit exporter configuration. The
+document records 201 successes, per-status application/framework alternatives,
+and shared schema components. See [the OpenAPI guide](../../docs/openapi.md).
 
 `api::describe()` describes the neutral application; selecting `::http::describe_with`
 validates routes, body/success mappings, and the selected error policy's per-status
@@ -403,7 +412,8 @@ cargo run --locked -p spline-example-blog-contracts --example blog-export -- --c
 server and Rust client packages with `cargo build --locked`, locates their binaries
 from Cargo's JSON output, starts the server on an available loopback port, and runs
 both README clients. It checks persisted posts, authentication, and title validation
-through HTTP, then shuts down the server. The command works with a custom
+through HTTP and independently validates response bodies against the OpenAPI document,
+then shuts down the server. The command works with a custom
 `CARGO_TARGET_DIR` and handles building the applications on a fresh checkout.
 
 This cross-package workflow has its own CI step alongside `cargo test --workspace`.

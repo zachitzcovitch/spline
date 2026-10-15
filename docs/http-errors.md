@@ -164,5 +164,5 @@ npm run test:blog
 
 The blog workflow runs both real clients and checks 403/404/422 statuses and typed
 error envelopes. Generated TypeScript still uses the same public error DTOs and
-discriminated results. This metadata supplies the error-response foundation for
-the [next OpenAPI milestone](../ROADMAP.md#next-priorities).
+discriminated results. [OpenAPI export](openapi.md) uses this metadata to document
+per-status application errors alongside possible framework faults.

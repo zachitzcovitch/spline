@@ -31,6 +31,8 @@ calls, with explicit HTTP APIs under `resource::http`/`api::http`.
 
 [Declared HTTP errors](docs/http-errors.md) now provides opt-in default status
 derives and policy-aware response metadata, shared by routing and export tooling.
+[OpenAPI export](docs/openapi.md) consumes those descriptions to generate validated
+3.1.2 documents with explicit deployment metadata.
 
 ## Purpose
 
@@ -172,7 +174,7 @@ Rust trait + DTOs
     ├── TypeScript DTOs, operation map, and call signatures
     └── Selected HTTP binding description
         ├── Executable TypeScript fetch client
-        └── Future OpenAPI exporter
+        └── OpenAPI 3.1.2 document
 ```
 
 Each operation description includes its stable identity, query/mutation kind,
@@ -191,7 +193,7 @@ compiled export program can collect the resulting descriptions.
 Generation is deterministic through explicit export programs. CI checks the schema,
 CRUD/composition/evolution, and blog artifacts for drift, then type-checks and
 executes the generated clients. [Contributing](CONTRIBUTING.md#generated-artifacts-and-diagnostics)
-lists all three generator commands.
+lists the generator commands for TypeScript and OpenAPI.
 
 ## Transport and runtime boundaries
 
@@ -253,8 +255,9 @@ The implemented HTTP profile defines:
 Error types can derive `spline::http::Error` with named status constants. The
 `DeclaredErrors` policy selects these defaults; `::http::describe_with(&policy)`
 records per-status serialized application-error envelopes and headers. Custom
-policies remain opaque unless they declare their static mapping. OpenAPI export
-and per-operation response headers such as `Location` and `ETag` remain future work.
+policies remain opaque unless they declare their static mapping. The OpenAPI
+exporter preserves these distinctions and includes framework alternatives at shared
+statuses. Per-operation response headers such as `Location` and `ETag` remain future work.
 
 For example, the supported `body = "input"` mapping sends a `NewPost` directly as the
 JSON request body. A successful creation returns a `Post` with status 201. The
@@ -381,8 +384,8 @@ The responsibilities are:
 2. **Registry:** collect descriptions, including shared and recursive types.
 3. **Serde-aware interpretation:** account for supported representation attributes
    and differences between serialization and deserialization.
-4. **Exporters:** generate TypeScript from those descriptions; future specification
-   exporters can reuse the same graph and selected binding metadata.
+4. **Exporters:** generate TypeScript and OpenAPI from those descriptions and
+   selected binding metadata.
 
 The important requirement is fidelity to the wire representation. Serde's
 `Serialize` and `Deserialize` traits execute logic; they do not provide a complete
@@ -406,12 +409,12 @@ descriptions.
 ## Documentation and specifications
 
 Macros capture doc comments and type metadata in the neutral descriptions and
-schema graph. The TypeScript exporter carries documentation into generated DTOs
-and operations; standardized specification exporters remain follow-on work.
+schema graph. The TypeScript and OpenAPI exporters carry documentation into
+generated DTOs, operations, and specification schemas.
 
-- **OpenAPI:** derive from contract metadata, data schemas, and the HTTP binding.
-  RPC-style implementation methods are compatible with resource-oriented HTTP
-  documentation. Public API support makes this a valuable follow-on milestone.
+- **OpenAPI:** the implemented 3.1.2 exporter consumes HTTP descriptions, directional
+  schemas, error policies, and explicit deployment options. Independent tools and
+  live responses verify the generated documents.
 - **OpenRPC:** appropriate if a future binding adopts JSON-RPC 2.0 specifically.
 - **Neutral tooling:** consume Spline's operation catalog and type descriptions.
 
@@ -435,18 +438,19 @@ The original query/mutation milestone is complete and has expanded into:
   middleware failures, shared backpressure, cancellation, and HTTP-independent calls.
 - [Local benchmarks](benchmarks/README.md) with documented metadata/export/client
   timing boundaries and fixture checks in CI.
+- [OpenAPI documents](docs/openapi.md) for the blog and CRUD workbench, with
+  independent schema/document validation and live conformance checks.
 
 [Contributing](CONTRIBUTING.md#verify-a-change) records the current verification
 commands. [The changelog](CHANGELOG.md) records the implemented API changes.
 
 ## Follow-on design questions
 
-The [roadmap](ROADMAP.md#next-priorities) orders the next milestones: OpenAPI export
-and preparation for a published release.
+The [roadmap](ROADMAP.md#next-priorities) prioritizes preparation for a published release.
 
 | Area | Remaining questions |
 | --- | --- |
-| OpenAPI | How should directional schemas, success/error envelopes, and framework responses be represented accurately for the implemented HTTP profile? |
+| OpenAPI integrations | Which documentation UI and richer deployment/security options have concrete application use cases? |
 | Client controls | What per-call cancellation, header, timeout, and deadline controls should generated clients expose? |
 | Broader representations | Which additional Serde shapes, numeric codecs, asymmetric client DTOs, and response headers have concrete use cases and conformance evidence? |
 | Additional bindings | How should new transports/codecs or streaming extend the unary operation/runtime boundary and declare their capabilities? |

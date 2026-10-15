@@ -38,9 +38,13 @@ spline-typescript
 ├── spline-schema
 ├── spline-contract
 └── spline-http-contract        std-only binding metadata, not HTTP runtime
+
+spline-openapi
+├── spline-schema / spline-contract / spline-http-contract
+└── serde / serde_json / url     document and deployment tooling, not HTTP execution
 ```
 
-The schema, contract metadata, and exporter normal dependency trees have no
+The schema, contract metadata, and TypeScript exporter normal dependency trees have no
 external runtime dependencies. The proc-macro crate pins `serde_derive_internals`
 0.30.0 and Syn 3.0.3. The facade integrates Serde 1.0.229 for generated inputs.
 
@@ -274,5 +278,5 @@ lists all generators, including the blog application.
 The [HTTP binding](http-binding.md), including [updates and 204 responses](http-updates.md),
 is implemented and verified with both clients against one server. Follow-on profile
 decisions include client call controls and broader response metadata. [Declared
-HTTP error/status metadata](http-errors.md) now supplies per-status application-error
-shapes for the future OpenAPI exporter.
+HTTP error/status metadata](http-errors.md) supplies per-status application-error
+shapes to the implemented [OpenAPI exporter](openapi.md).

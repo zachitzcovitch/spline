@@ -3,16 +3,21 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { responseAssertions, validateDocument } from "../../../scripts/openapi-validation.mjs";
 
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const typescript = fileURLToPath(new URL("../typescript/run.mjs", import.meta.url));
 
 test("the blog server and both README clients work across package boundaries", { timeout: 600_000 }, async t => {
+  const document = JSON.parse(await readFile(new URL("../openapi.json", import.meta.url), "utf8"));
+  await validateDocument(document);
+  const assertResponse = responseAssertions(document);
   const build = await execute(process.env.CARGO ?? "cargo", [
     "build", "--locked", "--message-format=json",
     "-p", "spline-example-blog-server",
@@ -54,6 +59,7 @@ test("the blog server and both README clients work across package boundaries", {
     for (const path of ["/users/alice", "/posts/post_1"]) {
       const response = await request(path);
       assert.equal(response.status, 401);
+      await assertResponse(path.startsWith("/users/") ? "/users/{id}" : "/posts/{id}", "get", response);
       const error = await response.json();
       assert.equal(error.kind, "framework");
       assert.equal(error.code, "unauthorized");
@@ -70,6 +76,7 @@ test("the blog server and both README clients work across package boundaries", {
       // Verify persisted effects independently of the clients' logs.
       const response = await request(`/posts/${id}`, { headers: { authorization: "Bearer bob-token" } });
       assert.equal(response.status, 200);
+      await assertResponse("/posts/{id}", "get", response);
       const post = await response.json();
       assert.equal(post.author.id, "alice");
       assert.equal(post.title, "Hello from Spline");
@@ -83,6 +90,7 @@ test("the blog server and both README clients work across package boundaries", {
       body: JSON.stringify({ title: "  ", body: "A title is required" }),
     });
     assert.equal(response.status, 422);
+    await assertResponse("/posts", "post", response);
     assert.equal(response.headers.get("x-spline-error"), "application");
     assert.deepEqual(await response.json(), { kind: "application", value: { kind: "invalid_title" } });
 
@@ -94,6 +102,7 @@ test("the blog server and both README clients work across package boundaries", {
     ]) {
       const response = await request(path, { method, headers: { authorization: "Bearer bob-token" } });
       assert.equal(response.status, status);
+      await assertResponse(method === "POST" ? "/posts/{id}/publish" : path.startsWith("/users/") ? "/users/{id}" : "/posts/{id}", method, response);
       assert.equal(response.headers.get("x-spline-error"), "application");
       assert.deepEqual(await response.json(), { kind: "application", value: { kind } });
     }

@@ -9,9 +9,16 @@ readme = "README.md"
 description = "Spline CRUD example and cross-language conformance fixtures"
 default-run = "spline-example-contract"
 
+[[example]]
+name = "contract-openapi"
+path = "examples/openapi.rs"
+
 [dependencies]
 spline = { workspace = true, features = ["http"] }
 spline-typescript.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+spline-openapi.workspace = true

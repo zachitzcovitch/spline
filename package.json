@@ -5,11 +5,14 @@
   "workspaces": ["crates/spline-typescript/typescript", "examples/contract/typescript", "examples/blog/typescript"],
   "scripts": {
     "check": "npm run check --workspaces",
+    "check:openapi": "node scripts/check-openapi.mjs",
     "test:blog": "node --test examples/blog/tests/*.mjs",
     "bench:typescript": "node benchmarks/typescript.mjs",
     "check:neutral": "node scripts/check-neutral.mjs"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
+    "ajv": "8.20.0",
     "typescript": "5.9.3"
   }
 }

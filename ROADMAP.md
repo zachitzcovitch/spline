@@ -21,12 +21,12 @@ priorities rather than release-date commitments.
   and request-scoped HTTP factories.
 - [Declared HTTP error statuses](docs/http-errors.md), with named constants on error
   derives, policy-aware response metadata, and custom policy overrides.
+- [OpenAPI 3.1.2 export](docs/openapi.md), with inspectable documents, directional
+  components, application/framework responses, and independently validated artifacts.
 
 ## Next priorities
 
-1. **OpenAPI export.** Export the implemented HTTP profile, directional schemas,
-   response envelopes, and error mappings from the application description.
-2. **First published release.** Review public APIs and documentation, verify
+1. **First published release.** Review public APIs and documentation, verify
    package contents/dependency versions, establish a versioning policy, and publish
    a tested set of crates and generated-client guidance.
 
@@ -34,6 +34,7 @@ priorities rather than release-date commitments.
 
 - Request cancellation, per-call headers/timeouts, and other client call controls.
 - Broader response metadata and additional HTTP conventions.
+- Documentation UI integrations and richer OpenAPI deployment/security configuration.
 - Compile-time and runtime cost for larger contracts; use measured benchmarks to
   guide optimizations while retaining schema and wire conformance.
 - Additional transports, streaming, and broader Serde representations as explicit

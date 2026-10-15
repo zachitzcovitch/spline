@@ -23,6 +23,7 @@ spline-schema = { path = "crates/spline-schema" }
 spline-contract = { path = "crates/spline-contract" }
 spline-macros = { path = "crates/spline-macros" }
 spline-typescript = { path = "crates/spline-typescript" }
+spline-openapi = { path = "crates/spline-openapi" }
 spline-http = { path = "crates/spline-http" }
 spline-http-contract = { path = "crates/spline-http-contract" }
 spline-runtime = { path = "crates/spline-runtime" }

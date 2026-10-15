@@ -14,6 +14,7 @@ clients built on that foundation.
 - [Schema registry](schema-registry.md): graph, identity, field rules, and recursion.
 - [Schema derive](schema-derive.md): compiler-side lowering and support boundaries.
 - [TypeScript export](typescript-exporter.md): naming, wire-type mapping, and compiler checks.
+- [OpenAPI export](openapi.md): Utoipa evaluation, document representation, and independent validation.
 
 ## Implementation migration
 

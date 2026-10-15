@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 mod builtins;
+mod compare;
 mod field;
 mod model;
 mod registry;

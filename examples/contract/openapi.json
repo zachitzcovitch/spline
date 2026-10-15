@@ -1,0 +1,1236 @@
+{
+  "components": {
+    "responses": {
+      "ServiceErrorResponse": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServiceError"
+            }
+          }
+        },
+        "description": "Request or service failure."
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "not_found",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "details": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "type": "object"
+              },
+              "kind": {
+                "const": "invalid_name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "details"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "NewUser": {
+        "additionalProperties": false,
+        "description": "Information supplied when creating a user.",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "ReplaceUser": {
+        "additionalProperties": false,
+        "description": "Complete replacement of the writable profile. An absent bio becomes null.",
+        "properties": {
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "ServiceError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "framework",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "User": {
+        "additionalProperties": false,
+        "description": "A public user record.",
+        "properties": {
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "bio"
+        ],
+        "type": "object"
+      },
+      "UserId": {
+        "type": "string"
+      },
+      "UserPatch": {
+        "additionalProperties": false,
+        "description": "Partial update: omitted fields stay unchanged; null clears the nullable bio.",
+        "properties": {
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Operations on user records.",
+    "title": "Users API",
+    "version": "0.1.0"
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "openapi": "3.1.2",
+  "paths": {
+    "/users": {
+      "post": {
+        "description": "Create a user from the supplied profile.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "users.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewUser"
+              }
+            }
+          },
+          "description": "A JSON body is required, even when its value may be null. application/json and application subtypes ending in +json are accepted, including content-type parameters.",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          }
+        },
+        "summary": "Create a user from the supplied profile.",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "delete": {
+        "description": "Delete an existing user with an empty success response.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "users.delete",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success with no response body."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          }
+        },
+        "summary": "Delete an existing user with an empty success response.",
+        "tags": [
+          "users"
+        ]
+      },
+      "get": {
+        "description": "Fetch an existing user.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "users.get",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          }
+        },
+        "summary": "Fetch an existing user.",
+        "tags": [
+          "users"
+        ]
+      },
+      "patch": {
+        "description": "Apply the supplied fields without changing omitted fields.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "users.update",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPatch"
+              }
+            }
+          },
+          "description": "A JSON body is required, even when its value may be null. application/json and application subtypes ending in +json are accepted, including content-type parameters.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          }
+        },
+        "summary": "Apply the supplied fields without changing omitted fields.",
+        "tags": [
+          "users"
+        ]
+      },
+      "put": {
+        "description": "Replace an existing user's writable profile.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "users.replace",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceUser"
+              }
+            }
+          },
+          "description": "A JSON body is required, even when its value may be null. application/json and application subtypes ending in +json are accepted, including content-type parameters.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "$ref": "#/components/schemas/ApiError"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure. See the response body for error details."
+          }
+        },
+        "summary": "Replace an existing user's writable profile.",
+        "tags": [
+          "users"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Operations on user records.",
+      "name": "users"
+    }
+  ]
+}

@@ -1199,6 +1199,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "spline",
+ "spline-openapi",
  "spline-typescript",
 ]
 
@@ -1218,6 +1219,7 @@ dependencies = [
  "serde",
  "serde_json",
  "spline",
+ "spline-openapi",
  "spline-typescript",
  "tokio",
 ]
@@ -1256,6 +1258,20 @@ dependencies = [
  "quote",
  "serde_derive_internals",
  "syn 3.0.3",
+]
+
+[[package]]
+name = "spline-openapi"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "spline",
+ "spline-contract",
+ "spline-http-contract",
+ "spline-schema",
+ "tokio",
+ "url",
 ]
 
 [[package]]

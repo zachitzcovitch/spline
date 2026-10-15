@@ -18,3 +18,4 @@ serde.workspace = true
 
 [dev-dependencies]
 spline-typescript.workspace = true
+spline-openapi.workspace = true

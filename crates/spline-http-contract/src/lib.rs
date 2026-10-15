@@ -11,7 +11,10 @@ use spline_schema::Graph;
 
 mod errors;
 mod plan;
-pub use errors::{ErrorMapping, ErrorResponse, ErrorResponses, ERROR_HEADER};
+pub use errors::{
+    application_error_schema, framework_error_schema, ErrorMapping, ErrorResponse, ErrorResponses,
+    ERROR_HEADER, MAX_BODY_BYTES,
+};
 pub use plan::{HttpBinding, HttpMethod, HttpPlan, Scalar, UrlParameter};
 
 pub type Result<T> = std::result::Result<T, Error>;

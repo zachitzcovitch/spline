@@ -1,0 +1,803 @@
+{
+  "components": {
+    "responses": {
+      "ServiceErrorResponse": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServiceError"
+            }
+          }
+        },
+        "description": "Request or service failure."
+      }
+    },
+    "schemas": {
+      "NewPost": {
+        "additionalProperties": false,
+        "description": "The author comes from the authenticated session, so clients supply only content.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "type": "object"
+      },
+      "Post": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/User"
+          },
+          "body": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "title",
+          "body",
+          "published"
+        ],
+        "type": "object"
+      },
+      "PostError": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "not_found",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "forbidden",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "invalid_title",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ServiceError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "framework",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "User": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "UserError": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "not_found",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "One application with grouped clients and a shared server context.",
+    "title": "Blog API",
+    "version": "0.1.0"
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "openapi": "3.1.2",
+  "paths": {
+    "/posts": {
+      "post": {
+        "description": "Create a draft owned by the authenticated user. The title must not be blank.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "posts.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPost"
+              }
+            }
+          },
+          "description": "A JSON body is required, even when its value may be null. application/json and application subtypes ending in +json are accepted, including content-type parameters.",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "forbidden",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "not_found",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "413": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "415": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "invalid_title",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "4XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          }
+        },
+        "summary": "Create a draft owned by the authenticated user. The title must not be blank.",
+        "tags": [
+          "posts"
+        ]
+      }
+    },
+    "/posts/{id}": {
+      "get": {
+        "description": "Read a post. Authenticated readers can view drafts as well as published posts.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "posts.get",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "forbidden",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "not_found",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "413": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "invalid_title",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "4XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          }
+        },
+        "summary": "Read a post. Authenticated readers can view drafts as well as published posts.",
+        "tags": [
+          "posts"
+        ]
+      }
+    },
+    "/posts/{id}/publish": {
+      "post": {
+        "description": "Publish a draft. Only its author may publish it; repeating the call is allowed.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "posts.publish",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "forbidden",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "not_found",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "413": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "invalid_title",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "4XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          }
+        },
+        "summary": "Publish a draft. Only its author may publish it; repeating the call is allowed.",
+        "tags": [
+          "posts"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "description": "Look up a profile by its ID.\n\nQuery parameters use URL form encoding. Duplicate or unknown query parameters are rejected. Request bodies are limited to 2097152 bytes.",
+        "operationId": "users.get",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "400": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "application",
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "not_found",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "value"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServiceError"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Application error or request/service failure."
+          },
+          "413": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          },
+          "5XX": {
+            "$ref": "#/components/responses/ServiceErrorResponse"
+          }
+        },
+        "summary": "Look up a profile by its ID.",
+        "tags": [
+          "users"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Drafts and publishing operations.",
+      "name": "posts"
+    },
+    {
+      "description": "Profiles shared by blog authors and readers.",
+      "name": "users"
+    }
+  ]
+}

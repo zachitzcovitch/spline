@@ -1,4 +1,5 @@
 use spline_example_blog_contracts::api;
+use spline_openapi::OpenApi;
 use spline_typescript::Typescript;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -11,21 +12,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     };
 
-    let source = Typescript::new()
-        .export_http_application(
-            &api::http::describe_with(&spline::http::DeclaredErrors)?,
-            "Blog",
-        )?
+    let binding = api::http::describe_with(&spline::http::DeclaredErrors)?;
+    let typescript = Typescript::new()
+        .export_http_application(&binding, "Blog")?
         .source;
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../typescript/generated.ts");
-    if mode == "--write" {
-        std::fs::write(path, source)?;
-        println!("Blog TypeScript client generated");
-    } else {
-        if std::fs::read_to_string(path)? != source {
-            return Err("Blog TypeScript client is stale; run cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write".into());
+    let openapi = OpenApi::new("Blog API", "0.1.0")
+        .server("/api")
+        .bearer_auth("bearerAuth")
+        .export_application(&binding)?
+        .to_pretty_json()?;
+    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    for (name, source) in [
+        ("typescript/generated.ts", typescript),
+        ("openapi.json", openapi),
+    ] {
+        let path = directory.join(name);
+        if mode == "--write" {
+            std::fs::write(path, source)?;
+        } else if std::fs::read_to_string(path)? != source {
+            return Err(format!("Blog artifact {name} is stale; run cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write").into());
         }
-        println!("Blog TypeScript client is current");
     }
+    println!(
+        "Blog artifacts {}",
+        if mode == "--write" {
+            "generated"
+        } else {
+            "are current"
+        }
+    );
     Ok(())
 }

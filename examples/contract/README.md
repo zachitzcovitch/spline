@@ -48,6 +48,23 @@ The HTTP suite starts ephemeral loopback servers and executes both clients, plus
 request-context, URL encoding, and error-path checks. See the
 [HTTP binding guide](../../docs/http-binding.md) for the profile and client errors.
 
+## OpenAPI fixture
+
+[openapi.json](openapi.json) documents the CRUD/PATCH/204 profile from the selected
+HTTP description. The workbench's executable error policy has opaque status
+metadata, so error fallbacks retain the full application envelope without inventing
+exact variant/status mappings. The [blog tutorial](../blog/README.md) demonstrates
+declared defaults.
+
+```sh
+cargo run --locked -p spline-example-contract --example contract-openapi -- --write
+cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+npm run check:openapi
+```
+
+The OpenAPI exporter is a development-only Cargo example. See the
+[OpenAPI guide](../../docs/openapi.md) for schema and response rules.
+
 ## Evolution fixtures
 
 The [versioned contracts](fixtures/evolution.rs) and

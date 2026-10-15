@@ -48,6 +48,10 @@ jobs:
         run: cargo run --locked -p spline-example-contract -- --check
       - name: Check tutorial client freshness
         run: cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
+      - name: Check CRUD OpenAPI freshness
+        run: cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+      - name: Validate OpenAPI documents
+        run: npm run check:openapi
       - name: Check generated TypeScript types
         run: npm run check
       - name: Check Rust benchmark fixtures

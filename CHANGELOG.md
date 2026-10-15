@@ -37,6 +37,14 @@ release yet; the workspace version is a development version.
   policies remain supported and opaque unless they declare their response mapping.
 - Neutral source-variant schema identities, preserving associations through Serde
   renames/tagging without adding HTTP fields to the schema or contract model.
+- A standalone `spline-openapi` exporter producing inspectable, deterministic
+  OpenAPI 3.1.2 documents from bound resources/applications. It preserves directional
+  schemas, recursive/generic components, positional argument wire mappings, PATCH,
+  204, and combined application/framework responses.
+- Explicit OpenAPI server URLs, global bearer authentication, directional component
+  name overrides, and JSON inspection/editing/rendering helpers.
+- Checked-in blog and CRUD OpenAPI documents, freshness commands, independent
+  Swagger Parser/Ajv validation, and live response conformance in CI.
 
 ### Maintenance
 
@@ -72,3 +80,7 @@ release yet; the workspace version is a development version.
   gives 204 operations a `void` result.
 - The blog declares default statuses on its public error types and shares them
   between server routing and export tooling through `DeclaredErrors`.
+- The blog exporter generates TypeScript and OpenAPI together. Shared structural
+  comparison in the neutral schema graph supports both exporters' directional names.
+- OpenAPI documents use neutral service-error components and customer-facing prose,
+  with internal transport markers and exporter-policy extensions omitted.

@@ -45,7 +45,9 @@ cargo test --locked --workspace
 cargo run --locked -p spline-typescript --example export -- --check
 cargo run --locked -p spline-example-contract -- --check
 cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
+cargo run --locked -p spline-example-contract --example contract-openapi -- --check
 npm run check
+npm run check:openapi
 npm run test:blog
 cargo bench --locked -p spline-benchmarks -- --test
 npm run bench:typescript -- --check
@@ -65,13 +67,14 @@ data under the ignored Cargo target directory.
 
 ## Generated artifacts and diagnostics
 
-Rust fixtures and contracts are the source of truth for checked-in TypeScript.
+Rust fixtures and contracts are the source of truth for checked-in TypeScript and OpenAPI.
 After an intentional change to those inputs or the exporter, regenerate:
 
 ```sh
 cargo run --locked -p spline-typescript --example export -- --write
 cargo run --locked -p spline-example-contract -- --write
 cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write
+cargo run --locked -p spline-example-contract --example contract-openapi -- --write
 ```
 
 Review the generated diff and rerun the relevant Rust and TypeScript checks.
@@ -111,6 +114,13 @@ Declared-error behavior is covered by `crates/spline/tests/http_errors.rs` and t
 HTTP compiler fixtures. Keep real statuses and serialized response metadata aligned;
 see [docs/http-errors.md](docs/http-errors.md) for derived defaults and custom policies.
 
+OpenAPI conformance lives in `crates/spline-openapi/tests/`. Its Rust tests run the
+independent Node validators, so install root npm dependencies before running them.
+The blog exporter checks both its TypeScript and OpenAPI artifacts; the workbench's
+OpenAPI generator is a development-only Cargo example. `npm run check:openapi`
+validates both documents, and the live blog workflow checks real response bodies
+against the selected schemas. See [docs/openapi.md](docs/openapi.md).
+
 ## Where changes belong
 
 - `spline-schema`: directional shapes, registration, and field semantics.
@@ -122,10 +132,11 @@ see [docs/http-errors.md](docs/http-errors.md) for derived defaults and custom p
 - `spline`: application-facing re-exports and macro conformance tests.
 - `spline-http`: HTTP extensions, encoding, Axum/reqwest integration, and client errors.
 - `spline-typescript`: deterministic type/client export and TypeScript fixtures.
+- `spline-openapi`: deterministic document/schema lowering and OpenAPI conformance.
 - `examples/contract`: runnable server and clients, including end-to-end tests.
 - `examples/blog`: guided Users/Posts tutorial and its end-to-end smoke test.
 - `benchmarks`: Criterion metadata/export/HTTP benchmarks and a Node client harness.
-- `scripts/check-neutral.mjs`: guards the default facade's no-HTTP dependency boundary.
+- `scripts/check-neutral.mjs`: guards neutral execution and the exporter's runtime-free boundary.
 
 Update the relevant guide in `docs/` when changing public behavior. Use the
 [research index](research/README.md) to understand the decisions behind the

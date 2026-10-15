@@ -228,6 +228,11 @@ Neutral `export_contract`/`export_application` consume neutral descriptions.
 `::http::describe()`. HTTP-specific no-content results become `void` only in that
 binding's export; the neutral unit shape remains JSON `null`.
 
+`spline-openapi` consumes the same selected HTTP descriptions, preferably through
+`::http::describe_with(&policy)` for declared error statuses. Its normal dependency
+graph contains metadata and JSON/URL tooling, with no execution runtime. See
+[OpenAPI export](openapi.md) for document configuration and independent validation.
+
 ## Verification and migration
 
 ```sh

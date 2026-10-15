@@ -186,7 +186,8 @@ Error types can opt into `#[derive(spline::http::Error)]` with
 these defaults, and `::http::describe_with(&policy)` collects their per-status
 response shapes. Custom executable policies remain available and opaque unless
 they supply static mappings. See [declared HTTP errors](http-errors.md) for authoring,
-validation, and the metadata foundation for future OpenAPI export.
+validation. [OpenAPI export](openapi.md) consumes this metadata and combines
+application/framework alternatives where they share a status.
 
 `users::http::router_with(factory, error_policy)` adds an HTTP request-scoped factory:
 
@@ -325,7 +326,7 @@ The Node runner executes the generated TypeScript through built-in type strippin
 
 ## Evidence
 
-The Rust suite and blog checks cover **176 behavior/integration checks**, plus trybuild harnesses
+The Rust suite and blog checks cover **184 behavior/integration checks**, plus trybuild harnesses
 with **35 compiler-failure fixtures** when HTTP is enabled. The eight live HTTP tests include both
 client executables calling one loopback server, Rust/TypeScript path and query
 round trips, request context, declared error statuses, malformed requests,
@@ -350,6 +351,8 @@ clones, and cancellation. Neutral-only tests verify in-process operation middlew
 and contracts with incomplete optional HTTP mappings.
 Declared-error checks compare real responses with per-status envelope schemas,
 including payload variants, Serde renames, shared statuses, and custom overrides.
+OpenAPI checks independently validate documents, Serde samples, negative instances,
+and live responses, including nullable bodies, omitted queries, PATCH, and 204.
 
 The TypeScript workspaces pass strict compilation with **61 expected-error assertions**.
 Runtime Node assertions additionally exercise generated request/response validation,
