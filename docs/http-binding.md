@@ -85,7 +85,23 @@ require a body mapping, and DELETE is bodyless in this profile. Every operation
 in a selected HTTP contract needs a binding. Incomplete mappings do not invalidate
 neutral composition or in-process calls; selecting `::http::describe()` returns a
 missing-binding error. The base `splinekit` crate remains
-usable without its optional `http` feature for neutral contracts and typed execution.
+usable without its optional HTTP features for neutral contracts and typed execution.
+
+### Client, server, or both
+
+| Facade feature | Generates | Depends on |
+| --- | --- | --- |
+| `http-client` | `::http::Client` and descriptions | reqwest; builds for `wasm32-unknown-unknown` |
+| `http-server` | `::http::router`/`router_with` and descriptions | Axum |
+| `http` | both | both |
+
+Choose per crate. A contracts crate shared by a server and a client usually
+enables `http-client`; the server crate adds `http-server` (or `http`). Cargo
+unifies features per build, so the server's build generates the router while a
+browser build of the client never compiles Axum. The blog example is laid out
+this way, and CI checks its contracts crate for `wasm32-unknown-unknown`. On
+wasm32 the reqwest client uses the browser's `fetch`, so redirect handling is the
+browser's.
 
 Path/query arguments support strings, booleans, the evaluated fixed-width integer
 types, and compatible string-literal unions. Optional nullable query values are

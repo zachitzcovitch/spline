@@ -8,6 +8,13 @@ repository.workspace = true
 readme.workspace = true
 description = "HTTP/JSON binding runtime for Splinekit, using Axum and reqwest"
 
+[features]
+default = ["client", "server"]
+# The reqwest client; with only this feature the crate builds for wasm32.
+client = ["dep:reqwest"]
+# The Axum server.
+server = ["dep:axum"]
+
 [dependencies]
 splinekit-contract.workspace = true
 splinekit-http-contract.workspace = true
@@ -16,8 +23,9 @@ splinekit-schema.workspace = true
 splinekit-macros.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-axum.workspace = true
-reqwest.workspace = true
+axum = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+http.workspace = true
 percent-encoding.workspace = true
 url.workspace = true
 

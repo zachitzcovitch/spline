@@ -2,22 +2,32 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "client")]
 mod client;
 mod compatibility;
 mod errors;
+#[cfg(feature = "server")]
 mod extensions;
+#[cfg(feature = "client")]
 mod response;
+#[cfg(feature = "server")]
 pub mod server;
 
+#[cfg(feature = "server")]
 pub use axum;
-pub use axum::http::StatusCode;
+#[cfg(feature = "client")]
 pub use client::Client;
 pub use compatibility::verify_serde;
-pub use errors::{DeclaredErrors, Error};
+pub use errors::{DeclaredErrors, Error, ErrorPolicy, Fault};
+#[cfg(feature = "server")]
 pub use extensions::{HttpExt, HttpFactoryBinding, HttpFactoryExt, HttpServiceBinding};
+pub use http::StatusCode;
+#[cfg(feature = "client")]
 pub use reqwest;
+#[cfg(feature = "client")]
 pub use response::ResponsePolicy;
-pub use server::{ErrorPolicy, Fault, RequestContext};
+#[cfg(feature = "server")]
+pub use server::RequestContext;
 pub use splinekit_http_contract as contract;
 pub use splinekit_macros::HttpError as Error;
 
@@ -70,6 +80,7 @@ impl fmt::Display for BuildError {
 }
 impl std::error::Error for BuildError {}
 
+#[cfg(feature = "client")]
 #[derive(Debug)]
 pub enum CallError<E> {
     Application(E),
@@ -80,6 +91,7 @@ pub enum CallError<E> {
     Encode(String),
 }
 
+#[cfg(feature = "client")]
 impl<E: fmt::Debug> fmt::Display for CallError<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -91,8 +103,10 @@ impl<E: fmt::Debug> fmt::Display for CallError<E> {
         }
     }
 }
+#[cfg(feature = "client")]
 impl<E: fmt::Debug> std::error::Error for CallError<E> {}
 
+#[cfg(any(feature = "client", feature = "server"))]
 pub(crate) fn json_content_type(value: Option<&str>) -> bool {
     value.is_some_and(|value| {
         let value = value

@@ -50,6 +50,8 @@ npm run check:neutral
 cargo run --locked -p splinekit --no-default-features --example neutral
 cargo test --locked --workspace
 cargo test --locked -p splinekit-schema --all-features --test ecosystem
+cargo check --locked --target wasm32-unknown-unknown -p splinekit --no-default-features --features http-client
+cargo check --locked --target wasm32-unknown-unknown -p splinekit-example-blog-contracts
 cargo run --locked -p splinekit-typescript --example export -- --check
 cargo run --locked -p splinekit-example-contract -- --check
 cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check

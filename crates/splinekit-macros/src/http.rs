@@ -339,6 +339,7 @@ pub fn generate(
     Ok(quote! {
         use super::__splinekit_runtime;
 
+        #runtime::__private::http_server! {
         impl<S, P> #runtime::http::HttpServiceBinding<S, P> for super::Definition
         where S: super::super::#trait_name + 'static, P: __ErrorPolicy {
             fn router_shared(service: ::std::sync::Arc<S>, errors: P)
@@ -360,6 +361,7 @@ pub fn generate(
             {
                 router_with(factory, errors)
             }
+        }
         }
 
         /// Select and validate this contract's HTTP binding.
@@ -389,6 +391,7 @@ pub fn generate(
             ::std::vec![#(#bindings),*]
         }
 
+        #runtime::__private::http_client! {
         #[derive(Clone, Debug)]
         pub struct Client { inner: #runtime::http::Client }
 
@@ -412,11 +415,13 @@ pub fn generate(
             }
             #(#client_methods)*
         }
+        }
 
         #[doc(hidden)]
         pub trait __ErrorPolicy: Send + Sync + 'static #(+ #policies)* {}
         impl<P: Send + Sync + 'static #(+ #policies)*> __ErrorPolicy for P {}
 
+        #runtime::__private::http_server! {
         pub fn router<S, P>(service: S, errors: P)
             -> ::core::result::Result<#runtime::http::axum::Router, #runtime::http::BuildError>
         where S: super::super::#trait_name + 'static, P: __ErrorPolicy {
@@ -455,5 +460,6 @@ pub fn generate(
             Ok(__splinekit_router)
         }
         #(#operation_routers)*
+        }
     })
 }

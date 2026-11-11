@@ -87,7 +87,10 @@ if (created.ok) {
 }
 ```
 
-Enable the `splinekit` crate's `http` feature for bound contracts. The binding supports
+Enable the `splinekit` crate's `http` feature for bound contracts, or only
+`http-client` / `http-server` for one side; a client-only build compiles for
+`wasm32-unknown-unknown`, so Dioxus, Leptos and other browser apps can use the
+generated Rust client. The binding supports
 GET, POST, PUT, PATCH, and DELETE, scalar path/query parameters, selected JSON
 bodies, 200/201 JSON successes, and empty 204 successes. See the
 [HTTP guide](docs/http-binding.md) for the wire format, request-context factory,
@@ -238,6 +241,8 @@ From the repository root:
 npm ci --ignore-scripts --no-audit --no-fund
 cargo test --locked --workspace
 cargo test --locked -p splinekit-schema --all-features --test ecosystem
+cargo check --locked --target wasm32-unknown-unknown -p splinekit --no-default-features --features http-client
+cargo check --locked --target wasm32-unknown-unknown -p splinekit-example-blog-contracts
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo check --locked -p splinekit --no-default-features

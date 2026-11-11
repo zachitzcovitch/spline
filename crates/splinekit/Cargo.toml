@@ -10,7 +10,11 @@ description = "Rust-authored API contracts and schemas"
 
 [features]
 default = []
-http = ["dep:splinekit-http"]
+# HTTP binding: the generated client (`http-client`, builds for wasm32), the
+# Axum router (`http-server`), or both (`http`).
+http = ["http-client", "http-server"]
+http-client = ["dep:splinekit-http", "splinekit-http/client"]
+http-server = ["dep:splinekit-http", "splinekit-http/server"]
 uuid = ["splinekit-schema/uuid"]
 chrono = ["splinekit-schema/chrono"]
 url = ["splinekit-schema/url"]

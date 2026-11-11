@@ -274,8 +274,12 @@ impl Client {
 }
 
 fn default_http() -> Result<reqwest::Client, BuildError> {
-    reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
+    let builder = reqwest::Client::builder();
+    // Redirects are surfaced, not followed. Browsers decide that for fetch,
+    // and reqwest's wasm32 client has no redirect policy.
+    #[cfg(not(target_arch = "wasm32"))]
+    let builder = builder.redirect(reqwest::redirect::Policy::none());
+    builder
         .build()
         .map_err(|error| BuildError::Configuration(error.to_string()))
 }

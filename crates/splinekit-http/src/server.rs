@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{Map, Value};
 use splinekit_http_contract::{HttpPlan, Scalar};
 
-use crate::{json_content_type, ERROR_HEADER, MAX_BODY_BYTES};
+use crate::{json_content_type, ErrorPolicy, Fault, ERROR_HEADER, MAX_BODY_BYTES};
 
 /// Request-owned context, suitable for an asynchronous per-request service factory.
 #[derive(Clone, Debug)]
@@ -30,29 +30,6 @@ impl RequestContext {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Fault {
-    pub status: u16,
-    pub code: String,
-    pub message: String,
-}
-
-impl Fault {
-    pub fn new(status: u16, code: impl Into<String>, message: impl Into<String>) -> Self {
-        Self {
-            status,
-            code: code.into(),
-            message: message.into(),
-        }
-    }
-    pub fn invalid(message: impl Into<String>) -> Self {
-        Self::new(400, "invalid_request", message)
-    }
-    fn internal() -> Self {
-        Self::new(500, "internal", "response encoding or error policy failed")
-    }
-}
-
 impl IntoResponse for Fault {
     fn into_response(self) -> Response {
         let status = StatusCode::from_u16(self.status)
@@ -68,25 +45,6 @@ impl IntoResponse for Fault {
             serde_json::to_vec(&body).unwrap(),
             Some("framework"),
         )
-    }
-}
-
-pub trait ErrorPolicy<E>: Send + Sync + 'static {
-    fn status(&self, error: &E) -> StatusCode;
-
-    /// Static application-error mappings, when known. Must describe all emitted
-    /// application values/statuses for this configuration. Return Opaque when a
-    /// dynamic policy cannot declare its responses exhaustively.
-    fn mapping(&self) -> splinekit_http_contract::ErrorMapping {
-        splinekit_http_contract::ErrorMapping::Opaque
-    }
-}
-impl<E, F> ErrorPolicy<E> for F
-where
-    F: Fn(&E) -> StatusCode + Send + Sync + 'static,
-{
-    fn status(&self, error: &E) -> StatusCode {
-        self(error)
     }
 }
 

@@ -13,7 +13,8 @@ name = "blog-export"
 path = "examples/export.rs"
 
 [dependencies]
-splinekit = { workspace = true, features = ["http"] }
+# Contracts carry the client; the server crate adds the router.
+splinekit = { workspace = true, features = ["http-client"] }
 serde.workspace = true
 
 [dev-dependencies]

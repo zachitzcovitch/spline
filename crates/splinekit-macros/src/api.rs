@@ -179,6 +179,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             __runtime::__private::http! {
             pub mod http {
             use super::{__runtime, #(#local),*};
+            __runtime::__private::http_server! {
             impl<S, P> __runtime::http::HttpServiceBinding<S, P> for super::Definition
             where S: #service_bounds + 'static, P: #error_bounds {
                 fn router_shared(service: ::std::sync::Arc<S>, errors: P)
@@ -201,6 +202,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                     router_with(factory, errors)
                 }
             }
+            }
             /// Select and validate HTTP mappings separately from neutral composition.
             pub fn describe() -> ::core::result::Result<__runtime::http::contract::ApplicationDescription, __runtime::http::BuildError> {
                 let mut builder = __runtime::http::contract::ApplicationBuilder::new(super::describe()?);
@@ -221,6 +223,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                 Ok(description)
             }
 
+            __runtime::__private::http_client! {
             #[derive(Clone, Debug)]
             pub struct Client { #(#groups: #local::http::Client,)* }
 
@@ -241,7 +244,9 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                 }
                 #(pub fn #groups(&self) -> &#local::http::Client { &self.#groups })*
             }
+            }
 
+            __runtime::__private::http_server! {
             pub fn router<S, P>(service: S, errors: P)
                 -> ::core::result::Result<__runtime::http::axum::Router, __runtime::http::BuildError>
             where S: #service_bounds + 'static, P: #error_bounds {
@@ -269,6 +274,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                     ::std::sync::Arc::clone(&factory), ::std::sync::Arc::clone(&errors),
                 )?);)*
                 Ok(router)
+            }
             }
             }
             }

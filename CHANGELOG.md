@@ -77,6 +77,13 @@ release yet; the workspace version is a development version.
   and enum values are never renamed; fields that would share a TypeScript name
   are an export error. `Typescript::export` (types for raw JSON) keeps wire
   names.
+- The HTTP binding splits by side: `http-client` (reqwest; builds for
+  `wasm32-unknown-unknown`) and `http-server` (Axum), with `http` meaning both.
+  Generated contracts and applications emit the client and router behind the
+  matching feature, so a browser build never compiles Axum. `ErrorPolicy` and
+  `Fault` move to the shared part of `splinekit-http`; `StatusCode` comes from
+  the `http` crate. CI checks the facade and the blog's contracts crate for
+  wasm32, and the dependency check keeps the client and server graphs apart.
 
 ### Maintenance
 

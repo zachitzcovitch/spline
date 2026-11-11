@@ -40,6 +40,10 @@ jobs:
         run: cargo run --locked -p splinekit --no-default-features --example neutral
       - name: Run Rust and cross-language HTTP tests
         run: cargo test --locked --workspace
+      - name: Check the generated Rust client for wasm32
+        run: |
+          cargo check --locked --target wasm32-unknown-unknown -p splinekit --no-default-features --features http-client
+          cargo check --locked --target wasm32-unknown-unknown -p splinekit-example-blog-contracts
       - name: Check ecosystem type integrations
         run: cargo test --locked -p splinekit-schema --all-features --test ecosystem
       - name: Run multi-crate blog workflow

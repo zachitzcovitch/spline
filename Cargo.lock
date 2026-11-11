@@ -1381,6 +1381,7 @@ name = "splinekit-http"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "http",
  "percent-encoding",
  "reqwest",
  "serde",
