@@ -211,12 +211,16 @@ async fn strict_policy_rejects_additions_but_still_accepts_the_original_server()
 async fn new_variants_and_invalid_known_fields_remain_protocol_failures() {
     let server = serve(new_router()).await;
     let client = v1::users::http::Client::new(&server.base).unwrap();
-    for id in ["new-state", "new-error"] {
-        assert!(matches!(
-            client.get(id.into()).await,
-            Err(CallError::Protocol(_))
-        ));
-    }
+    assert!(matches!(
+        client.get("new-state".into()).await,
+        Err(CallError::Protocol(_))
+    ));
+    // An error code the old contract doesn't declare reaches it as a fault
+    // with that code, not as a protocol failure.
+    let Err(CallError::Framework(fault)) = client.get("new-error".into()).await else {
+        panic!("undeclared error code")
+    };
+    assert_eq!(fault.code, "busy");
     for id in ["new-variant", "ambiguous"] {
         assert!(matches!(
             client.event(id.into()).await,

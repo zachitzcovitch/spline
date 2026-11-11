@@ -71,6 +71,10 @@ pub(crate) fn plan(operation: &Operation, binding: HttpBinding, graph: &Graph) -
     if binding.success_status == 204 && !matches!(resolve(&operation.output, graph)?, Shape::Null) {
         return Err(fail("204 requires a unit/null output schema"));
     }
+    crate::application_error_codes(&operation.error, graph).map_err(|error| match error {
+        Error::Binding(message) => fail(&message),
+        error => error,
+    })?;
     if binding.method == HttpMethod::Get
         && (binding.body.is_some() || operation.kind == OperationKind::Mutation)
     {

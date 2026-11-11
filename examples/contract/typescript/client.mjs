@@ -20,7 +20,7 @@ const deleted = await client.delete(created.value.id);
 if (!deleted.ok || deleted.value !== undefined) throw new Error("expected a bodyless delete success");
 console.log("Replaced, partially updated, and deleted the user");
 const missing = await client.get("missing");
-if (missing.ok || missing.error.kind !== "application" || missing.error.value.kind !== "not_found") {
+if (missing.ok || missing.error.kind !== "application" || missing.error.value.code !== "not_found") {
   throw new Error("expected a typed NotFound error");
 }
 console.log("Handled typed NotFound error");

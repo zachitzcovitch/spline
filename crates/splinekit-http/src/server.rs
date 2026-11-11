@@ -8,7 +8,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{Map, Value};
 use splinekit_http_contract::{HttpPlan, Scalar};
 
-use crate::{json_content_type, ErrorPolicy, Fault, ERROR_HEADER, MAX_BODY_BYTES};
+use crate::{json_content_type, ErrorPolicy, Fault, MAX_BODY_BYTES, PROBLEM_CONTENT_TYPE};
+use splinekit_http_contract::PROBLEM_MEMBERS;
 
 /// Request-owned context, suitable for an asynchronous per-request service factory.
 #[derive(Clone, Debug)]
@@ -38,13 +39,13 @@ impl IntoResponse for Fault {
         let Some(status) = status else {
             return Fault::internal().into_response();
         };
-        let body =
-            serde_json::json!({ "kind": "framework", "code": self.code, "message": self.message });
-        json_response(
-            status,
-            serde_json::to_vec(&body).unwrap(),
-            Some("framework"),
-        )
+        let mut body = Map::new();
+        body.insert("status".into(), status.as_u16().into());
+        body.insert("code".into(), self.code.into());
+        if let Some(detail) = self.detail {
+            body.insert("detail".into(), detail.into());
+        }
+        problem_response(status, serde_json::to_vec(&body).unwrap())
     }
 }
 
@@ -63,7 +64,7 @@ pub fn respond<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
             _ => Fault::internal().into_response(),
         },
         Ok(value) if matches!(success, 200 | 201) => match serde_json::to_vec(&value) {
-            Ok(body) => json_response(StatusCode::from_u16(success).unwrap(), body, None),
+            Ok(body) => json_response(StatusCode::from_u16(success).unwrap(), body),
             Err(_) => Fault::internal().into_response(),
         },
         Ok(_) => Fault::internal().into_response(),
@@ -72,16 +73,23 @@ pub fn respond<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
             if !status.is_client_error() && !status.is_server_error() {
                 return Fault::internal().into_response();
             }
-            #[derive(Serialize)]
-            struct Envelope<E> {
-                kind: &'static str,
-                value: E,
+            // The binding checked the error type: an object tagged by `code`
+            // with no problem-detail members of its own. Add the status.
+            let Ok(Value::Object(fields)) = serde_json::to_value(error) else {
+                return Fault::internal().into_response();
+            };
+            if !fields.get("code").is_some_and(Value::is_string)
+                || PROBLEM_MEMBERS
+                    .iter()
+                    .any(|member| fields.contains_key(*member))
+            {
+                return Fault::internal().into_response();
             }
-            match serde_json::to_vec(&Envelope {
-                kind: "application",
-                value: error,
-            }) {
-                Ok(body) => json_response(status, body, Some("application")),
+            let mut body = Map::new();
+            body.insert("status".into(), status.as_u16().into());
+            body.extend(fields);
+            match serde_json::to_vec(&body) {
+                Ok(body) => problem_response(status, body),
                 Err(_) => Fault::internal().into_response(),
             }
         }
@@ -105,18 +113,21 @@ pub fn respond_call<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
     }
 }
 
-fn json_response(status: StatusCode, body: Vec<u8>, error: Option<&'static str>) -> Response {
+fn json_response(status: StatusCode, body: Vec<u8>) -> Response {
+    typed_response(status, body, "application/json")
+}
+
+fn problem_response(status: StatusCode, body: Vec<u8>) -> Response {
+    typed_response(status, body, PROBLEM_CONTENT_TYPE)
+}
+
+fn typed_response(status: StatusCode, body: Vec<u8>, content_type: &'static str) -> Response {
     let mut response = Response::new(Body::from(body));
     *response.status_mut() = status;
     response.headers_mut().insert(
         header::CONTENT_TYPE,
-        header::HeaderValue::from_static("application/json"),
+        header::HeaderValue::from_static(content_type),
     );
-    if let Some(error) = error {
-        response
-            .headers_mut()
-            .insert(ERROR_HEADER, header::HeaderValue::from_static(error));
-    }
     response
 }
 

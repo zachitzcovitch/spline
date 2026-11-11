@@ -13,9 +13,10 @@ Generated HTTP clients now default to **compatible response decoding**:
 - Preserve map keys and validate their values. An additional dictionary entry is
   data, not an unknown DTO field.
 - Preserve explicitly open objects according to their schema.
-- Keep generated enums closed: unknown variants are protocol failures, including
-  newly emitted application-error variants. A string enum wrapped in
-  `splinekit::Open<E>` is the opt-in exception (below).
+- Keep generated enums closed: unknown variants are protocol failures. A string
+  enum wrapped in `splinekit::Open<E>` is the opt-in exception (below). An
+  application error `code` the client doesn't declare is different: it arrives as
+  a framework fault carrying that code, so old clients can still branch on it.
 
 This applies to success bodies and application-error payloads. Request validation
 continues to follow the authored input schema and Serde behavior. Receiver
@@ -66,7 +67,7 @@ stable operation identity, routing, success status, and semantics of existing fi
 | Remove a required output property | Protocol failure. | Protocol failure. |
 | Change a known type, emit disallowed null, or exceed an integer range | Protocol failure. | Protocol failure. |
 | Add an output/error enum variant but keep emitting old variants | Existing variants remain decodable. | Existing variants remain decodable. |
-| Emit that new variant to an old client | Protocol failure. | Protocol failure. |
+| Emit that new variant to an old client | Protocol failure (an output enum); a framework fault with the new `code` (an error). | Same. |
 
 Request-side rules are independent:
 
@@ -97,9 +98,11 @@ tested additive-input changes.
 
 ### Enum additions need an explicit strategy
 
-Generated output/error types remain discriminated and exhaustive. A new variant
-is not silently coerced into an old variant, changed to null, or returned as an
-untyped application error: it becomes `Protocol` / `kind: "protocol"`.
+Generated output/error types remain discriminated and exhaustive. A new output
+variant is not silently coerced into an old variant or changed to null: it
+becomes `Protocol` / `kind: "protocol"`. A new error variant is never decoded as
+one of the old client's errors: its `code` isn't declared there, so it arrives as
+`Framework` / `kind: "framework"` with that `code`.
 
 Known variants with added object fields can evolve through projection. If multiple
 union alternatives match but produce different projected values, both clients

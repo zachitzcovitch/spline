@@ -1,9 +1,8 @@
-use std::collections::BTreeMap;
-
 use serde_json::{json, Map, Value};
 use splinekit_contract::Operation;
 use splinekit_http_contract::{
-    application_error_schema, ErrorResponses, HttpMethod, HttpPlan, ERROR_HEADER, MAX_BODY_BYTES,
+    application_error_schema, ErrorResponses, HttpMethod, HttpPlan, MAX_BODY_BYTES,
+    PROBLEM_CONTENT_TYPE,
 };
 
 use crate::{schema::Schemas, Result};
@@ -14,11 +13,7 @@ fn framework_ref() -> Value {
 }
 
 pub(crate) fn framework_response() -> Value {
-    error_response(
-        "Request or service failure.",
-        framework_ref(),
-        BTreeMap::new(),
-    )
+    error_response("Request or service failure.", framework_ref())
 }
 
 pub(crate) fn method(method: HttpMethod) -> &'static str {
@@ -114,9 +109,12 @@ pub(crate) fn render(
     responses.insert(plan.binding.success_status.to_string(), success);
     let fallback = match &plan.errors {
         ErrorResponses::Opaque => {
-            error_response("Application error or request/service failure. See the response body for error details.",
-                json!({"anyOf":[schemas.render(&application_error_schema(op.error.clone()))?,framework_ref()]}),
-                BTreeMap::new())
+            let application = application_error_schema(&op.error, schemas.graph)
+                .map_err(|error| crate::Error::Configuration(error.to_string()))?;
+            error_response(
+                "Application error or request/service failure. Branch on the problem's `code`.",
+                json!({"anyOf":[schemas.render(&application)?,framework_ref()]}),
+            )
         }
         ErrorResponses::Declared(_) => {
             json!({"$ref":"#/components/responses/ServiceErrorResponse"})
@@ -132,18 +130,11 @@ pub(crate) fn render(
     responses.insert("5XX".into(), fallback);
     if let ErrorResponses::Declared(declared) = &plan.errors {
         for (status, response) in declared {
-            let mut headers = BTreeMap::new();
-            for (name, value) in &response.headers {
-                if !name.eq_ignore_ascii_case(ERROR_HEADER) {
-                    headers.insert(name.clone(),json!({"description":"Application-error response header.","schema":{"type":"string","const":value}}));
-                }
-            }
             responses.insert(
                 status.to_string(),
                 error_response(
-                    "Application error or request/service failure.",
+                    "Application error or request/service failure. Branch on the problem's `code`.",
                     json!({"anyOf":[schemas.render(&response.body)?,framework_ref()]}),
-                    headers,
                 ),
             );
         }
@@ -152,11 +143,6 @@ pub(crate) fn render(
     Ok(operation)
 }
 
-fn error_response(description: &str, body: Value, headers: BTreeMap<String, Value>) -> Value {
-    let mut response =
-        json!({"description":description,"content":{"application/json":{"schema":body}}});
-    if !headers.is_empty() {
-        response["headers"] = json!(headers);
-    }
-    response
+fn error_response(description: &str, body: Value) -> Value {
+    json!({"description":description,"content":{PROBLEM_CONTENT_TYPE:{"schema":body}}})
 }

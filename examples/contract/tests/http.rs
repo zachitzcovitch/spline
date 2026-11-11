@@ -95,19 +95,26 @@ pub struct Formats {
     pub status: splinekit::Open<EchoStatus>,
 }
 
+/// The echo operations' one application error.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum EchoError {
+    Rejected,
+}
+
 #[splinekit::contract(namespace = "echo", module = "echo")]
 pub trait Echo {
     #[query]
     #[http(get = "/health")]
-    async fn health(&self) -> Result<(), ()>;
+    async fn health(&self) -> Result<(), EchoError>;
 
     #[query]
     #[http(get = "/no-content", status = 204)]
-    async fn no_content(&self) -> Result<Empty, ()>;
+    async fn no_content(&self) -> Result<Empty, EchoError>;
 
     #[mutation]
     #[http(post = "/command", body = "fail", status = 204)]
-    async fn command(&self, fail: bool) -> Result<(), ()>;
+    async fn command(&self, fail: bool) -> Result<(), EchoError>;
 
     #[query]
     #[http(get = "/echo/{value}")]
@@ -117,30 +124,30 @@ pub trait Echo {
         count: i32,
         flag: bool,
         note: Option<String>,
-    ) -> Result<EchoValue, ()>;
+    ) -> Result<EchoValue, EchoError>;
 
     #[mutation]
     #[http(post = "/formats", body = "input")]
-    async fn formats(&self, input: Formats) -> Result<Formats, ()>;
+    async fn formats(&self, input: Formats) -> Result<Formats, EchoError>;
 
     #[mutation]
     #[http(post = "/named", body = "input")]
-    async fn named(&self, input: Named) -> Result<Named, ()>;
+    async fn named(&self, input: Named) -> Result<Named, EchoError>;
 }
 pub type Empty = ();
 struct EchoService;
 impl Echo for EchoService {
-    async fn health(&self) -> Result<(), ()> {
+    async fn health(&self) -> Result<(), EchoError> {
         Ok(())
     }
 
-    async fn no_content(&self) -> Result<Empty, ()> {
+    async fn no_content(&self) -> Result<Empty, EchoError> {
         Ok(())
     }
 
-    async fn command(&self, fail: bool) -> Result<(), ()> {
+    async fn command(&self, fail: bool) -> Result<(), EchoError> {
         if fail {
-            Err(())
+            Err(EchoError::Rejected)
         } else {
             Ok(())
         }
@@ -152,7 +159,7 @@ impl Echo for EchoService {
         count: i32,
         flag: bool,
         note: Option<String>,
-    ) -> Result<EchoValue, ()> {
+    ) -> Result<EchoValue, EchoError> {
         Ok(EchoValue {
             value,
             count,
@@ -161,11 +168,11 @@ impl Echo for EchoService {
         })
     }
 
-    async fn formats(&self, input: Formats) -> Result<Formats, ()> {
+    async fn formats(&self, input: Formats) -> Result<Formats, EchoError> {
         Ok(input)
     }
 
-    async fn named(&self, input: Named) -> Result<Named, ()> {
+    async fn named(&self, input: Named) -> Result<Named, EchoError> {
         Ok(input)
     }
 }
@@ -175,7 +182,10 @@ async fn rust_and_generated_typescript_clients_call_the_same_server() {
     let router = users::router(DemoUsers::default(), error_status)
         .unwrap()
         .merge(
-            echo::http::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST).unwrap(),
+            echo::http::router(EchoService, |_: &EchoError| {
+                axum::http::StatusCode::BAD_REQUEST
+            })
+            .unwrap(),
         );
     let server = serve(router).await;
     let client = users::Client::new(&server.base).unwrap();
@@ -296,7 +306,6 @@ async fn resource_routes_have_plain_json_bodies_and_declared_statuses() {
         .await
         .unwrap();
     assert_eq!(response.status(), 201);
-    assert!(response.headers().get(http::ERROR_HEADER).is_none());
     let user: serde_json::Value = response.json().await.unwrap();
     assert_eq!(user["displayName"], "Direct HTTP");
     let error = client
@@ -305,10 +314,10 @@ async fn resource_routes_have_plain_json_bodies_and_declared_statuses() {
         .await
         .unwrap();
     assert_eq!(error.status(), 404);
-    assert_eq!(error.headers()[http::ERROR_HEADER], "application");
+    assert_eq!(error.headers()["content-type"], "application/problem+json");
     assert_eq!(
         error.json::<serde_json::Value>().await.unwrap(),
-        json!({ "kind": "application", "value": { "kind": "not_found" } })
+        json!({ "status": 404, "code": "not_found" })
     );
 }
 
@@ -356,17 +365,23 @@ async fn malformed_requests_are_structured_framework_errors() {
     for (request, status) in requests {
         let response = request.send().await.unwrap();
         assert_eq!(response.status(), status);
-        assert_eq!(response.headers()[http::ERROR_HEADER], "framework");
+        assert_eq!(
+            response.headers()["content-type"],
+            "application/problem+json"
+        );
         let value: serde_json::Value = response.json().await.unwrap();
-        assert_eq!(value["kind"], "framework");
-        assert!(value["message"].is_string());
+        assert_eq!(value["status"], status);
+        assert!(value["code"].is_string());
+        assert!(value["detail"].is_string());
     }
 }
 
 #[tokio::test]
 async fn encoded_paths_scalar_queries_and_base_prefixes_round_trip() {
-    let router =
-        echo::http::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST).unwrap();
+    let router = echo::http::router(EchoService, |_: &EchoError| {
+        axum::http::StatusCode::BAD_REQUEST
+    })
+    .unwrap();
     let server = serve(axum::Router::new().nest("/v1", router)).await;
     let client = echo::http::Client::new(&format!("{}/v1/", server.base)).unwrap();
     assert!(client.health().await.is_ok());
@@ -374,7 +389,7 @@ async fn encoded_paths_scalar_queries_and_base_prefixes_round_trip() {
     assert!(client.command(false).await.is_ok());
     assert!(matches!(
         client.command(true).await,
-        Err(CallError::Application(()))
+        Err(CallError::Application(EchoError::Rejected))
     ));
     let value = "slash/space ?#%ü";
     let note = "query &+?/ü";
@@ -480,10 +495,23 @@ async fn client_distinguishes_protocol_http_and_transport_failures() {
                         axum::Json(json!({ "id": "x", "displayName": "x" })),
                     )
                         .into_response(),
+                    // A declared code whose body doesn't decode as that error.
                     "error" => (
                         axum::http::StatusCode::BAD_REQUEST,
-                        [(http::ERROR_HEADER, "application")],
-                        axum::Json(json!({ "kind": "application", "value": 3 })),
+                        [("content-type", "application/problem+json")],
+                        r#"{"status":400,"code":"invalid_name","details":3}"#,
+                    )
+                        .into_response(),
+                    "fault" => (
+                        axum::http::StatusCode::UNAUTHORIZED,
+                        [("content-type", "application/problem+json")],
+                        r#"{"status":401,"code":"unauthorized","detail":"token required"}"#,
+                    )
+                        .into_response(),
+                    // JSON from something else: no problem status and code.
+                    "gateway" => (
+                        axum::http::StatusCode::BAD_GATEWAY,
+                        axum::Json(json!({ "message": "bad gateway" })),
                     )
                         .into_response(),
                     _ => (axum::http::StatusCode::SERVICE_UNAVAILABLE, "proxy failure")
@@ -504,6 +532,17 @@ async fn client_distinguishes_protocol_http_and_transport_failures() {
         client.get(UserId("proxy".into())).await,
         Err(CallError::Http { status: 503 })
     ));
+    assert!(matches!(
+        client.get(UserId("gateway".into())).await,
+        Err(CallError::Http { status: 502 })
+    ));
+    let Err(CallError::Framework(fault)) = client.get(UserId("fault".into())).await else {
+        panic!("framework fault")
+    };
+    assert_eq!(
+        (fault.status, fault.code.as_str(), fault.detail.as_deref()),
+        (401, "unauthorized", Some("token required"))
+    );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let unavailable = format!("http://{}", listener.local_addr().unwrap());
     drop(listener);
@@ -528,7 +567,7 @@ pub struct Asymmetric {
 pub trait Broken {
     #[mutation]
     #[http(post = "/broken", body = "input")]
-    async fn put(&self, input: Asymmetric) -> Result<Asymmetric, ()>;
+    async fn put(&self, input: Asymmetric) -> Result<Asymmetric, EchoError>;
 }
 
 #[test]
@@ -653,25 +692,27 @@ async fn a_transport_layer_refreshes_a_session_once_and_resends_the_request() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let seen = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&seen);
-    let router = echo::http::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST)
-        .unwrap()
-        .layer(axum::middleware::from_fn(
-            move |request: axum::extract::Request, next: axum::middleware::Next| {
-                let counted = Arc::clone(&counted);
-                async move {
-                    counted.fetch_add(1, Ordering::SeqCst);
-                    let authorized = request
-                        .headers()
-                        .get(axum::http::header::AUTHORIZATION)
-                        .is_some_and(|value| value == "Bearer fresh");
-                    if authorized {
-                        next.run(request).await
-                    } else {
-                        axum::http::StatusCode::UNAUTHORIZED.into_response()
-                    }
+    let router = echo::http::router(EchoService, |_: &EchoError| {
+        axum::http::StatusCode::BAD_REQUEST
+    })
+    .unwrap()
+    .layer(axum::middleware::from_fn(
+        move |request: axum::extract::Request, next: axum::middleware::Next| {
+            let counted = Arc::clone(&counted);
+            async move {
+                counted.fetch_add(1, Ordering::SeqCst);
+                let authorized = request
+                    .headers()
+                    .get(axum::http::header::AUTHORIZATION)
+                    .is_some_and(|value| value == "Bearer fresh");
+                if authorized {
+                    next.run(request).await
+                } else {
+                    axum::http::StatusCode::UNAUTHORIZED.into_response()
                 }
-            },
-        ));
+            }
+        },
+    ));
     let server = serve(router).await;
     let refreshes = Arc::new(AtomicUsize::new(0));
     let transport = RefreshOnce {

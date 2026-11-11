@@ -28,17 +28,17 @@ assert.deepEqual(await client.delete(id), { ok: true, value: undefined });
 assert.equal((await client.get(id)).error.kind, "application");
 assert.equal((await client.delete(id)).error.kind, "application");
 assert.deepEqual(await client.get("missing"), {
-  ok: false, error: { kind: "application", value: { kind: "not_found" } },
+  ok: false, error: { kind: "application", value: { code: "not_found" } },
 });
 const invalid = await client.create({ displayName: " " });
 assert.equal(invalid.error.kind, "application");
-assert.equal(invalid.error.value.kind, "invalid_name");
+assert.equal(invalid.error.value.code, "invalid_name");
 
 const echo = createEchoClient(base);
 assert.deepEqual(await echo.health(), { ok: true, value: null });
 assert.deepEqual(await echo.noContent(), { ok: true, value: undefined });
 assert.deepEqual(await echo.command(false), { ok: true, value: undefined });
-assert.deepEqual(await echo.command(true), { ok: false, error: { kind: "application", value: null } });
+assert.deepEqual(await echo.command(true), { ok: false, error: { kind: "application", value: { code: "rejected" } } });
 const value = "slash/space ?#%ü";
 const note = "query &+?/ü";
 assert.deepEqual(await echo.inspect(value, -7, true, note), { ok: true, value: { value, count: -7, flag: true, note } });
@@ -124,7 +124,7 @@ const emptyWithMetadata = createUsersClient(base, {
   fetch: async () => new Response(null, { status: 204, headers: { "content-type": "application/json" } }),
 });
 assert.deepEqual(await emptyWithMetadata.delete("x"), { ok: true, value: undefined });
-for (const headers of [{ "content-length": "0" }, { "transfer-encoding": "chunked" }, { "x-splinekit-error": "application" }]) {
+for (const headers of [{ "content-length": "0" }, { "transfer-encoding": "chunked" }]) {
   const bad204 = createUsersClient(base, { fetch: async () => new Response(null, { status: 204, headers }) });
   assert.equal((await bad204.delete("x")).error.kind, "protocol");
 }
@@ -144,18 +144,30 @@ for (const bad of [
   mock("{}"),
   mock("{"),
   mock(JSON.stringify({ id: "x", displayName: "x" }), 201),
-  mock(JSON.stringify({ kind: "application", value: 3 }), 404, { "x-splinekit-error": "application" }),
-  mock(JSON.stringify({ kind: "application" }), 404, { "x-splinekit-error": "application" }),
-  mock(JSON.stringify({ kind: "framework", code: "bad" }), 400, { "x-splinekit-error": "framework" }),
+  // A declared code whose body doesn't decode as that error.
+  mock(JSON.stringify({ status: 404, code: "invalid_name", details: 3 }), 404, { "content-type": "application/problem+json" }),
 ]) {
   assert.equal((await bad.get("x")).error.kind, "protocol");
 }
+// JSON that isn't problem details from this service: an unrecognized HTTP failure.
+for (const [body, status] of [
+  [{ kind: "application" }, 404],
+  [{ status: "400", code: "bad" }, 400],
+  [{ status: 500, code: "bad" }, 400],
+  [{ status: 400 }, 400],
+]) {
+  assert.deepEqual(await mock(JSON.stringify(body), status).get("x"), { ok: false, error: { kind: "http", status } });
+}
 const unavailable = mock("proxy error", 503, { "content-type": "text/html" });
 assert.deepEqual(await unavailable.get("x"), { ok: false, error: { kind: "http", status: 503 } });
-const framework = mock(JSON.stringify({ kind: "framework", code: "unauthorized", message: "token required" }),
-  401, { "x-splinekit-error": "framework" });
+const framework = mock(JSON.stringify({ status: 401, code: "unauthorized", detail: "token required" }),
+  401, { "content-type": "application/problem+json" });
 assert.deepEqual(await framework.get("x"), {
-  ok: false, error: { kind: "framework", status: 401, code: "unauthorized", message: "token required" },
+  ok: false, error: { kind: "framework", status: 401, code: "unauthorized", detail: "token required" },
+});
+// An undeclared code is a fault with that code; `detail` is optional.
+assert.deepEqual(await mock(JSON.stringify({ status: 400, code: "bad" }), 400).get("x"), {
+  ok: false, error: { kind: "framework", status: 400, code: "bad" },
 });
 const transport = createUsersClient(base, { fetch: async () => { throw new TypeError("network unavailable"); } });
 assert.equal((await transport.get("x")).error.kind, "transport");

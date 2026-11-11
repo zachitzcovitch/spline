@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use splinekit::http::{
     axum,
     contract::{ErrorMapping, ErrorResponses},
-    reqwest, CallError, DeclaredErrors, ErrorPolicy, HttpExt, StatusCode, ERROR_HEADER,
+    reqwest, CallError, DeclaredErrors, ErrorPolicy, HttpExt, StatusCode,
 };
 use splinekit::{Direction, Schema, Shape};
 use support::{body, field, graph, matches};
@@ -20,7 +20,7 @@ pub struct Details {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Schema, splinekit::http::Error)]
 #[serde(
-    tag = "type",
+    tag = "code",
     content = "payload",
     rename_all = "snake_case",
     deny_unknown_fields
@@ -43,9 +43,10 @@ pub enum ApiError<T> {
 pub type AppError = ApiError<Details>;
 
 #[derive(Debug, Serialize, Deserialize, Schema, splinekit::http::Error)]
-#[http(status = StatusCode::CONFLICT)]
-pub struct Problem {
-    message: String,
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum Problem {
+    #[http(status = StatusCode::CONFLICT)]
+    Unavailable { message: String },
 }
 
 pub mod items {
@@ -95,7 +96,7 @@ impl items::Items for Backend {
 }
 impl health::Health for Backend {
     async fn get(&self) -> Result<(), Problem> {
-        Err(Problem {
+        Err(Problem::Unavailable {
             message: "unavailable".into(),
         })
     }
@@ -141,18 +142,18 @@ async fn derived_statuses_and_serialized_metadata_agree_with_real_http_and_typed
     let native = api::http::Client::new(&server.base).unwrap();
     let http = reqwest::Client::new();
     for (kind, status, payload) in [
-        (0, 404, json!({"type": "absent"})),
+        (0, 404, json!({"code": "absent"})),
         (
             1,
             422,
-            json!({"type": "invalid", "payload": {"fieldName": "title"}}),
+            json!({"code": "invalid", "payload": {"fieldName": "title"}}),
         ),
         (
             2,
             422,
-            json!({"type": "rejected", "payload": {"message": "invalid"}}),
+            json!({"code": "rejected", "payload": {"message": "invalid"}}),
         ),
-        (3, 403, json!({"type": "forbidden"})),
+        (3, 403, json!({"code": "forbidden"})),
     ] {
         let response = http
             .get(format!("{}/items/{kind}", server.base))
@@ -160,12 +161,21 @@ async fn derived_statuses_and_serialized_metadata_agree_with_real_http_and_typed
             .await
             .unwrap();
         assert_eq!(response.status().as_u16(), status);
-        assert_eq!(response.headers()[ERROR_HEADER], "application");
+        assert_eq!(
+            response.headers()["content-type"],
+            "application/problem+json"
+        );
+        // Nothing on the wire names the framework.
+        assert!(response
+            .headers()
+            .keys()
+            .all(|name| !name.as_str().contains("splinekit")));
         let actual: Value = response.json().await.unwrap();
-        assert_eq!(actual, json!({"kind": "application", "value": payload}));
+        let mut expected = payload.clone();
+        expected["status"] = json!(status);
+        assert_eq!(actual, expected);
         let documented = &responses[&status];
-        assert_eq!(documented.content_type, "application/json");
-        assert_eq!(documented.headers[ERROR_HEADER], "application");
+        assert_eq!(documented.content_type, "application/problem+json");
         assert!(matches(
             description.application().schemas(),
             &documented.body,
@@ -182,10 +192,11 @@ async fn derived_statuses_and_serialized_metadata_agree_with_real_http_and_typed
         };
         assert_eq!(serde_json::to_value(error).unwrap(), payload);
     }
-    let Err(CallError::Application(problem)) = native.health().get().await else {
-        panic!("typed struct error")
+    let Err(CallError::Application(Problem::Unavailable { message })) = native.health().get().await
+    else {
+        panic!("typed error")
     };
-    assert_eq!(problem.message, "unavailable");
+    assert_eq!(message, "unavailable");
     let response = http
         .get(format!("{}/health", server.base))
         .send()
@@ -223,18 +234,26 @@ fn response_groups_are_deterministic_and_match_the_selected_serialization_direct
         panic!("enum")
     };
     assert_eq!(
-        field(&variants[0], "type").shape,
+        field(&variants[0], "code").shape,
         Shape::Literal("absent".into())
     );
-    let value = &field(&declared(errors)[&422].body, "value").shape;
-    let Shape::Union(alternatives) = value else {
+    let Shape::Union(alternatives) = &declared(errors)[&422].body else {
         panic!("shared status")
     };
     assert_eq!(alternatives.len(), 2);
+    assert!(alternatives
+        .iter()
+        .all(|alternative| matches!(field(alternative, "status").shape, Shape::Integer { .. })));
+    // The wire code is the serialized name, not the Rust variant name.
     assert!(!matches(
         description.contract().schemas(),
         &declared(errors)[&404].body,
-        &json!({"kind":"application", "value":{"type":"not_found"}})
+        &json!({"status": 404, "code": "not_found"})
+    ));
+    assert!(matches(
+        description.contract().schemas(),
+        &declared(errors)[&404].body,
+        &json!({"status": 404, "code": "absent"})
     ));
 }
 
@@ -337,7 +356,7 @@ async fn custom_policies_override_defaults_and_remain_opaque_without_a_declarati
 fn aliases_recursive_external_errors_and_whole_type_overrides_have_explicit_metadata() {
     #[derive(Serialize, Schema, splinekit::http::Error)]
     #[splinekit(only = "serialize")]
-    #[serde(rename_all = "camelCase")]
+    #[serde(tag = "code", content = "value", rename_all = "camelCase")]
     enum Recursive {
         #[http(status = StatusCode::NOT_FOUND)]
         Missing,
@@ -374,7 +393,8 @@ fn aliases_recursive_external_errors_and_whole_type_overrides_have_explicit_meta
             <Recursive as splinekit::http::Error>::mapping(),
         )
         .unwrap();
-    let actual = json!({"kind":"application", "value":serde_json::to_value(Recursive::Nested(Box::new(Recursive::Missing))).unwrap()});
+    let mut actual = serde_json::to_value(Recursive::Nested(Box::new(Recursive::Missing))).unwrap();
+    actual["status"] = json!(409);
     assert!(matches(
         description.contract().schemas(),
         &declared(&description.plans()["recursive.get"].errors)[&409].body,
@@ -406,4 +426,81 @@ fn aliases_recursive_external_errors_and_whole_type_overrides_have_explicit_meta
         <Keyword as renamed::http::Error>::status(&Keyword::r#type),
         StatusCode::FORBIDDEN
     );
+}
+
+fn bind_with_error<E: Schema>() -> Result<(), String> {
+    #[derive(Schema)]
+    struct Args {}
+    let mut builder = splinekit::contract::ContractBuilder::new("errors", "").unwrap();
+    builder
+        .operation::<Args, (), E>("get", "get", splinekit::contract::OperationKind::Query, "")
+        .unwrap();
+    let mut builder = splinekit::http::contract::ContractBuilder::new(builder.finish().unwrap());
+    builder
+        .bind(
+            "errors.get",
+            splinekit::http::contract::HttpBinding {
+                method: splinekit::http::contract::HttpMethod::Get,
+                path: "/errors".into(),
+                body: None,
+                success_status: 200,
+            },
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[test]
+fn application_errors_must_be_code_tagged_objects_that_cannot_pass_for_problem_members() {
+    #[allow(dead_code)]
+    #[derive(Serialize, Schema)]
+    #[splinekit(only = "serialize")]
+    struct Untagged {
+        message: String,
+    }
+    #[allow(dead_code)]
+    #[derive(Serialize, Schema)]
+    #[splinekit(only = "serialize")]
+    #[serde(tag = "kind", rename_all = "snake_case")]
+    enum WrongTag {
+        Gone,
+    }
+    #[allow(dead_code)]
+    #[derive(Serialize, Schema)]
+    #[splinekit(only = "serialize")]
+    #[serde(tag = "code", rename_all = "snake_case")]
+    enum Reserved {
+        InvalidRequest,
+    }
+    #[allow(dead_code)]
+    #[derive(Serialize, Schema)]
+    #[splinekit(only = "serialize")]
+    #[serde(tag = "code", rename_all = "snake_case")]
+    enum Member {
+        Gone { detail: String },
+    }
+    #[allow(dead_code)]
+    #[derive(Serialize, Schema)]
+    #[splinekit(only = "serialize")]
+    #[serde(tag = "code", rename_all = "snake_case")]
+    enum Fine {
+        Gone { at: String },
+        Busy,
+    }
+    for (result, message) in [
+        (bind_with_error::<Untagged>(), "tagged by `code`"),
+        (bind_with_error::<WrongTag>(), "tagged by `code`"),
+        (bind_with_error::<()>(), "tagged by `code`"),
+        (
+            bind_with_error::<Reserved>(),
+            "`invalid_request` is reserved for framework faults",
+        ),
+        (
+            bind_with_error::<Member>(),
+            "field named `detail`, which problem details reserve",
+        ),
+    ] {
+        let error = result.unwrap_err();
+        assert!(error.contains(message), "{error}");
+    }
+    bind_with_error::<Fine>().unwrap();
 }

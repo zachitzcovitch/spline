@@ -34,10 +34,10 @@ async function results() {
     // @ts-expect-error user and post result types are distinct
     user.value.published;
   } else if (user.error.kind === "application") {
-    const kind: "not_found" = user.error.value.kind;
+    const kind: "not_found" = user.error.value.code;
     void kind;
     // @ts-expect-error user errors do not include post-only variants
-    const postOnly: "forbidden" = user.error.value.kind;
+    const postOnly: "forbidden" = user.error.value.code;
     void postOnly;
   }
   const post = await client.posts.publish("post_1");
@@ -45,7 +45,7 @@ async function results() {
     const author: ApiOperations["app.users.get"]["output"] = post.value.author;
     void author;
   } else if (post.error.kind === "application") {
-    const kind: "not_found" | "forbidden" | "invalid_title" = post.error.value.kind;
+    const kind: "not_found" | "forbidden" | "invalid_title" = post.error.value.code;
     void kind;
   }
   const deleted = await client.posts.delete("post_1");

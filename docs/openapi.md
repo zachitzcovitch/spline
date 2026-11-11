@@ -104,7 +104,7 @@ let exporter = OpenApi::new("API", "1").name(
 ```
 
 Component names use OpenAPI's ASCII letters/digits/dot/underscore/hyphen grammar.
-`ServiceError` is reserved for the request/service error envelope. Assign both equivalent
+`ServiceError` is reserved for the framework fault's problem body. Assign both equivalent
 directions the same override to share that name; different shapes cannot share one
 component. Structural equivalence is shared with TypeScript through the neutral
 schema graph, including nested references and recursion.
@@ -128,27 +128,29 @@ authoritative application statuses. The [error guide](http-errors.md) describes 
 derive and custom policy mappings.
 
 Application errors and framework faults can use the same HTTP status. The exporter
-groups them under one Response Object with alternative envelope schemas. A request
+groups them under one Response Object with alternative problem schemas, all as
+`application/problem+json`. A request
 factory can reject with 404 even when the resource also declares a 404 application error.
 
-Framework faults use a reusable `ServiceError` component describing
-`kind`, `code`, and `message`; the HTTP status is not a JSON body property. Common
+Framework faults use a reusable `ServiceError` component describing `status`,
+`code` and an optional developer-facing `detail`; other problem members are
+allowed. Application errors are documented as their `code`-tagged values with
+`status` added. Common
 decoding/size/encoding/service failures have explicit responses. `4XX` and `5XX`
 framework-only fallbacks use the reusable `ServiceErrorResponse` response. Exact
 response keys take precedence over ranges, so explicit error responses also include
 the framework alternative.
 
-No-policy descriptions and opaque executable policies retain their full application
-error envelope in the fallback responses, without inventing exact variant/status
+No-policy descriptions and opaque executable policies document every application
+error in the fallback responses, without inventing exact variant/status
 mappings.
 The [CRUD artifact](../examples/contract/openapi.json) demonstrates an opaque policy;
 the [blog artifact](../examples/blog/openapi.json) demonstrates derived defaults.
 
 Generated documents use neutral component names and customer-facing descriptions.
-Internal transport marker headers and exporter/policy extensions are omitted from
-the public spec. Response bodies retain their serialized shapes and discriminator
+Exporter/policy extensions are omitted from the public spec. Response bodies retain their serialized shapes and discriminator
 values; application-authored names and documentation are exported as authored.
-Live conformance tests also check marker/envelope agreement on actual responses.
+Live conformance tests also check actual error responses against these schemas.
 
 ## Artifacts and verification
 

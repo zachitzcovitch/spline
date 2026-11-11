@@ -5,6 +5,25 @@ use splinekit_schema::{
 };
 use splinekit_typescript::{Error, Typescript};
 
+/// A minimal HTTP application error: `{"code": "failed"}`.
+struct AppError;
+impl splinekit_schema::Schema for AppError {
+    fn info() -> splinekit_schema::TypeInfo {
+        splinekit_schema::TypeInfo::named("test.AppError")
+    }
+    fn describe(
+        _: &mut splinekit_schema::Context<'_>,
+    ) -> splinekit_schema::Result<splinekit_schema::Shape> {
+        Ok(splinekit_schema::Shape::Object(splinekit_schema::Object {
+            fields: vec![splinekit_schema::Field::required(
+                "code",
+                splinekit_schema::Shape::Literal("failed".into()),
+            )],
+            unknown_fields: splinekit_schema::UnknownFields::Reject,
+        }))
+    }
+}
+
 struct Shared;
 impl Schema for Shared {
     fn info() -> TypeInfo {
@@ -32,7 +51,7 @@ fn application(resources: &[(&str, &str)]) -> ApplicationDescription {
     for (group, namespace) in resources {
         application
             .resource(group, namespace, "Resource docs", |resource| {
-                resource.operation::<Input, Shared, ()>(
+                resource.operation::<Input, Shared, AppError>(
                     "get",
                     "get",
                     OperationKind::Query,

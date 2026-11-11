@@ -3,7 +3,7 @@
     "responses": {
       "ServiceErrorResponse": {
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ServiceError"
             }
@@ -63,62 +63,62 @@
           {
             "additionalProperties": false,
             "properties": {
-              "kind": {
+              "code": {
                 "const": "not_found",
                 "type": "string"
               }
             },
             "required": [
-              "kind"
+              "code"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
             "properties": {
-              "kind": {
+              "code": {
                 "const": "forbidden",
                 "type": "string"
               }
             },
             "required": [
-              "kind"
+              "code"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
             "properties": {
-              "kind": {
+              "code": {
                 "const": "invalid_title",
                 "type": "string"
               }
             },
             "required": [
-              "kind"
+              "code"
             ],
             "type": "object"
           }
         ]
       },
       "ServiceError": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "code": {
             "type": "string"
           },
-          "kind": {
-            "const": "framework",
+          "detail": {
             "type": "string"
           },
-          "message": {
-            "type": "string"
+          "status": {
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
-          "kind",
-          "code",
-          "message"
+          "status",
+          "code"
         ],
         "type": "object"
       },
@@ -143,13 +143,13 @@
           {
             "additionalProperties": false,
             "properties": {
-              "kind": {
+              "code": {
                 "const": "not_found",
                 "type": "string"
               }
             },
             "required": [
-              "kind"
+              "code"
             ],
             "type": "object"
           }
@@ -202,33 +202,25 @@
           },
           "403": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "forbidden",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "forbidden",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -239,37 +231,29 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "not_found",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "not_found",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -280,7 +264,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "$ref": "#/components/responses/ServiceErrorResponse"
@@ -290,33 +274,25 @@
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "invalid_title",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "invalid_title",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -327,7 +303,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "$ref": "#/components/responses/ServiceErrorResponse"
@@ -377,33 +353,25 @@
           },
           "403": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "forbidden",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "forbidden",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -414,37 +382,29 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "not_found",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "not_found",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -455,40 +415,32 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "$ref": "#/components/responses/ServiceErrorResponse"
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "invalid_title",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "invalid_title",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -499,7 +451,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "$ref": "#/components/responses/ServiceErrorResponse"
@@ -549,33 +501,25 @@
           },
           "403": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "forbidden",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "forbidden",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -586,37 +530,29 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "not_found",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "not_found",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -627,40 +563,32 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "$ref": "#/components/responses/ServiceErrorResponse"
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "invalid_title",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "invalid_title",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -671,7 +599,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "$ref": "#/components/responses/ServiceErrorResponse"
@@ -721,33 +649,25 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "kind": {
-                          "const": "application",
+                        "code": {
+                          "const": "not_found",
                           "type": "string"
                         },
-                        "value": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "kind": {
-                              "const": "not_found",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "kind"
-                          ],
-                          "type": "object"
+                        "status": {
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "kind",
-                        "value"
+                        "status",
+                        "code"
                       ],
                       "type": "object"
                     },
@@ -758,7 +678,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "$ref": "#/components/responses/ServiceErrorResponse"

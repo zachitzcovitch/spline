@@ -15,7 +15,7 @@ struct Args {}
 fn binding<O: Schema>() -> splinekit::http::contract::ContractDescription {
     let mut neutral = splinekit::contract::ContractBuilder::new("test", "").unwrap();
     neutral
-        .operation::<Args, O, ()>(
+        .operation::<Args, O, Failure>(
             "value",
             "value",
             splinekit::contract::OperationKind::Query,
@@ -78,13 +78,14 @@ fn independent_schema_validation_preserves_serde_directions_recursion_tuples_and
             {"pointer":"#/paths/~1profiles~1{id}/get/parameters/1/schema","value":"unknown","valid":false},
             {"pointer":"#/paths/~1profiles~1{id}/get/parameters/1/schema","value":null,"valid":false},
             {"pointer":"#/paths/~1nullable/post/requestBody/content/application~1json/schema","value":null,"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1json/schema","value":{"kind":"application","value":{"kind":"invalid_value","details":{"message":"bad"}}},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1json/schema","value":{"kind":"application","value":{"kind":"rejected","details":"bad"}},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1json/schema","value":{"kind":"framework","code":"invalid_request","message":"bad"},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1json/schema","value":{"kind":"application","value":{"kind":"missing"}},"valid":false},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/404/content/application~1json/schema","value":{"kind":"application","value":{"kind":"missing"}},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/404/content/application~1json/schema","value":{"kind":"framework","code":"hidden","message":"not visible"},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/500/content/application~1json/schema","value":{"kind":"application","value":{"kind":"internal","details":{"trace":"x"}}},"valid":true}
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1problem+json/schema","value":{"status":400,"code":"invalid_value","details":{"message":"bad"}},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1problem+json/schema","value":{"status":400,"code":"rejected","details":"bad"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1problem+json/schema","value":{"status":400,"code":"invalid_request","detail":"bad"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1problem+json/schema","value":{"status":400,"details":{"message":"bad"}},"valid":false},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1problem+json/schema","value":{"status":"400","code":"invalid_value","details":{"message":"bad"}},"valid":false},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/404/content/application~1problem+json/schema","value":{"status":404,"code":"missing"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/404/content/application~1problem+json/schema","value":{"status":404,"code":"hidden","detail":"not visible"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/500/content/application~1problem+json/schema","value":{"status":500,"code":"server_fault","details":{"trace":"x"}},"valid":true}
         ]),
     );
     let components = doc.as_json()["components"]["schemas"].as_object().unwrap();
@@ -165,10 +166,10 @@ fn opaque_policies_document_full_errors_without_inventing_status_mappings() {
     independent(
         &doc,
         json!([
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/4XX/content/application~1json/schema","value":{"kind":"application","value":{"kind":"missing"}},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/500/content/application~1json/schema","value":{"kind":"application","value":{"kind":"missing"}},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1json/schema","value":{"kind":"framework","code":"custom","message":"bad"},"valid":true},
-            {"pointer":"#/paths/~1profiles~1{id}/get/responses/4XX/content/application~1json/schema","value":{"kind":"application","value":{"kind":"new_variant"}},"valid":false}
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/4XX/content/application~1problem+json/schema","value":{"status":418,"code":"missing"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/500/content/application~1problem+json/schema","value":{"status":500,"code":"missing"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/400/content/application~1problem+json/schema","value":{"status":400,"code":"custom","detail":"bad"},"valid":true},
+            {"pointer":"#/paths/~1profiles~1{id}/get/responses/4XX/content/application~1problem+json/schema","value":{"status":418},"valid":false}
         ]),
     );
 }
@@ -285,7 +286,7 @@ fn export_is_deterministic_across_resource_registration_order_and_keeps_logical_
         pub trait Other {
             #[query]
             #[http(get = "/other")]
-            async fn get(&self) -> Result<(), ()>;
+            async fn get(&self) -> Result<(), crate::Failure>;
         }
     }
     fn application(reverse: bool) -> splinekit::http::contract::ApplicationDescription {

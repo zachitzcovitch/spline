@@ -10,7 +10,7 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize, Schema, splinekit::http::Error)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "code", rename_all = "snake_case", deny_unknown_fields)]
 pub enum UserError {
     #[http(status = StatusCode::NOT_FOUND)]
     NotFound,

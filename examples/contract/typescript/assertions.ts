@@ -40,7 +40,7 @@ async function consume() {
   }
   if (result.error.kind === "transport") return result.error.message;
   const application = result.error.value;
-  if (application.kind === "invalid_name") return application.details.message;
+  if (application.code === "invalid_name") return application.details.message;
   // @ts-expect-error declared unit error has no details payload
   application.details;
   return "missing";

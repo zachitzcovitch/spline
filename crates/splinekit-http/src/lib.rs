@@ -37,7 +37,7 @@ pub use transport::{HttpRequest, HttpResponse, ReqwestTransport, Transport};
 
 use std::fmt;
 
-pub use splinekit_http_contract::{ERROR_HEADER, MAX_BODY_BYTES};
+pub use splinekit_http_contract::{MAX_BODY_BYTES, PROBLEM_CONTENT_TYPE};
 
 mod sealed {
     pub trait Unit {}
@@ -103,7 +103,10 @@ impl<E: fmt::Debug> fmt::Display for CallError<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Application(error) => write!(f, "application error: {error:?}"),
-            Self::Framework(error) => write!(f, "{}: {}", error.code, error.message),
+            Self::Framework(error) => match &error.detail {
+                Some(detail) => write!(f, "{} ({}): {detail}", error.code, error.status),
+                None => write!(f, "{} ({})", error.code, error.status),
+            },
             Self::Http { status } => write!(f, "unrecognized HTTP response: {status}"),
             Self::Transport(error) => error.fmt(f),
             Self::Protocol(message) | Self::Encode(message) => f.write_str(message),

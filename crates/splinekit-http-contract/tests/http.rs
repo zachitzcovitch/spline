@@ -2,6 +2,25 @@ use splinekit_contract::{ContractBuilder as NeutralBuilder, OperationKind};
 use splinekit_http_contract::{ContractBuilder, Error, HttpBinding, HttpMethod, Scalar};
 use splinekit_schema::{Context, Field, Object, Presence, Schema, Shape, TypeInfo, UnknownFields};
 
+/// A minimal HTTP application error: `{"code": "failed"}`.
+struct Failure;
+impl splinekit_schema::Schema for Failure {
+    fn info() -> splinekit_schema::TypeInfo {
+        splinekit_schema::TypeInfo::named("test.Failure")
+    }
+    fn describe(
+        _: &mut splinekit_schema::Context<'_>,
+    ) -> splinekit_schema::Result<splinekit_schema::Shape> {
+        Ok(splinekit_schema::Shape::Object(splinekit_schema::Object {
+            fields: vec![splinekit_schema::Field::required(
+                "code",
+                splinekit_schema::Shape::Literal("failed".into()),
+            )],
+            unknown_fields: splinekit_schema::UnknownFields::Reject,
+        }))
+    }
+}
+
 struct Input;
 impl Schema for Input {
     fn info() -> TypeInfo {
@@ -50,7 +69,7 @@ fn binding(path: &str) -> HttpBinding {
 fn builder() -> ContractBuilder {
     let mut builder = NeutralBuilder::new("test", "").unwrap();
     builder
-        .operation::<Input, String, String>("first", "first", OperationKind::Mutation, "")
+        .operation::<Input, String, Failure>("first", "first", OperationKind::Mutation, "")
         .unwrap();
     ContractBuilder::new(builder.finish().unwrap())
 }
@@ -118,10 +137,10 @@ fn invalid_bindings_fail_without_mutating_the_descriptor() {
 fn ambiguous_dynamic_routes_are_rejected_before_axum_registration() {
     let mut neutral = NeutralBuilder::new("test", "").unwrap();
     neutral
-        .operation::<Input, String, String>("first", "first", OperationKind::Mutation, "")
+        .operation::<Input, String, Failure>("first", "first", OperationKind::Mutation, "")
         .unwrap();
     neutral
-        .operation::<Input, String, String>("second", "second", OperationKind::Mutation, "")
+        .operation::<Input, String, Failure>("second", "second", OperationKind::Mutation, "")
         .unwrap();
     let mut builder = ContractBuilder::new(neutral.finish().unwrap());
     builder.bind("test.first", binding("/items/{id}")).unwrap();
@@ -136,7 +155,7 @@ fn new_verbs_share_a_route_and_validate_their_request_body_profile() {
     let mut neutral = NeutralBuilder::new("test", "").unwrap();
     for name in ["replace", "update"] {
         neutral
-            .operation::<Input, String, String>(name, name, OperationKind::Mutation, "")
+            .operation::<Input, String, Failure>(name, name, OperationKind::Mutation, "")
             .unwrap();
     }
     let mut builder = ContractBuilder::new(neutral.finish().unwrap());
@@ -181,13 +200,13 @@ fn no_content_requires_a_null_output_and_delete_is_bodyless() {
     };
     let mut neutral = NeutralBuilder::new("test", "").unwrap();
     neutral
-        .operation::<Id, String, String>("invalid", "invalid", OperationKind::Mutation, "")
+        .operation::<Id, String, Failure>("invalid", "invalid", OperationKind::Mutation, "")
         .unwrap();
     neutral
-        .operation::<Id, (), String>("delete", "delete", OperationKind::Mutation, "")
+        .operation::<Id, (), Failure>("delete", "delete", OperationKind::Mutation, "")
         .unwrap();
     neutral
-        .operation::<Id, (), String>("read", "read", OperationKind::Query, "")
+        .operation::<Id, (), Failure>("read", "read", OperationKind::Query, "")
         .unwrap();
     let mut builder = ContractBuilder::new(neutral.finish().unwrap());
     assert!(builder

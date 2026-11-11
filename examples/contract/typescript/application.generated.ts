@@ -13,11 +13,11 @@ export type Post = {
 };
 
 export type PostError = {
-  "kind": "not_found";
+  "code": "not_found";
 } | {
-  "kind": "forbidden";
+  "code": "forbidden";
 } | {
-  "kind": "invalid_title";
+  "code": "invalid_title";
 };
 
 export type User = {
@@ -26,7 +26,7 @@ export type User = {
 };
 
 export type UserError = {
-  "kind": "not_found";
+  "code": "not_found";
 };
 
 /**
@@ -80,7 +80,8 @@ export type ApiCalls<Failure = never> = {
 export type ApiHttpFailure =
   | { kind: "transport" | "protocol" | "encode"; message: string }
   | { kind: "http"; status: number }
-  | { kind: "framework"; status: number; code: string; message: string };
+  /** A problem-details fault from the service: branch on `code`; `detail` is developer text, not for end users. */
+  | { kind: "framework"; status: number; code: string; detail?: string };
 
 export type ApiHttpOptions = {
   fetch?: typeof globalThis.fetch;
@@ -127,9 +128,9 @@ export function createApiClient(
     ["app.users.rename.Args (Deserialize)"]: ["object", false, [["name", "name", ["string"], false]]],
     ["composition.NewPost (Deserialize)"]: ["object", false, [["title", "title", ["string"], false]]],
     ["composition.Post (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["author", "author", ["ref", "composition.User (Serialize)"], false], ["title", "title", ["string"], false], ["published", "published", ["boolean"], false]]],
-    ["composition.PostError (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "not_found"], false]]], ["object", false, [["kind", "kind", ["literal", "forbidden"], false]]], ["object", false, [["kind", "kind", ["literal", "invalid_title"], false]]]]],
+    ["composition.PostError (Serialize)"]: ["union", [["object", false, [["code", "code", ["literal", "not_found"], false]]], ["object", false, [["code", "code", ["literal", "forbidden"], false]]], ["object", false, [["code", "code", ["literal", "invalid_title"], false]]]]],
     ["composition.User (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["displayName", "displayName", ["string"], false]]],
-    ["composition.UserError (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "not_found"], false]]]]],
+    ["composition.UserError (Serialize)"]: ["union", [["object", false, [["code", "code", ["literal", "not_found"], false]]]]],
   };
   const object = (value: unknown): value is { [name: string]: unknown } =>
     value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
@@ -288,7 +289,9 @@ export function createApiClient(
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string; body: string | null; status: number;
     paths: string[]; queries: [string, boolean][];
-    input: __SplinekitWire; output: __SplinekitWire; error: __SplinekitWire;
+    input: __SplinekitWire; output: __SplinekitWire;
+    /** Declared application errors: [status (0 = any), codes, wire shape]. */
+    errors: [number, string[], __SplinekitWire][];
   };
   const message = (error: unknown): string => error instanceof globalThis.Error ? error.message : globalThis.String(error);
   const jsonType = (response: globalThis.Response): boolean => {
@@ -334,10 +337,9 @@ export function createApiClient(
     let response: globalThis.Response;
     try { response = await fetcher(url, init); }
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
-    const marker = response.headers.get("x-splinekit-error");
     const success = response.status === plan.status;
     if (success && response.status === 204) {
-      if (marker !== null || response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
+      if (response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
         return { ok: false, error: { kind: "protocol", message: "invalid 204 response headers" } };
       }
       let text: string;
@@ -347,13 +349,13 @@ export function createApiClient(
         ? { ok: true, value: undefined as O }
         : { ok: false, error: { kind: "protocol", message: "204 response must have an empty body" } };
     }
-    if (success && (!jsonType(response) || marker !== null)) {
+    if (success && !jsonType(response)) {
       return { ok: false, error: { kind: "protocol", message: "invalid success response headers" } };
     }
     if (!success && response.status < 400) {
       return { ok: false, error: { kind: "protocol", message: `unexpected success/redirect status ${response.status}` } };
     }
-    if (!success && (!jsonType(response) || marker === null)) {
+    if (!success && !jsonType(response)) {
       return { ok: false, error: { kind: "http", status: response.status } };
     }
     let text: string;
@@ -361,50 +363,69 @@ export function createApiClient(
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
     let value: unknown;
     try { value = globalThis.JSON.parse(text); }
-    catch (error) { return { ok: false, error: { kind: "protocol", message: message(error) } }; }
+    catch (error) {
+      return success
+        ? { ok: false, error: { kind: "protocol", message: message(error) } }
+        : { ok: false, error: { kind: "http", status: response.status } };
+    }
     if (success) {
       const decoded = project(value, plan.output);
       return decoded !== undefined
         ? { ok: true, value: decoded as O }
         : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
     }
-    if (object(value) && marker === "application" && value.kind === "application" && owns(value, "value")) {
-      const decoded = project(value.value, plan.error);
-      if (decoded !== undefined) return { ok: false, error: { kind: "application", value: decoded as E } };
+    // Problem details carrying this status and a code; anything else (a
+    // proxy's page, a gateway error) is an unrecognized HTTP failure.
+    if (!object(value) || value.status !== response.status || typeof value.code !== "string") {
+      return { ok: false, error: { kind: "http", status: response.status } };
     }
-    if (object(value) && marker === "framework" && value.kind === "framework"
-        && typeof value.code === "string" && typeof value.message === "string") {
-      return { ok: false, error: { kind: "framework", status: response.status, code: value.code, message: value.message } };
+    const code = value.code;
+    // A code the operation declares at this status is an application error
+    // and must decode as one; any other code is a framework fault.
+    const declared = plan.errors.find(([status, codes]) => (status === 0 || status === response.status) && codes.includes(code));
+    if (declared !== undefined) {
+      // fromEntries defines properties, so a `__proto__` key stays data.
+      const fields = globalThis.Object.fromEntries(globalThis.Object.entries(value)
+        .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
+      const decoded = project(fields, declared[2]);
+      return decoded !== undefined
+        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
-    return { ok: false, error: { kind: "protocol", message: "unrecognized error envelope" } };
+    return {
+      ok: false,
+      error: typeof value.detail === "string"
+        ? { kind: "framework", status: response.status, code, detail: value.detail }
+        : { kind: "framework", status: response.status, code },
+    };
   };
   return {
     ["posts"]: {
       ["create"]: (input: NewPost) => call<Post, PostError>({
         method: "POST", path: "/posts", body: "input", status: 201, paths: [], queries: [],
-        input: ["ref", "app.posts.create.Args (Deserialize)"], output: ["ref", "composition.Post (Serialize)"], error: ["ref", "composition.PostError (Serialize)"],
+        input: ["ref", "app.posts.create.Args (Deserialize)"], output: ["ref", "composition.Post (Serialize)"], errors: [[0, ["forbidden", "invalid_title", "not_found"], ["ref", "composition.PostError (Serialize)"]]],
       }, { ["input"]: input }),
       ["delete"]: (id: string) => call<void, PostError>({
         method: "DELETE", path: "/posts/{id}", body: null, status: 204, paths: ["id"], queries: [],
-        input: ["ref", "app.posts.delete.Args (Deserialize)"], output: ["null"], error: ["ref", "composition.PostError (Serialize)"],
+        input: ["ref", "app.posts.delete.Args (Deserialize)"], output: ["null"], errors: [[0, ["forbidden", "invalid_title", "not_found"], ["ref", "composition.PostError (Serialize)"]]],
       }, { ["id"]: id }),
       ["get"]: (id: string) => call<Post, PostError>({
         method: "GET", path: "/posts/{id}", body: null, status: 200, paths: ["id"], queries: [],
-        input: ["ref", "app.posts.get.Args (Deserialize)"], output: ["ref", "composition.Post (Serialize)"], error: ["ref", "composition.PostError (Serialize)"],
+        input: ["ref", "app.posts.get.Args (Deserialize)"], output: ["ref", "composition.Post (Serialize)"], errors: [[0, ["forbidden", "invalid_title", "not_found"], ["ref", "composition.PostError (Serialize)"]]],
       }, { ["id"]: id }),
       ["publish"]: (id: string) => call<Post, PostError>({
         method: "POST", path: "/posts/{id}/publish", body: null, status: 200, paths: ["id"], queries: [],
-        input: ["ref", "app.posts.publish.Args (Deserialize)"], output: ["ref", "composition.Post (Serialize)"], error: ["ref", "composition.PostError (Serialize)"],
+        input: ["ref", "app.posts.publish.Args (Deserialize)"], output: ["ref", "composition.Post (Serialize)"], errors: [[0, ["forbidden", "invalid_title", "not_found"], ["ref", "composition.PostError (Serialize)"]]],
       }, { ["id"]: id }),
     },
     ["users"]: {
       ["get"]: (id: string) => call<User, UserError>({
         method: "GET", path: "/users/{id}", body: null, status: 200, paths: ["id"], queries: [],
-        input: ["ref", "app.users.get.Args (Deserialize)"], output: ["ref", "composition.User (Serialize)"], error: ["ref", "composition.UserError (Serialize)"],
+        input: ["ref", "app.users.get.Args (Deserialize)"], output: ["ref", "composition.User (Serialize)"], errors: [[0, ["not_found"], ["ref", "composition.UserError (Serialize)"]]],
       }, { ["id"]: id }),
       ["rename"]: (name: string) => call<User, UserError>({
         method: "POST", path: "/users/me/rename", body: "name", status: 200, paths: [], queries: [],
-        input: ["ref", "app.users.rename.Args (Deserialize)"], output: ["ref", "composition.User (Serialize)"], error: ["ref", "composition.UserError (Serialize)"],
+        input: ["ref", "app.users.rename.Args (Deserialize)"], output: ["ref", "composition.User (Serialize)"], errors: [[0, ["not_found"], ["ref", "composition.UserError (Serialize)"]]],
       }, { ["name"]: name }),
     },
 

@@ -102,7 +102,8 @@ fn metadata(c: &mut Criterion) {
 
     // Descriptions and exporter configuration are prepared outside the timed loop.
     let exporter = Typescript::new();
-    let blog_http = api::http::describe().unwrap();
+    // The checked-in client is generated with the blog's declared error statuses.
+    let blog_http = api::http::describe_with(&splinekit::http::DeclaredErrors).unwrap();
     assert_eq!(
         exporter
             .export_http_application(&blog_http, "Blog")

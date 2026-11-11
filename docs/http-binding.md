@@ -133,30 +133,49 @@ Content-Type: application/json
 {"id":"user_2","displayName":"New user","bio":null}
 ```
 
-An application error uses the status supplied by the server's error policy:
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details,
+machine-first: every error body has a numeric `status` matching the HTTP status
+and a string `code`. Clients branch on `code` and the fields beside it. Nothing in
+an error is text meant for end users; what a person reads is the application's
+choice.
+
+An application error is the error value itself, an object tagged by `code`
+(`#[serde(tag = "code")]`), with `status` added. Its HTTP status comes from the
+server's error policy:
 
 ```http
 HTTP/1.1 404 Not Found
-Content-Type: application/json
-x-splinekit-error: application
+Content-Type: application/problem+json
 
-{"kind":"application","value":{"kind":"not_found"}}
+{"status":404,"code":"not_found"}
 ```
 
-Framework failures, including malformed input and request-factory rejection, use:
+Framework faults (malformed input, a rejected request factory, a failed service)
+add an optional `detail`: developer-facing text for logs and debugging, which may
+change between versions:
 
 ```http
 HTTP/1.1 400 Bad Request
-Content-Type: application/json
-x-splinekit-error: framework
+Content-Type: application/problem+json
 
-{"kind":"framework","code":"invalid_request","message":"..."}
+{"status":400,"code":"invalid_request","detail":"..."}
 ```
 
-The marker header and envelope kind must agree. This distinguishes declared
-application errors from framework failures and unmarked proxy/server responses.
-For cross-origin browser use, the application's CORS layer must allow the desired
-origins/headers and expose `x-splinekit-error` to fetch.
+No header marks either kind, and nothing on the wire names Splinekit. A client
+recognizes an application error by its body: a `code` the operation declares at
+that status, which must then decode as that error. Any other problem body is a
+framework fault with its `code`; anything that isn't problem details from the
+service (a proxy's page, a gateway's JSON) is an unrecognized HTTP failure. To keep
+the two apart, binding checks each operation's error type:
+
+- it serializes as objects (or a union of objects) with a required literal `code`;
+- no `code` is one the binding's own faults use: `invalid_request`,
+  `body_too_large`, `unsupported_media_type`, `internal`, `service_failure`;
+- no field is named like an RFC 9457 member (`type`, `title`, `status`, `detail`,
+  `instance`).
+
+A request factory's faults use codes the application chooses, such as
+`unauthorized`; don't reuse a code the operation declares at the same status.
 
 JSON request bodies accept `application/json` and application subtypes ending in
 `+json`, including content-type parameters. A missing/wrong media type receives
@@ -264,10 +283,10 @@ The generated methods return `Result<Output, splinekit::http::CallError<ApiError
 | Variant | Meaning |
 | --- | --- |
 | `Application(E)` | A decoded, declared application error. |
-| `Framework(Fault)` | A structured framework failure, retaining status/code/message. |
-| `Http { status }` | An unmarked/unrecognized HTTP failure response. |
+| `Framework(Fault)` | A framework fault (or an error code this client doesn't declare), with its status, code and optional developer `detail`. |
+| `Http { status }` | An error response that isn't problem details from the service. |
 | `Transport(BoxError)` | The transport failed to send the request or read the response. |
-| `Protocol(String)` | Unexpected success status, invalid headers/envelope, or invalid response data. |
+| `Protocol(String)` | Unexpected success status or headers, invalid response data, or a declared error code whose body doesn't decode. |
 | `Encode(String)` | Arguments could not be encoded for their binding. |
 
 Native clients now validate response JSON against the known output/error shape
@@ -311,7 +330,7 @@ const result = await client.create({ displayName: "TypeScript client" });
 if (result.ok) {
   console.log(result.value.id);
 } else if (result.error.kind === "application") {
-  console.log(result.error.value.kind);
+  console.log(result.error.value.code);
 }
 ```
 
@@ -412,7 +431,7 @@ tests and three of the compiler-failure fixtures, now included in the root suite
 Typed runtime tests cover readiness, operational failures, backpressure across
 clones, and cancellation. Neutral-only tests verify in-process operation middleware
 and contracts with incomplete optional HTTP mappings.
-Declared-error checks compare real responses with per-status envelope schemas,
+Declared-error checks compare real responses with per-status problem schemas,
 including payload variants, Serde renames, shared statuses, and custom overrides.
 OpenAPI checks independently validate documents, Serde samples, negative instances,
 and live responses, including nullable bodies, omitted queries, PATCH, and 204.

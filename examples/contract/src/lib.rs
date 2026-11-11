@@ -50,7 +50,7 @@ pub struct UserPatch {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(
-    tag = "kind",
+    tag = "code",
     content = "details",
     rename_all = "snake_case",
     deny_unknown_fields

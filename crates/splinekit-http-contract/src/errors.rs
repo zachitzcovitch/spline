@@ -1,35 +1,149 @@
-//! Application-error declarations and their validated HTTP response shapes.
+//! Error responses on the wire: RFC 9457 problem details, machine-first.
+//!
+//! Every error response is `application/problem+json` with a numeric `status`
+//! equal to the HTTP status and a string `code`. Clients branch on `code` and
+//! the fields beside it; nothing in an error is text meant for end users.
+//!
+//! - An application error is the application's own error value, an object
+//!   tagged by `code` (`#[serde(tag = "code")]`), with `status` added.
+//! - A framework fault (invalid input, a rejected request, a failed service)
+//!   is `status`, `code` and an optional developer-facing `detail`.
+//!
+//! No header marks either kind. A client recognizes an application error by
+//! decoding it as one of the operation's declared errors at that status;
+//! application errors may not declare the binding's own fault codes or use
+//! RFC 9457's member names as fields, so the two can't be confused.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use splinekit_schema::{Field, Graph, Object, Shape, UnknownFields};
+use splinekit_schema::{Field, Graph, Object, Presence, Shape, UnknownFields};
 
 use crate::{Error, Result};
 
-pub const ERROR_HEADER: &str = "x-splinekit-error";
+pub const PROBLEM_CONTENT_TYPE: &str = "application/problem+json";
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 
-/// The serialized framework fault; its HTTP status is not part of the JSON body.
+/// RFC 9457's members. Application error fields can't use these names.
+pub const PROBLEM_MEMBERS: [&str; 5] = ["type", "title", "status", "detail", "instance"];
+
+/// The codes of the faults the binding itself sends. Application errors
+/// can't declare them.
+pub const FRAMEWORK_CODES: [&str; 5] = [
+    "invalid_request",
+    "body_too_large",
+    "unsupported_media_type",
+    "internal",
+    "service_failure",
+];
+
+fn status_field() -> Field {
+    Field::required(
+        "status",
+        Shape::Integer {
+            signed: false,
+            bits: 16,
+        },
+    )
+}
+
+/// A framework fault's body. Other members are ignored, so intermediaries and
+/// later versions can add RFC 9457 members.
 pub fn framework_error_schema() -> Shape {
     Shape::Object(Object {
         fields: vec![
-            Field::required("kind", Shape::Literal("framework".into())),
+            status_field(),
             Field::required("code", Shape::String),
-            Field::required("message", Shape::String),
+            Field {
+                presence: Presence::Optional,
+                ..Field::required("detail", Shape::String)
+            },
         ],
-        unknown_fields: UnknownFields::Reject,
+        unknown_fields: UnknownFields::Ignore,
     })
 }
 
-/// The serialized application-error envelope, independent of its selected status.
-pub fn application_error_schema(value: Shape) -> Shape {
-    Shape::Object(Object {
-        fields: vec![
-            Field::required("kind", Shape::Literal("application".into())),
-            Field::required("value", value),
-        ],
-        unknown_fields: UnknownFields::Reject,
+/// An application error's body: each `code`-tagged alternative of `error`
+/// with `status` added. `error` must have passed [`application_error_codes`].
+pub fn application_error_schema(error: &Shape, graph: &Graph) -> Result<Shape> {
+    Ok(match resolve(error, graph)? {
+        Shape::Union(alternatives) => Shape::Union(
+            alternatives
+                .iter()
+                .map(|alternative| application_error_schema(alternative, graph))
+                .collect::<Result<_>>()?,
+        ),
+        Shape::Object(object) => {
+            let mut fields = vec![status_field()];
+            fields.extend(object.fields.iter().cloned());
+            Shape::Object(Object {
+                fields,
+                unknown_fields: object.unknown_fields,
+            })
+        }
+        _ => return Err(not_tagged()),
     })
+}
+
+/// The `code`s an operation's error type declares, checking that it has the
+/// wire form above: objects (or a union of objects) with a required literal
+/// `code` that isn't a framework code, and no field named like an RFC 9457
+/// member.
+pub fn application_error_codes(error: &Shape, graph: &Graph) -> Result<BTreeSet<String>> {
+    let mut codes = BTreeSet::new();
+    validate(error, graph, &mut codes)?;
+    Ok(codes)
+}
+
+fn validate(shape: &Shape, graph: &Graph, codes: &mut BTreeSet<String>) -> Result<()> {
+    match resolve(shape, graph)? {
+        Shape::Union(alternatives) => alternatives
+            .iter()
+            .try_for_each(|alternative| validate(alternative, graph, codes)),
+        Shape::Object(object) => {
+            let code = object
+                .fields
+                .iter()
+                .find(|field| field.name == "code" && field.presence == Presence::Required)
+                .map(|field| resolve(&field.shape, graph))
+                .transpose()?;
+            let Some(Shape::Literal(code)) = code else {
+                return Err(not_tagged());
+            };
+            if FRAMEWORK_CODES.contains(&code.as_str()) {
+                return Err(Error::Binding(format!(
+                    "application error code `{code}` is reserved for framework faults"
+                )));
+            }
+            if !codes.insert(code.clone()) {
+                return Err(Error::Binding(format!(
+                    "application error code `{code}` is declared twice"
+                )));
+            }
+            if let Some(field) = object
+                .fields
+                .iter()
+                .find(|field| PROBLEM_MEMBERS.contains(&field.name.as_str()))
+            {
+                return Err(Error::Binding(format!(
+                    "application error `{code}` has a field named `{}`, which problem details reserve",
+                    field.name
+                )));
+            }
+            Ok(())
+        }
+        _ => Err(not_tagged()),
+    }
+}
+
+fn not_tagged() -> Error {
+    Error::Binding(
+        "HTTP application errors must serialize as objects tagged by `code` (#[serde(tag = \"code\")])"
+            .into(),
+    )
+}
+
+fn resolve<'a>(shape: &'a Shape, graph: &'a Graph) -> Result<&'a Shape> {
+    crate::plan::resolve(shape, graph)
 }
 
 /// A policy's declared status mapping. Opaque policies make no static status claim.
@@ -45,10 +159,12 @@ pub enum ErrorMapping {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ErrorResponse {
-    /// Complete JSON application-error envelope, including kind and value.
+    /// The application errors declared at this status, as the client decodes
+    /// them (problem members removed).
+    pub error: Shape,
+    /// The complete problem body: `error` with `status` added.
     pub body: Shape,
     pub content_type: &'static str,
-    pub headers: BTreeMap<String, String>,
 }
 
 /// Declared application responses only. Framework/factory faults are distinct and
@@ -121,26 +237,24 @@ pub(crate) fn responses(
             }
         }
     }
-    Ok(ErrorResponses::Declared(
-        grouped
-            .into_iter()
-            .map(|(status, mut shapes)| {
-                let value = if shapes.len() == 1 {
-                    shapes.pop().unwrap()
-                } else {
-                    Shape::Union(shapes)
-                };
-                (
-                    status,
-                    ErrorResponse {
-                        body: application_error_schema(value),
-                        content_type: "application/json",
-                        headers: BTreeMap::from([(ERROR_HEADER.into(), "application".into())]),
-                    },
-                )
-            })
-            .collect(),
-    ))
+    let mut declared = BTreeMap::new();
+    for (status, mut shapes) in grouped {
+        let error = if shapes.len() == 1 {
+            shapes.pop().unwrap()
+        } else {
+            Shape::Union(shapes)
+        };
+        let body = application_error_schema(&error, graph)?;
+        declared.insert(
+            status,
+            ErrorResponse {
+                error,
+                body,
+                content_type: PROBLEM_CONTENT_TYPE,
+            },
+        );
+    }
+    Ok(ErrorResponses::Declared(declared))
 }
 
 fn validate_status(status: u16) -> Result<()> {

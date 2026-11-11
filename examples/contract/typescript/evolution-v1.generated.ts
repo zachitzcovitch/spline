@@ -7,12 +7,12 @@ export type Create = {
 };
 
 export type Error = {
-  "kind": "missing";
+  "code": "missing";
   "details": {
     "message": string;
   };
 } | {
-  "kind": "rejected";
+  "code": "rejected";
 };
 
 export type Event = {
@@ -67,7 +67,8 @@ export type EvolutionV1Calls<Failure = never> = {
 export type EvolutionV1HttpFailure =
   | { kind: "transport" | "protocol" | "encode"; message: string }
   | { kind: "http"; status: number }
-  | { kind: "framework"; status: number; code: string; message: string };
+  /** A problem-details fault from the service: branch on `code`; `detail` is developer text, not for end users. */
+  | { kind: "framework"; status: number; code: string; detail?: string };
 
 export type EvolutionV1HttpOptions = {
   fetch?: typeof globalThis.fetch;
@@ -107,7 +108,7 @@ export function createEvolutionV1Client(
     | ["object", boolean, [string, string, __SplinekitWire, boolean][]];
   const definitions: { [name: string]: __SplinekitWire } = {
     ["evolution.Create (Deserialize)"]: ["object", false, [["displayName", "displayName", ["string"], false], ["state", "state", ["ref", "evolution.State (Deserialize)"], false]]],
-    ["evolution.Error (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "missing"], false], ["details", "details", ["object", false, [["message", "message", ["string"], false]]], false]]], ["object", false, [["kind", "kind", ["literal", "rejected"], false]]]]],
+    ["evolution.Error (Serialize)"]: ["union", [["object", false, [["code", "code", ["literal", "missing"], false], ["details", "details", ["object", false, [["message", "message", ["string"], false]]], false]]], ["object", false, [["code", "code", ["literal", "rejected"], false]]]]],
     ["evolution.Event (Serialize)"]: ["union", [["object", false, [["item", "item", ["object", false, [["id", "id", ["string"], false]]], false]]], ["object", false, [["other", "other", ["object", false, [["id", "id", ["string"], false]]], false]]]]],
     ["evolution.Profile (Serialize)"]: ["object", false, [["displayName", "displayName", ["string"], false]]],
     ["evolution.State (Deserialize)"]: ["union", [["literal", "active"], ["literal", "inactive"]]],
@@ -274,7 +275,9 @@ export function createEvolutionV1Client(
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string; body: string | null; status: number;
     paths: string[]; queries: [string, boolean][];
-    input: __SplinekitWire; output: __SplinekitWire; error: __SplinekitWire;
+    input: __SplinekitWire; output: __SplinekitWire;
+    /** Declared application errors: [status (0 = any), codes, wire shape]. */
+    errors: [number, string[], __SplinekitWire][];
   };
   const message = (error: unknown): string => error instanceof globalThis.Error ? error.message : globalThis.String(error);
   const jsonType = (response: globalThis.Response): boolean => {
@@ -320,10 +323,9 @@ export function createEvolutionV1Client(
     let response: globalThis.Response;
     try { response = await fetcher(url, init); }
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
-    const marker = response.headers.get("x-splinekit-error");
     const success = response.status === plan.status;
     if (success && response.status === 204) {
-      if (marker !== null || response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
+      if (response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
         return { ok: false, error: { kind: "protocol", message: "invalid 204 response headers" } };
       }
       let text: string;
@@ -333,13 +335,13 @@ export function createEvolutionV1Client(
         ? { ok: true, value: undefined as O }
         : { ok: false, error: { kind: "protocol", message: "204 response must have an empty body" } };
     }
-    if (success && (!jsonType(response) || marker !== null)) {
+    if (success && !jsonType(response)) {
       return { ok: false, error: { kind: "protocol", message: "invalid success response headers" } };
     }
     if (!success && response.status < 400) {
       return { ok: false, error: { kind: "protocol", message: `unexpected success/redirect status ${response.status}` } };
     }
-    if (!success && (!jsonType(response) || marker === null)) {
+    if (!success && !jsonType(response)) {
       return { ok: false, error: { kind: "http", status: response.status } };
     }
     let text: string;
@@ -347,35 +349,54 @@ export function createEvolutionV1Client(
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
     let value: unknown;
     try { value = globalThis.JSON.parse(text); }
-    catch (error) { return { ok: false, error: { kind: "protocol", message: message(error) } }; }
+    catch (error) {
+      return success
+        ? { ok: false, error: { kind: "protocol", message: message(error) } }
+        : { ok: false, error: { kind: "http", status: response.status } };
+    }
     if (success) {
       const decoded = project(value, plan.output);
       return decoded !== undefined
         ? { ok: true, value: decoded as O }
         : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
     }
-    if (object(value) && marker === "application" && value.kind === "application" && owns(value, "value")) {
-      const decoded = project(value.value, plan.error);
-      if (decoded !== undefined) return { ok: false, error: { kind: "application", value: decoded as E } };
+    // Problem details carrying this status and a code; anything else (a
+    // proxy's page, a gateway error) is an unrecognized HTTP failure.
+    if (!object(value) || value.status !== response.status || typeof value.code !== "string") {
+      return { ok: false, error: { kind: "http", status: response.status } };
     }
-    if (object(value) && marker === "framework" && value.kind === "framework"
-        && typeof value.code === "string" && typeof value.message === "string") {
-      return { ok: false, error: { kind: "framework", status: response.status, code: value.code, message: value.message } };
+    const code = value.code;
+    // A code the operation declares at this status is an application error
+    // and must decode as one; any other code is a framework fault.
+    const declared = plan.errors.find(([status, codes]) => (status === 0 || status === response.status) && codes.includes(code));
+    if (declared !== undefined) {
+      // fromEntries defines properties, so a `__proto__` key stays data.
+      const fields = globalThis.Object.fromEntries(globalThis.Object.entries(value)
+        .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
+      const decoded = project(fields, declared[2]);
+      return decoded !== undefined
+        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
-    return { ok: false, error: { kind: "protocol", message: "unrecognized error envelope" } };
+    return {
+      ok: false,
+      error: typeof value.detail === "string"
+        ? { kind: "framework", status: response.status, code, detail: value.detail }
+        : { kind: "framework", status: response.status, code },
+    };
   };
   return {
     ["create"]: (input: Create) => call<User, Error>({
       method: "POST", path: "/evolution/users", body: "input", status: 201, paths: [], queries: [],
-      input: ["ref", "evolution.users.create.Args (Deserialize)"], output: ["ref", "evolution.User (Serialize)"], error: ["ref", "evolution.Error (Serialize)"],
+      input: ["ref", "evolution.users.create.Args (Deserialize)"], output: ["ref", "evolution.User (Serialize)"], errors: [[0, ["missing", "rejected"], ["ref", "evolution.Error (Serialize)"]]],
     }, { ["input"]: input }),
     ["event"]: (id: string) => call<Event, Error>({
       method: "GET", path: "/evolution/events/{id}", body: null, status: 200, paths: ["id"], queries: [],
-      input: ["ref", "evolution.users.event.Args (Deserialize)"], output: ["ref", "evolution.Event (Serialize)"], error: ["ref", "evolution.Error (Serialize)"],
+      input: ["ref", "evolution.users.event.Args (Deserialize)"], output: ["ref", "evolution.Event (Serialize)"], errors: [[0, ["missing", "rejected"], ["ref", "evolution.Error (Serialize)"]]],
     }, { ["id"]: id }),
     ["get"]: (id: string) => call<User, Error>({
       method: "GET", path: "/evolution/users/{id}", body: null, status: 200, paths: ["id"], queries: [],
-      input: ["ref", "evolution.users.get.Args (Deserialize)"], output: ["ref", "evolution.User (Serialize)"], error: ["ref", "evolution.Error (Serialize)"],
+      input: ["ref", "evolution.users.get.Args (Deserialize)"], output: ["ref", "evolution.User (Serialize)"], errors: [[0, ["missing", "rejected"], ["ref", "evolution.Error (Serialize)"]]],
     }, { ["id"]: id }),
 
   };

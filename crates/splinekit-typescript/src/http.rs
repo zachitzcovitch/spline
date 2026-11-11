@@ -2,7 +2,10 @@ use std::collections::BTreeSet;
 use std::fmt::Write;
 
 use splinekit_contract::ResourceDescription;
-use splinekit_http_contract::{ApplicationDescription, ContractDescription, HttpMethod, HttpPlan};
+use splinekit_http_contract::{
+    application_error_codes, ApplicationDescription, ContractDescription, ErrorResponses,
+    HttpMethod, HttpPlan,
+};
 use splinekit_schema::{Graph, Presence, Shape, StringFormat, UnknownFields};
 use std::collections::BTreeMap;
 
@@ -118,6 +121,28 @@ impl Typescript {
                     .map(|p| format!("[{}, {}]", render::string(&p.name), p.optional))
                     .collect::<Vec<_>>()
                     .join(", ");
+                // The declared application errors the client recognizes:
+                // [status (0 = any), codes, wire shape].
+                let declared: Vec<(u16, &Shape)> = match &plan.errors {
+                    ErrorResponses::Opaque => vec![(0, &operation.error)],
+                    ErrorResponses::Declared(responses) => responses
+                        .iter()
+                        .map(|(status, response)| (*status, &response.error))
+                        .collect(),
+                };
+                let errors = declared
+                    .into_iter()
+                    .map(|(status, shape)| {
+                        let codes = application_error_codes(shape, schemas)
+                            .expect("the binding validated the error type")
+                            .iter()
+                            .map(|code| render::string(code))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        format!("[{status}, [{codes}], {}]", wire(shape))
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 let parameters = contract::parameters(operation, &artifact.symbols)?;
                 let fields = operation
                     .arguments
@@ -133,10 +158,10 @@ impl Typescript {
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
-                writeln!(methods, "{indent}[{}]: ({parameters}) => call<{}, {}>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
+                writeln!(methods, "{indent}[{}]: ({parameters}) => call<{}, {}>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, errors: [{errors}],\n{indent}}}, {{ {fields} }}),",
                 render::string(&crate::names::camel(&operation.name)), contract::output(operation, &artifact.symbols, &void_outputs)?, render::shape(&operation.error, &artifact.symbols, 1)?,
                 render::string(&plan.binding.path), plan.binding.success_status,
-                wire(&operation.input), wire(&operation.output), wire(&operation.error),
+                wire(&operation.input), wire(&operation.output),
             ).unwrap();
             }
             if group.is_some() {

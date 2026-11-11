@@ -61,7 +61,7 @@ test("the blog server and both README clients work across package boundaries", {
       assert.equal(response.status, 401);
       await assertResponse(path.startsWith("/users/") ? "/users/{id}" : "/posts/{id}", "get", response);
       const error = await response.json();
-      assert.equal(error.kind, "framework");
+      assert.equal(error.status, 401);
       assert.equal(error.code, "unauthorized");
     }
 
@@ -91,10 +91,10 @@ test("the blog server and both README clients work across package boundaries", {
     });
     assert.equal(response.status, 422);
     await assertResponse("/posts", "post", response);
-    assert.equal(response.headers.get("x-splinekit-error"), "application");
-    assert.deepEqual(await response.json(), { kind: "application", value: { kind: "invalid_title" } });
+    assert.equal(response.headers.get("content-type"), "application/problem+json");
+    assert.deepEqual(await response.json(), { status: 422, code: "invalid_title" });
 
-    // The derived defaults preserve the same status/envelope across both resources.
+    // The derived defaults preserve the same status and problem body across both resources.
     for (const [path, method, status, kind] of [
       ["/users/missing", "GET", 404, "not_found"],
       ["/posts/missing", "GET", 404, "not_found"],
@@ -103,8 +103,8 @@ test("the blog server and both README clients work across package boundaries", {
       const response = await request(path, { method, headers: { authorization: "Bearer bob-token" } });
       assert.equal(response.status, status);
       await assertResponse(method === "POST" ? "/posts/{id}/publish" : path.startsWith("/users/") ? "/users/{id}" : "/posts/{id}", method, response);
-      assert.equal(response.headers.get("x-splinekit-error"), "application");
-      assert.deepEqual(await response.json(), { kind: "application", value: { kind } });
+      assert.equal(response.headers.get("content-type"), "application/problem+json");
+      assert.deepEqual(await response.json(), { status, code: kind });
     }
   } finally {
     lines.close();

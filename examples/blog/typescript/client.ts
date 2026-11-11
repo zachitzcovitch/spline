@@ -31,7 +31,7 @@ export async function run(baseUrl: string): Promise<void> {
   if (
     !denied.ok &&
     denied.error.kind === "application" &&
-    denied.error.value.kind === "forbidden"
+    denied.error.value.code === "forbidden"
   ) {
     console.log("Bob cannot publish Alice's post (typed Forbidden)");
   } else {

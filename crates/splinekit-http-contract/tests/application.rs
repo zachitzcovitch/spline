@@ -2,6 +2,25 @@ use splinekit_contract::{ApplicationBuilder as NeutralBuilder, OperationKind};
 use splinekit_http_contract::{ApplicationBuilder, HttpBinding, HttpMethod};
 use splinekit_schema::{Context, Field, Object, Schema, Shape, TypeInfo, UnknownFields};
 
+/// A minimal HTTP application error: `{"code": "failed"}`.
+struct Failure;
+impl splinekit_schema::Schema for Failure {
+    fn info() -> splinekit_schema::TypeInfo {
+        splinekit_schema::TypeInfo::named("test.Failure")
+    }
+    fn describe(
+        _: &mut splinekit_schema::Context<'_>,
+    ) -> splinekit_schema::Result<splinekit_schema::Shape> {
+        Ok(splinekit_schema::Shape::Object(splinekit_schema::Object {
+            fields: vec![splinekit_schema::Field::required(
+                "code",
+                splinekit_schema::Shape::Literal("failed".into()),
+            )],
+            unknown_fields: splinekit_schema::UnknownFields::Reject,
+        }))
+    }
+}
+
 struct Input;
 impl Schema for Input {
     fn info() -> TypeInfo {
@@ -32,7 +51,7 @@ fn http_route_conflicts_are_separate_from_neutral_composition_and_recoverable() 
     for resource in ["users", "posts"] {
         neutral
             .resource(resource, resource, "", |r| {
-                r.operation::<Input, String, ()>("get", "get", OperationKind::Query, "")
+                r.operation::<Input, String, Failure>("get", "get", OperationKind::Query, "")
             })
             .unwrap();
     }

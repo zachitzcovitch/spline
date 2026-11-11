@@ -8,14 +8,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use splinekit_contract::Operation;
 use splinekit_http_contract::{
-    ApplicationDescription, ContractDescription, HttpMethod, HttpPlan, Scalar,
+    application_error_codes, ApplicationDescription, ContractDescription, ErrorResponses,
+    HttpMethod, HttpPlan, Scalar, PROBLEM_MEMBERS,
 };
 use splinekit_schema::{Graph, Shape};
 
 use crate::transport::{erase, Erased, ReqwestTransport, Transport};
-use crate::{
-    json_content_type, response, BuildError, CallError, Fault, ResponsePolicy, ERROR_HEADER,
-};
+use crate::{json_content_type, response, BuildError, CallError, Fault, ResponsePolicy};
 
 const PATH_COMPONENT: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
     .remove(b'-')
@@ -237,11 +236,6 @@ impl Client {
             .await
             .map_err(CallError::Transport)?;
         let status = response.status().as_u16();
-        let error_kind = response
-            .headers()
-            .get(ERROR_HEADER)
-            .and_then(|v| v.to_str().ok())
-            .map(str::to_owned);
         let json = json_content_type(
             response
                 .headers()
@@ -250,8 +244,7 @@ impl Client {
         );
         if status == plan.binding.success_status {
             if status == 204 {
-                if response.headers().contains_key(ERROR_HEADER)
-                    || response.headers().contains_key(header::CONTENT_LENGTH)
+                if response.headers().contains_key(header::CONTENT_LENGTH)
                     || response.headers().contains_key(header::TRANSFER_ENCODING)
                 {
                     return Err(CallError::Protocol("invalid 204 response headers".into()));
@@ -266,7 +259,7 @@ impl Client {
                 return serde_json::from_value(Value::Null)
                     .map_err(|error| CallError::Protocol(error.to_string()));
             }
-            if !json || response.headers().contains_key(ERROR_HEADER) {
+            if !json {
                 return Err(CallError::Protocol(
                     "invalid success response headers".into(),
                 ));
@@ -284,38 +277,59 @@ impl Client {
                 "unexpected success/redirect status {status}"
             )));
         }
-        if !json || error_kind.is_none() {
+        // Problem details carrying this status and a code; anything else
+        // (a proxy's page, a gateway error) is an unrecognized HTTP failure.
+        let problem = json
+            .then(|| serde_json::from_slice::<Value>(response.body()).ok())
+            .flatten()
+            .and_then(|value| match value {
+                Value::Object(fields) => Some(fields),
+                _ => None,
+            })
+            .filter(|fields| {
+                fields.get("status").and_then(Value::as_u64) == Some(u64::from(status))
+                    && fields.get("code").is_some_and(Value::is_string)
+            });
+        let Some(mut problem) = problem else {
             return Err(CallError::Http { status });
-        }
-        let value: Value = serde_json::from_slice(response.body())
-            .map_err(|error| CallError::Protocol(error.to_string()))?;
-        match (
-            error_kind.as_deref(),
-            value.get("kind").and_then(Value::as_str),
-        ) {
-            (Some("application"), Some("application")) => {
-                let value = value
-                    .get("value")
-                    .ok_or_else(|| CallError::Protocol("application error has no value".into()))?;
-                let value =
-                    response::project(value, &call.error, &self.schemas, self.response_policy)
-                        .map_err(CallError::Protocol)?;
-                let error = serde_json::from_value(value)
-                    .map_err(|error| CallError::Protocol(error.to_string()))?;
-                Err(CallError::Application(error))
+        };
+        let code = problem["code"].as_str().unwrap_or_default().to_owned();
+        // A code the operation declares at this status is an application
+        // error and must decode as one; any other code is a framework fault.
+        let declared = match &plan.errors {
+            ErrorResponses::Opaque => Some(&call.error),
+            ErrorResponses::Declared(responses) => {
+                responses.get(&status).map(|response| &response.error)
             }
-            (Some("framework"), Some("framework")) => {
-                let code = value.get("code").and_then(Value::as_str);
-                let message = value.get("message").and_then(Value::as_str);
-                match (code, message) {
-                    (Some(code), Some(message)) => {
-                        Err(CallError::Framework(Fault::new(status, code, message)))
-                    }
-                    _ => Err(CallError::Protocol("malformed framework error".into())),
-                }
+        };
+        let declares = declared
+            .map(|shape| application_error_codes(shape, &self.schemas))
+            .transpose()
+            .map_err(|error| CallError::Protocol(error.to_string()))?
+            .is_some_and(|codes| codes.contains(&code));
+        if let (true, Some(shape)) = (declares, declared) {
+            for member in PROBLEM_MEMBERS {
+                problem.remove(member);
             }
-            _ => Err(CallError::Protocol("unrecognized error envelope".into())),
+            let value = response::project(
+                &Value::Object(problem),
+                shape,
+                &self.schemas,
+                self.response_policy,
+            )
+            .map_err(CallError::Protocol)?;
+            let error = serde_json::from_value(value)
+                .map_err(|error| CallError::Protocol(error.to_string()))?;
+            return Err(CallError::Application(error));
         }
+        Err(CallError::Framework(Fault {
+            status,
+            code,
+            detail: problem
+                .get("detail")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        }))
     }
 }
 

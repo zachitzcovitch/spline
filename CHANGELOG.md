@@ -5,6 +5,19 @@ release yet; the workspace version is a development version.
 
 ## Unreleased
 
+### Changed
+
+- Errors are RFC 9457 problem details (`application/problem+json`): a numeric
+  `status` and a string `code`, plus the application error's fields or a
+  framework fault's optional developer `detail`. HTTP application errors must be
+  objects tagged by `code` (`#[serde(tag = "code")]`), may not use the binding's
+  fault codes, and may not have fields named like RFC 9457 members; binding
+  checks this. The `x-splinekit-error` header and the `{kind, value}` envelope are
+  gone, so nothing on the wire names Splinekit and browsers need no extra CORS
+  exposed header. Clients recognize a declared `code` at its status; an
+  undeclared code is a framework fault. `Fault::message` is now
+  `Fault::detail: Option<String>`.
+
 ### Added
 
 - Directional JSON schemas, recursive/generic registration, and Serde-aware derives.

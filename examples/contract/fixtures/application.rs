@@ -37,14 +37,14 @@ pub struct NewPost {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "code", rename_all = "snake_case", deny_unknown_fields)]
 #[splinekit(name = "composition.UserError")]
 pub enum UserError {
     NotFound,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "code", rename_all = "snake_case", deny_unknown_fields)]
 #[splinekit(name = "composition.PostError")]
 pub enum PostError {
     NotFound,

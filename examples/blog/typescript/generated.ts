@@ -18,11 +18,11 @@ export type Post = {
 };
 
 export type PostError = {
-  "kind": "not_found";
+  "code": "not_found";
 } | {
-  "kind": "forbidden";
+  "code": "forbidden";
 } | {
-  "kind": "invalid_title";
+  "code": "invalid_title";
 };
 
 export type User = {
@@ -31,7 +31,7 @@ export type User = {
 };
 
 export type UserError = {
-  "kind": "not_found";
+  "code": "not_found";
 };
 
 /**
@@ -101,7 +101,8 @@ export type BlogCalls<Failure = never> = {
 export type BlogHttpFailure =
   | { kind: "transport" | "protocol" | "encode"; message: string }
   | { kind: "http"; status: number }
-  | { kind: "framework"; status: number; code: string; message: string };
+  /** A problem-details fault from the service: branch on `code`; `detail` is developer text, not for end users. */
+  | { kind: "framework"; status: number; code: string; detail?: string };
 
 export type BlogHttpOptions = {
   fetch?: typeof globalThis.fetch;
@@ -145,9 +146,9 @@ export function createBlogClient(
     ["posts.publish.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
     ["splinekit_example_blog_contracts.posts.NewPost (Deserialize)"]: ["object", false, [["title", "title", ["string"], false], ["body", "body", ["string"], false]]],
     ["splinekit_example_blog_contracts.posts.Post (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["author", "author", ["ref", "splinekit_example_blog_contracts.users.User (Serialize)"], false], ["title", "title", ["string"], false], ["body", "body", ["string"], false], ["published", "published", ["boolean"], false]]],
-    ["splinekit_example_blog_contracts.posts.PostError (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "not_found"], false]]], ["object", false, [["kind", "kind", ["literal", "forbidden"], false]]], ["object", false, [["kind", "kind", ["literal", "invalid_title"], false]]]]],
+    ["splinekit_example_blog_contracts.posts.PostError (Serialize)"]: ["union", [["object", false, [["code", "code", ["literal", "not_found"], false]]], ["object", false, [["code", "code", ["literal", "forbidden"], false]]], ["object", false, [["code", "code", ["literal", "invalid_title"], false]]]]],
     ["splinekit_example_blog_contracts.users.User (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["displayName", "displayName", ["string"], false]]],
-    ["splinekit_example_blog_contracts.users.UserError (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "not_found"], false]]]]],
+    ["splinekit_example_blog_contracts.users.UserError (Serialize)"]: ["union", [["object", false, [["code", "code", ["literal", "not_found"], false]]]]],
     ["users.get.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
   };
   const object = (value: unknown): value is { [name: string]: unknown } =>
@@ -307,7 +308,9 @@ export function createBlogClient(
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string; body: string | null; status: number;
     paths: string[]; queries: [string, boolean][];
-    input: __SplinekitWire; output: __SplinekitWire; error: __SplinekitWire;
+    input: __SplinekitWire; output: __SplinekitWire;
+    /** Declared application errors: [status (0 = any), codes, wire shape]. */
+    errors: [number, string[], __SplinekitWire][];
   };
   const message = (error: unknown): string => error instanceof globalThis.Error ? error.message : globalThis.String(error);
   const jsonType = (response: globalThis.Response): boolean => {
@@ -353,10 +356,9 @@ export function createBlogClient(
     let response: globalThis.Response;
     try { response = await fetcher(url, init); }
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
-    const marker = response.headers.get("x-splinekit-error");
     const success = response.status === plan.status;
     if (success && response.status === 204) {
-      if (marker !== null || response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
+      if (response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
         return { ok: false, error: { kind: "protocol", message: "invalid 204 response headers" } };
       }
       let text: string;
@@ -366,13 +368,13 @@ export function createBlogClient(
         ? { ok: true, value: undefined as O }
         : { ok: false, error: { kind: "protocol", message: "204 response must have an empty body" } };
     }
-    if (success && (!jsonType(response) || marker !== null)) {
+    if (success && !jsonType(response)) {
       return { ok: false, error: { kind: "protocol", message: "invalid success response headers" } };
     }
     if (!success && response.status < 400) {
       return { ok: false, error: { kind: "protocol", message: `unexpected success/redirect status ${response.status}` } };
     }
-    if (!success && (!jsonType(response) || marker === null)) {
+    if (!success && !jsonType(response)) {
       return { ok: false, error: { kind: "http", status: response.status } };
     }
     let text: string;
@@ -380,42 +382,61 @@ export function createBlogClient(
     catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
     let value: unknown;
     try { value = globalThis.JSON.parse(text); }
-    catch (error) { return { ok: false, error: { kind: "protocol", message: message(error) } }; }
+    catch (error) {
+      return success
+        ? { ok: false, error: { kind: "protocol", message: message(error) } }
+        : { ok: false, error: { kind: "http", status: response.status } };
+    }
     if (success) {
       const decoded = project(value, plan.output);
       return decoded !== undefined
         ? { ok: true, value: decoded as O }
         : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
     }
-    if (object(value) && marker === "application" && value.kind === "application" && owns(value, "value")) {
-      const decoded = project(value.value, plan.error);
-      if (decoded !== undefined) return { ok: false, error: { kind: "application", value: decoded as E } };
+    // Problem details carrying this status and a code; anything else (a
+    // proxy's page, a gateway error) is an unrecognized HTTP failure.
+    if (!object(value) || value.status !== response.status || typeof value.code !== "string") {
+      return { ok: false, error: { kind: "http", status: response.status } };
     }
-    if (object(value) && marker === "framework" && value.kind === "framework"
-        && typeof value.code === "string" && typeof value.message === "string") {
-      return { ok: false, error: { kind: "framework", status: response.status, code: value.code, message: value.message } };
+    const code = value.code;
+    // A code the operation declares at this status is an application error
+    // and must decode as one; any other code is a framework fault.
+    const declared = plan.errors.find(([status, codes]) => (status === 0 || status === response.status) && codes.includes(code));
+    if (declared !== undefined) {
+      // fromEntries defines properties, so a `__proto__` key stays data.
+      const fields = globalThis.Object.fromEntries(globalThis.Object.entries(value)
+        .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
+      const decoded = project(fields, declared[2]);
+      return decoded !== undefined
+        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
-    return { ok: false, error: { kind: "protocol", message: "unrecognized error envelope" } };
+    return {
+      ok: false,
+      error: typeof value.detail === "string"
+        ? { kind: "framework", status: response.status, code, detail: value.detail }
+        : { kind: "framework", status: response.status, code },
+    };
   };
   return {
     ["posts"]: {
       ["create"]: (input: NewPost) => call<Post, PostError>({
         method: "POST", path: "/posts", body: "input", status: 201, paths: [], queries: [],
-        input: ["ref", "posts.create.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.posts.Post (Serialize)"], error: ["ref", "splinekit_example_blog_contracts.posts.PostError (Serialize)"],
+        input: ["ref", "posts.create.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.posts.Post (Serialize)"], errors: [[403, ["forbidden"], ["object", false, [["code", "code", ["literal", "forbidden"], false]]]], [404, ["not_found"], ["object", false, [["code", "code", ["literal", "not_found"], false]]]], [422, ["invalid_title"], ["object", false, [["code", "code", ["literal", "invalid_title"], false]]]]],
       }, { ["input"]: input }),
       ["get"]: (id: string) => call<Post, PostError>({
         method: "GET", path: "/posts/{id}", body: null, status: 200, paths: ["id"], queries: [],
-        input: ["ref", "posts.get.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.posts.Post (Serialize)"], error: ["ref", "splinekit_example_blog_contracts.posts.PostError (Serialize)"],
+        input: ["ref", "posts.get.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.posts.Post (Serialize)"], errors: [[403, ["forbidden"], ["object", false, [["code", "code", ["literal", "forbidden"], false]]]], [404, ["not_found"], ["object", false, [["code", "code", ["literal", "not_found"], false]]]], [422, ["invalid_title"], ["object", false, [["code", "code", ["literal", "invalid_title"], false]]]]],
       }, { ["id"]: id }),
       ["publish"]: (id: string) => call<Post, PostError>({
         method: "POST", path: "/posts/{id}/publish", body: null, status: 200, paths: ["id"], queries: [],
-        input: ["ref", "posts.publish.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.posts.Post (Serialize)"], error: ["ref", "splinekit_example_blog_contracts.posts.PostError (Serialize)"],
+        input: ["ref", "posts.publish.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.posts.Post (Serialize)"], errors: [[403, ["forbidden"], ["object", false, [["code", "code", ["literal", "forbidden"], false]]]], [404, ["not_found"], ["object", false, [["code", "code", ["literal", "not_found"], false]]]], [422, ["invalid_title"], ["object", false, [["code", "code", ["literal", "invalid_title"], false]]]]],
       }, { ["id"]: id }),
     },
     ["users"]: {
       ["get"]: (id: string) => call<User, UserError>({
         method: "GET", path: "/users/{id}", body: null, status: 200, paths: ["id"], queries: [],
-        input: ["ref", "users.get.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.users.User (Serialize)"], error: ["ref", "splinekit_example_blog_contracts.users.UserError (Serialize)"],
+        input: ["ref", "users.get.Args (Deserialize)"], output: ["ref", "splinekit_example_blog_contracts.users.User (Serialize)"], errors: [[404, ["not_found"], ["object", false, [["code", "code", ["literal", "not_found"], false]]]]],
       }, { ["id"]: id }),
     },
 

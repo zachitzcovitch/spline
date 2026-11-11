@@ -48,7 +48,7 @@ pub mod v1 {
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
     #[splinekit(name = "evolution.Error")]
     #[serde(
-        tag = "kind",
+        tag = "code",
         content = "details",
         rename_all = "snake_case",
         deny_unknown_fields
@@ -129,7 +129,7 @@ pub mod v2 {
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
     #[splinekit(name = "evolution.Error")]
     #[serde(
-        tag = "kind",
+        tag = "code",
         content = "details",
         rename_all = "snake_case",
         deny_unknown_fields

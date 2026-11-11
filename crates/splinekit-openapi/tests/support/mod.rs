@@ -60,7 +60,7 @@ pub struct Delta {
 
 #[derive(Debug, Serialize, Deserialize, Schema, splinekit::http::Error)]
 #[serde(
-    tag = "kind",
+    tag = "code",
     content = "details",
     rename_all = "snake_case",
     deny_unknown_fields
@@ -74,6 +74,7 @@ pub enum Failure {
     #[http(status = StatusCode::BAD_REQUEST)]
     Rejected(String),
     #[http(status = StatusCode::INTERNAL_SERVER_ERROR)]
+    #[serde(rename = "server_fault")]
     Internal { trace: String },
 }
 

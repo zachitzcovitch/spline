@@ -83,7 +83,7 @@ const created = await client.create({ displayName: "New user" });
 if (created.ok) {
   console.log(created.value.id);
 } else if (created.error.kind === "application") {
-  console.log(created.error.value.kind);
+  console.log(created.error.value.code);
 }
 ```
 

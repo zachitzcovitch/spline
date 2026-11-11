@@ -28,15 +28,17 @@ assert.equal(created.value.counters.tags, 0);
 assert.equal(created.value.state, "inactive");
 
 assert.deepEqual(await client.get("existing-error"), {
-  ok: false, error: { kind: "application", value: { kind: "missing", details: { message: "missing" } } },
+  ok: false, error: { kind: "application", value: { code: "missing", details: { message: "missing" } } },
 });
 assert.equal((await strict.get("existing-error")).error.kind, "protocol");
 assert.deepEqual(await client.event("known"), { ok: true, value: { item: { id: "known" } } });
 assert.equal((await strict.event("known")).error.kind, "protocol");
 
-for (const id of ["new-state", "new-error"]) {
-  assert.equal((await client.get(id)).error.kind, "protocol");
-}
+assert.equal((await client.get("new-state")).error.kind, "protocol");
+// An error code the old contract doesn't declare reaches it as a fault with that code.
+const busy = (await client.get("new-error")).error;
+assert.equal(busy.kind, "framework");
+assert.equal(busy.code, "busy");
 for (const id of ["new-variant", "ambiguous"]) {
   assert.equal((await client.event(id)).error.kind, "protocol");
 }

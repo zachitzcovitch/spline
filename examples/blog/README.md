@@ -270,7 +270,7 @@ variants. For example, `posts.rs` contains:
 use splinekit::http::StatusCode;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema, splinekit::http::Error)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "code", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PostError {
     #[http(status = StatusCode::NOT_FOUND)]
     NotFound,
@@ -339,7 +339,7 @@ name and failure details. This keeps routine success handling concise.
 
 For the expected `Forbidden` error, `client.ts` inspects the generated result
 directly: check `result.ok`, then `result.error.kind === "application"`, then the
-specific variant in `result.error.value.kind`. Each check narrows the generated
+specific variant in `result.error.value.code`. Each check narrows the generated
 types, making the expected-error handling explicit in the workflow.
 
 You can also import clean types directly:

@@ -8,7 +8,7 @@ An API error type can declare its default HTTP statuses with the opt-in
 use splinekit::http::StatusCode;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema, splinekit::http::Error)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "code", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PostError {
     #[http(status = StatusCode::NOT_FOUND)]
     NotFound,
@@ -27,8 +27,19 @@ variants may share a status. Payloads use the same annotation:
 
 ```rust
 #[http(status = StatusCode::UNPROCESSABLE_ENTITY)]
-Invalid { field: String, message: String },
+Invalid { field: String },
 ```
+
+On the wire each error is problem details: the value tagged by `code`, plus the
+HTTP `status`. `PostError::Invalid { field: "title".into() }` is sent as
+`{"status":422,"code":"invalid","field":"title"}` with
+`Content-Type: application/problem+json`. Give errors data, not prose: a client
+branches on `code` and decides what its users read. Binding refuses error types
+that aren't tagged by `code`, that declare one of the binding's own fault codes,
+or that have a field named like an RFC 9457 member; see the
+[wire profile](http-binding.md#wire-responses). Adjacent tagging
+(`#[serde(tag = "code", content = "details")]`) works too and keeps payloads under
+one field.
 
 The derive implements `splinekit::http::Error`, supplying both an exhaustive runtime
 match and its static mapping. It uses the type's `Schema` for the actual serialized
@@ -72,40 +83,42 @@ Each plan contains `ErrorResponses`:
 - `Opaque`: no static status mapping is claimed. This is the result for no-policy
   `::http::describe()` and custom policies without a declaration.
 
-An `ErrorResponse` includes the complete JSON envelope schema, content type, and
-`x-splinekit-error: application` header. For a 404 above, its body describes:
+An `ErrorResponse` has the declared errors at that status (`error`, as a client
+decodes them), the complete problem body (`body`: those errors with `status`
+added) and the content type, `application/problem+json`. For a 404 above, its body
+describes:
 
 ```json
-{"kind":"application","value":{"kind":"not_found"}}
+{"status":404,"code":"not_found"}
 ```
 
-Several variants sharing a status produce a union of their serialized values
-inside that envelope. Shapes retain references into the neutral description's
-Serialize graph, including generic and recursive payloads. Serde variant/field
-renames and external/internal/adjacent tagging are preserved.
+Several variants sharing a status produce a union. Shapes retain references into
+the neutral description's Serialize graph, including generic and recursive
+payloads. Serde variant/field renames and internal/adjacent tagging are preserved.
 
 Routers use the same policy-aware validation path before installing routes.
 Invalid declarations fail construction, including missing, duplicate, or unknown
 variant rules supplied manually. Client setup can continue using the no-policy
-description: typed error decoding uses the complete error schema and the matching
-header/envelope, independently of a particular server policy.
+description: typed error decoding then matches a declared `code` at any status,
+independently of a particular server policy.
 
 These are **application-error responses**. Framework faults, request-factory
-rejection, service failures, and unmarked HTTP errors have distinct meanings. In
+rejection, service failures, and unrecognized HTTP errors have distinct meanings. In
 particular, a request factory can return other 4xx/5xx framework faults; the table
 does not claim to enumerate every possible HTTP response. See the
 [HTTP wire profile](http-binding.md#wire-responses).
 
 ## Whole-error statuses and supported representations
 
-A struct, or an enum whose complete error shape uses one status, can declare a
-container status:
+An error type whose complete shape uses one status can declare a container
+status:
 
 ```rust
 #[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema, splinekit::http::Error)]
+#[serde(tag = "code", rename_all = "snake_case")]
 #[http(status = StatusCode::CONFLICT)]
-pub struct Conflict {
-    pub message: String,
+pub enum Conflict {
+    VersionChanged { current: u32 },
 }
 ```
 
@@ -163,6 +176,6 @@ npm run test:blog
 ```
 
 The blog workflow runs both real clients and checks 403/404/422 statuses and typed
-error envelopes. Generated TypeScript still uses the same public error DTOs and
+problem bodies. Generated TypeScript still uses the same public error DTOs and
 discriminated results. [OpenAPI export](openapi.md) uses this metadata to document
 per-status application errors alongside possible framework faults.

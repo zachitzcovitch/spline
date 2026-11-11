@@ -249,12 +249,13 @@ The implemented HTTP profile defines:
 
 - **Inputs:** identify path parameters, query parameters, and the request body.
 - **Success:** 200/201 JSON responses and bodyless 204 responses for unit outputs.
-- **Errors:** typed application-error envelopes with an executable status policy,
-  separate from framework and unmarked HTTP failures.
+- **Errors:** RFC 9457 problem details, machine-first: typed application errors
+  tagged by `code` with an executable status policy, separate from framework faults
+  and unrecognized HTTP failures. No marker header; no text for end users.
 
 Error types can derive `splinekit::http::Error` with named status constants. The
 `DeclaredErrors` policy selects these defaults; `::http::describe_with(&policy)`
-records per-status serialized application-error envelopes and headers. Custom
+records per-status problem bodies for the declared application errors. Custom
 policies remain opaque unless they declare their static mapping. The OpenAPI
 exporter preserves these distinctions and includes framework alternatives at shared
 statuses. Per-operation response headers such as `Location` and `ETag` remain future work.

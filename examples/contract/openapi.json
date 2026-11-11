@@ -3,7 +3,7 @@
     "responses": {
       "ServiceErrorResponse": {
         "content": {
-          "application/json": {
+          "application/problem+json": {
             "schema": {
               "$ref": "#/components/schemas/ServiceError"
             }
@@ -18,19 +18,23 @@
           {
             "additionalProperties": false,
             "properties": {
-              "kind": {
+              "code": {
                 "const": "not_found",
                 "type": "string"
               }
             },
             "required": [
-              "kind"
+              "code"
             ],
             "type": "object"
           },
           {
             "additionalProperties": false,
             "properties": {
+              "code": {
+                "const": "invalid_name",
+                "type": "string"
+              },
               "details": {
                 "additionalProperties": false,
                 "properties": {
@@ -42,14 +46,10 @@
                   "message"
                 ],
                 "type": "object"
-              },
-              "kind": {
-                "const": "invalid_name",
-                "type": "string"
               }
             },
             "required": [
-              "kind",
+              "code",
               "details"
             ],
             "type": "object"
@@ -99,23 +99,23 @@
         "type": "object"
       },
       "ServiceError": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "code": {
             "type": "string"
           },
-          "kind": {
-            "const": "framework",
+          "detail": {
             "type": "string"
           },
-          "message": {
-            "type": "string"
+          "status": {
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
-          "kind",
-          "code",
-          "message"
+          "status",
+          "code"
         ],
         "type": "object"
       },
@@ -208,25 +208,63 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -235,29 +273,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -266,29 +342,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "415": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -297,29 +411,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -328,29 +480,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "500": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -359,29 +549,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "5XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -390,7 +618,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           }
         },
         "summary": "Create a user from the supplied profile.",
@@ -421,25 +649,63 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -448,29 +714,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -479,29 +783,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -510,29 +852,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "500": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -541,29 +921,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "5XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -572,7 +990,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           }
         },
         "summary": "Delete an existing user with an empty success response.",
@@ -608,25 +1026,63 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -635,29 +1091,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -666,29 +1160,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -697,29 +1229,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "500": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -728,29 +1298,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "5XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -759,7 +1367,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           }
         },
         "summary": "Fetch an existing user.",
@@ -806,25 +1414,63 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -833,29 +1479,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -864,29 +1548,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "415": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -895,29 +1617,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -926,29 +1686,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "500": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -957,29 +1755,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "5XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -988,7 +1824,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           }
         },
         "summary": "Apply the supplied fields without changing omitted fields.",
@@ -1035,25 +1871,63 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -1062,29 +1936,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "413": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -1093,29 +2005,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "415": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -1124,29 +2074,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "4XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -1155,29 +2143,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "500": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -1186,29 +2212,67 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           },
           "5XX": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "const": "application",
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "not_found",
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code"
+                          ],
+                          "type": "object"
                         },
-                        "value": {
-                          "$ref": "#/components/schemas/ApiError"
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "code": {
+                              "const": "invalid_name",
+                              "type": "string"
+                            },
+                            "details": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "message"
+                              ],
+                              "type": "object"
+                            },
+                            "status": {
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "code",
+                            "details"
+                          ],
+                          "type": "object"
                         }
-                      },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
-                      "type": "object"
+                      ]
                     },
                     {
                       "$ref": "#/components/schemas/ServiceError"
@@ -1217,7 +2281,7 @@
                 }
               }
             },
-            "description": "Application error or request/service failure. See the response body for error details."
+            "description": "Application error or request/service failure. Branch on the problem's `code`."
           }
         },
         "summary": "Replace an existing user's writable profile.",

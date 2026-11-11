@@ -3,6 +3,25 @@ use splinekit_http_contract::{ContractBuilder as HttpBuilder, HttpBinding, HttpM
 use splinekit_schema::{Context, DefinitionId, Direction, Name, Schema, Shape, TypeInfo};
 use splinekit_typescript::{Error, Typescript};
 
+/// A minimal HTTP application error: `{"code": "failed"}`.
+struct AppError;
+impl splinekit_schema::Schema for AppError {
+    fn info() -> splinekit_schema::TypeInfo {
+        splinekit_schema::TypeInfo::named("test.AppError")
+    }
+    fn describe(
+        _: &mut splinekit_schema::Context<'_>,
+    ) -> splinekit_schema::Result<splinekit_schema::Shape> {
+        Ok(splinekit_schema::Shape::Object(splinekit_schema::Object {
+            fields: vec![splinekit_schema::Field::required(
+                "code",
+                splinekit_schema::Shape::Literal("failed".into()),
+            )],
+            unknown_fields: splinekit_schema::UnknownFields::Reject,
+        }))
+    }
+}
+
 struct Value;
 impl Schema for Value {
     fn info() -> TypeInfo {
@@ -32,7 +51,7 @@ fn positional_signatures_follow_argument_order_not_alphabetical_order() {
     }
     let mut builder = ContractBuilder::new("ordered", "").unwrap();
     builder
-        .operation::<Input, String, String>("inspect", "inspect", OperationKind::Query, "")
+        .operation::<Input, String, AppError>("inspect", "inspect", OperationKind::Query, "")
         .unwrap();
     let artifact = Typescript::new()
         .export_contract(&builder.finish().unwrap(), "Ordered")
@@ -61,7 +80,7 @@ fn keyword_and_runtime_shadowing_parameters_receive_local_safe_names() {
     }
     let mut builder = ContractBuilder::new("safe", "").unwrap();
     builder
-        .operation::<Input, (), ()>("inspect", "inspect", OperationKind::Query, "")
+        .operation::<Input, (), AppError>("inspect", "inspect", OperationKind::Query, "")
         .unwrap();
     let mut builder = HttpBuilder::new(builder.finish().unwrap());
     builder
@@ -103,7 +122,7 @@ fn http_runtime_insertion_does_not_rewrite_user_literals_as_template_markers() {
     }
     let mut builder = ContractBuilder::new("marker", "").unwrap();
     builder
-        .operation::<Input, String, String>("send", "send", OperationKind::Mutation, "")
+        .operation::<Input, String, AppError>("send", "send", OperationKind::Mutation, "")
         .unwrap();
     let mut builder = HttpBuilder::new(builder.finish().unwrap());
     builder
@@ -214,10 +233,10 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
     }
     let mut builder = ContractBuilder::new("empty", "").unwrap();
     builder
-        .operation::<Empty, (), Value>("delete", "delete", OperationKind::Mutation, "")
+        .operation::<Empty, (), AppError>("delete", "delete", OperationKind::Mutation, "")
         .unwrap();
     builder
-        .operation::<Empty, (), String>("json", "json", OperationKind::Query, "")
+        .operation::<Empty, (), AppError>("json", "json", OperationKind::Query, "")
         .unwrap();
     let neutral = builder.finish().unwrap();
     assert_eq!(neutral.operations()["delete"].output, Shape::Null);
@@ -225,7 +244,7 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         .export_contract(&neutral, "Empty")
         .unwrap()
         .source;
-    assert!(neutral_source.contains("delete(): Promise<EmptyResult<null, Value, Failure>>"));
+    assert!(neutral_source.contains("delete(): Promise<EmptyResult<null, AppError, Failure>>"));
     let mut builder = HttpBuilder::new(neutral);
     builder
         .bind(
@@ -254,11 +273,11 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         .export_http_client(&description, "Empty")
         .unwrap()
         .source;
-    assert!(source.contains("delete(): Promise<EmptyResult<void, Value, Failure>>"));
-    assert!(source.contains("json(): Promise<EmptyResult<null, string, Failure>>"));
+    assert!(source.contains("delete(): Promise<EmptyResult<void, AppError, Failure>>"));
+    assert!(source.contains("json(): Promise<EmptyResult<null, AppError, Failure>>"));
     // Generated result utility names participate in the same checks as DTOs.
     let key = DefinitionId {
-        name: Name::new("api.Value"),
+        name: Name::new("test.AppError"),
         direction: Direction::Serialize,
     };
     let source = Typescript::new().name(key, "EmptyResult");
@@ -282,7 +301,7 @@ fn api_exports_use_camel_case_rust_names_while_type_exports_keep_the_wire() {
     }
     let mut builder = ContractBuilder::new("accounts", "").unwrap();
     builder
-        .operation::<Input, Account, String>("get", "get", OperationKind::Query, "")
+        .operation::<Input, Account, AppError>("get", "get", OperationKind::Query, "")
         .unwrap();
     let contract = builder.finish().unwrap();
     let api = Typescript::new()
@@ -355,7 +374,7 @@ fn fields_that_would_share_a_typescript_name_are_refused_in_api_exports() {
     }
     let mut builder = ContractBuilder::new("clash", "").unwrap();
     builder
-        .operation::<Empty, Clash, String>("get", "get", OperationKind::Query, "")
+        .operation::<Empty, Clash, AppError>("get", "get", OperationKind::Query, "")
         .unwrap();
     assert!(matches!(
         Typescript::new().export_contract(&builder.finish().unwrap(), "Clash"),
@@ -379,7 +398,7 @@ fn operations_groups_and_parameters_are_camel_case_and_must_stay_distinct() {
     }
     let mut builder = ContractBuilder::new("lookups", "").unwrap();
     builder
-        .operation::<Args, String, String>("find_user", "find_user", OperationKind::Query, "")
+        .operation::<Args, String, AppError>("find_user", "find_user", OperationKind::Query, "")
         .unwrap();
     let source = Typescript::new()
         .export_contract(&builder.finish().unwrap(), "Lookups")
@@ -390,10 +409,10 @@ fn operations_groups_and_parameters_are_camel_case_and_must_stay_distinct() {
 
     let mut builder = ContractBuilder::new("clash", "").unwrap();
     builder
-        .operation::<Args, String, String>("get_user", "get_user", OperationKind::Query, "")
+        .operation::<Args, String, AppError>("get_user", "get_user", OperationKind::Query, "")
         .unwrap();
     builder
-        .operation::<Args, String, String>("getUser", "getUser", OperationKind::Query, "")
+        .operation::<Args, String, AppError>("getUser", "getUser", OperationKind::Query, "")
         .unwrap();
     assert!(matches!(
         Typescript::new().export_contract(&builder.finish().unwrap(), "Clash"),

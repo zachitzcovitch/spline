@@ -43,20 +43,26 @@ pub mod profiles {
 splinekit::api! { pub mod api { profiles: self::profiles } }
 
 pub mod partial {
+    #[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema)]
+    #[serde(tag = "code", rename_all = "snake_case")]
+    pub enum PartialError {
+        Unavailable,
+    }
+
     #[splinekit::contract]
     pub trait Partial {
         #[query]
         #[http(get = "/partial")]
-        async fn remote(&self) -> Result<(), ()>;
+        async fn remote(&self) -> Result<(), PartialError>;
         #[query]
-        async fn local(&self) -> Result<(), ()>;
+        async fn local(&self) -> Result<(), PartialError>;
     }
     pub struct Store;
     impl Partial for Store {
-        async fn remote(&self) -> Result<(), ()> {
+        async fn remote(&self) -> Result<(), PartialError> {
             Ok(())
         }
-        async fn local(&self) -> Result<(), ()> {
+        async fn local(&self) -> Result<(), PartialError> {
             Ok(())
         }
     }

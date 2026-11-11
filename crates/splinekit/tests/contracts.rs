@@ -11,7 +11,7 @@ pub struct User {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "code", rename_all = "snake_case")]
 #[splinekit(name = "test.Error")]
 pub enum ApiError {
     Missing,

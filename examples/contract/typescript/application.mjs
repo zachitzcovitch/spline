@@ -24,7 +24,7 @@ const unwrap = result => { assert.equal(result.ok, true, JSON.stringify(result))
 const error = (result, kind) => {
   assert.equal(result.ok, false);
   assert.equal(result.error.kind, "application");
-  assert.equal(result.error.value.kind, kind);
+  assert.equal(result.error.value.code, kind);
 };
 
 const renamed = unwrap(await alice.users.rename("TypeScript Alice"));

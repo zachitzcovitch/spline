@@ -172,7 +172,10 @@ async fn raw_http_observes_json_updates_and_an_actually_empty_204() {
     ] {
         let response = client.patch(&resource).json(&body).send().await.unwrap();
         assert_eq!(response.status(), 400);
-        assert_eq!(response.headers()[http::ERROR_HEADER], "framework");
+        assert_eq!(
+            response.json::<serde_json::Value>().await.unwrap()["code"],
+            "invalid_request"
+        );
     }
     assert_eq!(
         client
@@ -209,11 +212,13 @@ async fn raw_http_observes_json_updates_and_an_actually_empty_204() {
     assert!(!response.headers().contains_key("content-type"));
     assert!(!response.headers().contains_key("content-length"));
     assert!(!response.headers().contains_key("transfer-encoding"));
-    assert!(!response.headers().contains_key(http::ERROR_HEADER));
     assert!(response.bytes().await.unwrap().is_empty());
     let missing = client.delete(&resource).send().await.unwrap();
     assert_eq!(missing.status(), 404);
-    assert_eq!(missing.headers()[http::ERROR_HEADER], "application");
+    assert_eq!(
+        missing.json::<serde_json::Value>().await.unwrap(),
+        json!({ "status": 404, "code": "not_found" })
+    );
 }
 
 #[tokio::test]
@@ -222,8 +227,6 @@ async fn native_client_rejects_wrong_status_and_noncompliant_no_content_framing(
         b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nContent-Type: application/json\r\nConnection: close\r\n\r\nnull",
         b"HTTP/1.1 204 No Content\r\nContent-Length: 4\r\nConnection: close\r\n\r\nnull",
         b"HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n0\r\n\r\n",
-        b"HTTP/1.1 204 No Content\r\nx-splinekit-error: application\r\nConnection: close\r\n\r\n",
-        b"HTTP/1.1 204 No Content\r\nx-splinekit-error: \xff\r\nConnection: close\r\n\r\n",
     ];
     for &raw in responses {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

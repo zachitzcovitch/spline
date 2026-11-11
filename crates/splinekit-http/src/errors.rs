@@ -43,24 +43,28 @@ where
 }
 
 /// A framework error: the request or the service failed outside the
-/// application's own errors. Servers send it; clients decode it.
+/// application's own errors. Servers send it as problem details; clients
+/// decode it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fault {
     pub status: u16,
+    /// A stable, machine-readable code. Branch on this.
     pub code: String,
-    pub message: String,
+    /// Developer-facing text for logs and debugging: not for end users, and
+    /// free to change.
+    pub detail: Option<String>,
 }
 
 impl Fault {
-    pub fn new(status: u16, code: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn new(status: u16, code: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
             status,
             code: code.into(),
-            message: message.into(),
+            detail: Some(detail.into()),
         }
     }
-    pub fn invalid(message: impl Into<String>) -> Self {
-        Self::new(400, "invalid_request", message)
+    pub fn invalid(detail: impl Into<String>) -> Self {
+        Self::new(400, "invalid_request", detail)
     }
     #[cfg(feature = "server")]
     pub(crate) fn internal() -> Self {

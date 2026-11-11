@@ -28,7 +28,7 @@ const addedCounter: number | undefined = user.counters["added_key"];
 
 async function errors() {
   const result = await compatible.get("existing-error");
-  if (!result.ok && result.error.kind === "application" && result.error.value.kind === "missing") {
+  if (!result.ok && result.error.kind === "application" && result.error.value.code === "missing") {
     const message: string = result.error.value.details.message;
     // @ts-expect-error fields added to a known error are absent from the old type
     result.error.value.details.retryable;
