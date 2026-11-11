@@ -82,7 +82,12 @@ impl Typescript {
         for (group, resource) in resources {
             let indent = if group.is_some() { "      " } else { "    " };
             if let Some(group) = group {
-                writeln!(methods, "    [{}]: {{", render::string(group)).unwrap();
+                writeln!(
+                    methods,
+                    "    [{}]: {{",
+                    render::string(&crate::names::camel(group))
+                )
+                .unwrap();
             }
             for operation in resource.operations().values() {
                 let plan = plans
@@ -129,7 +134,7 @@ impl Typescript {
                     .collect::<Vec<_>>()
                     .join(", ");
                 writeln!(methods, "{indent}[{}]: ({parameters}) => call<{}, {}>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
-                render::string(&operation.name), contract::output(operation, &artifact.symbols, &void_outputs)?, render::shape(&operation.error, &artifact.symbols, 1)?,
+                render::string(&crate::names::camel(&operation.name)), contract::output(operation, &artifact.symbols, &void_outputs)?, render::shape(&operation.error, &artifact.symbols, 1)?,
                 render::string(&plan.binding.path), plan.binding.success_status,
                 wire(&operation.input), wire(&operation.output), wire(&operation.error),
             ).unwrap();

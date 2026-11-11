@@ -36,7 +36,7 @@ assert.equal(invalid.error.value.kind, "invalid_name");
 
 const echo = createEchoClient(base);
 assert.deepEqual(await echo.health(), { ok: true, value: null });
-assert.deepEqual(await echo.no_content(), { ok: true, value: undefined });
+assert.deepEqual(await echo.noContent(), { ok: true, value: undefined });
 assert.deepEqual(await echo.command(false), { ok: true, value: undefined });
 assert.deepEqual(await echo.command(true), { ok: false, error: { kind: "application", value: null } });
 const value = "slash/space ?#%ü";

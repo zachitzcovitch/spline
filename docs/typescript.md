@@ -52,11 +52,16 @@ errors. It omits generated dispatch argument wrappers. The full directional grap
 and schema validation rules remain available to the runtime. This permits clean
 names without weakening request validation or response projection.
 
-## Property names
+## Property and member names
 
 The wire keeps one naming convention, whatever Serde produces; each language sees
-its own idiom. Contract, application and HTTP client exports name properties in
-camelCase, derived from the Rust field name:
+its own idiom. Contract, application and HTTP client exports use camelCase of the
+Rust names for methods (`no_content` → `noContent()`), resource groups
+(`billing_plans` → `client.billingPlans`), parameters and properties. Two methods
+or groups whose names would match are an export error. Operation identities in
+the operations map (`users.get`) are stable logical ids and stay as declared.
+
+Properties are derived from the Rust field name:
 
 | Rust field | Wire (Serde) | TypeScript |
 | --- | --- | --- |
@@ -128,9 +133,10 @@ positional arguments. Tooling can index `BlogOperations["posts.create"]["output"
 when needed; normal application code can use `Post` directly. Generated per-operation
 input/output/error aliases are unnecessary and are no longer exported.
 
-Normal parameter names are preserved, such as `id` and `input`. Reserved names or
-names shadowing the runtime call helper receive a local `argN` fallback. The
-original logical field name and wire mapping stay intact.
+Parameter names are camelCase of the Rust argument names, such as `id` or
+`userId` for `user_id`. Reserved names or names shadowing the runtime call helper
+receive a local `argN` fallback. The original logical field name and wire mapping
+stay intact.
 
 HTTP-bound 204 results use `void` in operation metadata and signatures; 200/201 unit
 results use JSON `null`. Neutral contract/application export and standalone schema

@@ -77,6 +77,9 @@ release yet; the workspace version is a development version.
   and enum values are never renamed; fields that would share a TypeScript name
   are an export error. `Typescript::export` (types for raw JSON) keeps wire
   names.
+- TypeScript methods, resource groups and parameters are camelCase too
+  (`no_content` → `noContent()`, `user_id` → `userId`); names that would collide
+  are an export error. Operation identities are unchanged.
 - The HTTP binding splits by side: `http-client` (reqwest; builds for
   `wasm32-unknown-unknown`) and `http-server` (Axum), with `http` meaning both.
   Generated contracts and applications emit the client and router behind the

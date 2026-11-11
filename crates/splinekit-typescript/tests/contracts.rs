@@ -362,3 +362,41 @@ fn fields_that_would_share_a_typescript_name_are_refused_in_api_exports() {
         Err(Error::InvalidShape(message)) if message.contains("userId")
     ));
 }
+
+#[test]
+fn operations_groups_and_parameters_are_camel_case_and_must_stay_distinct() {
+    struct Args;
+    impl Schema for Args {
+        fn info() -> TypeInfo {
+            TypeInfo::named("api.LookupArgs")
+        }
+        fn describe(_: &mut Context<'_>) -> splinekit_schema::Result<Shape> {
+            Ok(Shape::Object(splinekit_schema::Object {
+                fields: vec![splinekit_schema::Field::required("user_id", Shape::String)],
+                unknown_fields: splinekit_schema::UnknownFields::Reject,
+            }))
+        }
+    }
+    let mut builder = ContractBuilder::new("lookups", "").unwrap();
+    builder
+        .operation::<Args, String, String>("find_user", "find_user", OperationKind::Query, "")
+        .unwrap();
+    let source = Typescript::new()
+        .export_contract(&builder.finish().unwrap(), "Lookups")
+        .unwrap()
+        .source;
+    assert!(source.contains("findUser(userId: string)"), "{source}");
+    assert!(!source.contains("find_user("), "{source}");
+
+    let mut builder = ContractBuilder::new("clash", "").unwrap();
+    builder
+        .operation::<Args, String, String>("get_user", "get_user", OperationKind::Query, "")
+        .unwrap();
+    builder
+        .operation::<Args, String, String>("getUser", "getUser", OperationKind::Query, "")
+        .unwrap();
+    assert!(matches!(
+        Typescript::new().export_contract(&builder.finish().unwrap(), "Clash"),
+        Err(Error::SymbolCollision(name)) if name == "getUser"
+    ));
+}

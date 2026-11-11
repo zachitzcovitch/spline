@@ -96,12 +96,18 @@ impl Typescript {
         writeln!(artifact.source, "export type {result}<Value, ApplicationError, Failure = never> =\n  | {{ ok: true; value: Value }}\n  | {{ ok: false; error: {{ kind: \"application\"; value: ApplicationError }} | Failure }};\n").unwrap();
         artifact.source.push_str("/** Typed call signatures; a binding supplies execution and any extra Failure union. */\n");
         writeln!(artifact.source, "export type {calls}<Failure = never> = {{").unwrap();
+        member_names(resources)?;
         for (group, resource) in resources {
             let depth = if let Some(group) = group {
                 artifact
                     .source
                     .push_str(&render::docs(resource.documentation(), 1));
-                writeln!(artifact.source, "  {}: {{", render::string(group)).unwrap();
+                writeln!(
+                    artifact.source,
+                    "  {}: {{",
+                    render::string(&crate::names::camel(group))
+                )
+                .unwrap();
                 2
             } else {
                 1
@@ -115,7 +121,7 @@ impl Typescript {
                 writeln!(
                     artifact.source,
                     "{indent}{}({parameters}): Promise<{result}<{}, {}, Failure>>;",
-                    render::property(&operation.name),
+                    render::property(&crate::names::camel(&operation.name)),
                     output(operation, &artifact.symbols, void_outputs)?,
                     render::shape(&operation.error, &artifact.symbols, depth)?
                 )
@@ -140,19 +146,44 @@ pub(crate) fn application_resources(
         .collect()
 }
 
+/// Group and operation names become camelCase TypeScript members; two that
+/// would end up with the same name are refused.
+pub(crate) fn member_names(
+    resources: &[(Option<&str>, &ResourceDescription)],
+) -> Result<(), Error> {
+    let mut groups = BTreeSet::new();
+    for (group, resource) in resources {
+        if let Some(group) = group {
+            let name = crate::names::camel(group);
+            if !groups.insert(name.clone()) {
+                return Err(Error::SymbolCollision(name));
+            }
+        }
+        let mut operations = BTreeSet::new();
+        for operation in resource.operations().values() {
+            let name = crate::names::camel(&operation.name);
+            if !operations.insert(name.clone()) {
+                return Err(Error::SymbolCollision(name));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn parameter_names(operation: &splinekit_contract::Operation) -> Vec<String> {
     let authored: BTreeSet<_> = operation
         .arguments
         .iter()
-        .map(|a| a.name.as_str())
+        .map(|a| crate::names::camel(&a.name))
         .collect();
     operation
         .arguments
         .iter()
         .enumerate()
         .map(|(index, argument)| {
-            if validate::symbol(&argument.name).is_ok() && argument.name != "call" {
-                argument.name.clone()
+            let name = crate::names::camel(&argument.name);
+            if validate::symbol(&name).is_ok() && name != "call" {
+                name
             } else {
                 let mut fallback = format!("arg{index}");
                 while authored.contains(fallback.as_str()) {
