@@ -267,3 +267,98 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         Err(Error::SymbolCollision(_))
     ));
 }
+
+#[test]
+fn api_exports_use_camel_case_rust_names_while_type_exports_keep_the_wire() {
+    #[derive(splinekit::Schema)]
+    #[splinekit(name = "api.Account")]
+    #[allow(dead_code)]
+    struct Account {
+        display_name: String,
+        #[serde(rename = "type")]
+        kind: String,
+        _private_flag: bool,
+        r#ref: String,
+    }
+    let mut builder = ContractBuilder::new("accounts", "").unwrap();
+    builder
+        .operation::<Input, Account, String>("get", "get", OperationKind::Query, "")
+        .unwrap();
+    let contract = builder.finish().unwrap();
+    let api = Typescript::new()
+        .export_contract(&contract, "Accounts")
+        .unwrap()
+        .source;
+    for property in ["\"displayName\"", "\"kind\"", "\"_privateFlag\"", "\"ref\""] {
+        assert!(api.contains(property), "missing {property}:\n{api}");
+    }
+    assert!(!api.contains("\"display_name\""), "{api}");
+
+    let mut registry = splinekit_schema::Registry::new();
+    let root = registry.register::<Account>(Direction::Serialize).unwrap();
+    let graph = registry.finish().unwrap();
+    let types = Typescript::new()
+        .export(
+            &graph,
+            &[splinekit_typescript::Root::new(
+                "Root",
+                Direction::Serialize,
+                root,
+            )],
+        )
+        .unwrap()
+        .source;
+    for property in [
+        "\"display_name\"",
+        "\"type\"",
+        "\"_private_flag\"",
+        "\"ref\"",
+    ] {
+        assert!(types.contains(property), "missing {property}:\n{types}");
+    }
+
+    struct Input;
+    impl Schema for Input {
+        fn info() -> TypeInfo {
+            TypeInfo::named("api.Empty")
+        }
+        fn describe(_: &mut Context<'_>) -> splinekit_schema::Result<Shape> {
+            Ok(Shape::Object(splinekit_schema::Object {
+                fields: vec![],
+                unknown_fields: splinekit_schema::UnknownFields::Reject,
+            }))
+        }
+    }
+}
+
+#[test]
+fn fields_that_would_share_a_typescript_name_are_refused_in_api_exports() {
+    #[derive(splinekit::Schema)]
+    #[splinekit(name = "api.Clash")]
+    #[allow(dead_code, non_snake_case)]
+    struct Clash {
+        user_id: String,
+        #[serde(rename = "userId2")]
+        userId: String,
+    }
+    struct Empty;
+    impl Schema for Empty {
+        fn info() -> TypeInfo {
+            TypeInfo::named("api.Nothing")
+        }
+        fn describe(_: &mut Context<'_>) -> splinekit_schema::Result<Shape> {
+            Ok(Shape::Object(splinekit_schema::Object {
+                fields: vec![],
+                unknown_fields: splinekit_schema::UnknownFields::Reject,
+            }))
+        }
+    }
+    let mut builder = ContractBuilder::new("clash", "").unwrap();
+    builder
+        .operation::<Empty, Clash, String>("get", "get", OperationKind::Query, "")
+        .unwrap();
+    assert!(matches!(
+        Typescript::new().export_contract(&builder.finish().unwrap(), "Clash"),
+        Err(Error::InvalidShape(message)) if message.contains("userId")
+    ));
+}

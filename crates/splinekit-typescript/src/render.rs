@@ -3,13 +3,25 @@ use std::fmt::Write;
 
 use splinekit_schema::{DefinitionId, Presence, Shape, UnknownFields};
 
+use crate::names::Properties;
 use crate::Error;
 
+/// Renders with idiomatic property names (API exports).
 pub fn shape(
     value: &Shape,
     symbols: &BTreeMap<DefinitionId, String>,
     indent: usize,
 ) -> Result<String, Error> {
+    shape_with(value, symbols, indent, Properties::Idiomatic)
+}
+
+pub(crate) fn shape_with(
+    value: &Shape,
+    symbols: &BTreeMap<DefinitionId, String>,
+    indent: usize,
+    properties: Properties,
+) -> Result<String, Error> {
+    let shape = |value: &Shape, symbols, indent| shape_with(value, symbols, indent, properties);
     Ok(match value {
         Shape::Null => "null".into(),
         Shape::Boolean => "boolean".into(),
@@ -65,7 +77,7 @@ pub fn shape(
                     writeln!(
                         output,
                         "{padding}{}{optional}: {};",
-                        string(&field.name),
+                        string(&properties.of(field)),
                         shape(&field.shape, symbols, indent + 1)?
                     )
                     .unwrap();

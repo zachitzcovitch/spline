@@ -100,7 +100,13 @@ pub fn symbol(value: &str) -> Result<(), Error> {
     }
 }
 
-pub fn shape(value: &Shape, direction: Direction, graph: &Graph) -> Result<(), Error> {
+pub fn shape(
+    value: &Shape,
+    direction: Direction,
+    graph: &Graph,
+    properties: crate::names::Properties,
+) -> Result<(), Error> {
+    let shape = |value: &Shape, direction, graph| self::shape(value, direction, graph, properties);
     match value {
         Shape::Ref(id) => {
             if id.direction != direction {
@@ -123,11 +129,18 @@ pub fn shape(value: &Shape, direction: Direction, graph: &Graph) -> Result<(), E
         }
         Shape::Object(object) => {
             let mut names = BTreeSet::new();
+            let mut seen = BTreeSet::new();
             for field in &object.fields {
                 if !names.insert(&field.name) {
                     return Err(Error::InvalidShape(format!(
                         "duplicate object field: {}",
                         field.name
+                    )));
+                }
+                let property = properties.of(field);
+                if !seen.insert(property.clone()) {
+                    return Err(Error::InvalidShape(format!(
+                        "two fields become the TypeScript property {property}"
                     )));
                 }
                 shape(&field.shape, direction, graph)?;

@@ -98,7 +98,13 @@ impl Typescript {
     /// Equivalent directions share a declaration; differing shapes use suffixes.
     /// There are no filesystem effects; callers decide where/how to save source.
     pub fn export(&self, graph: &Graph, roots: &[Root]) -> Result<Artifact, Error> {
-        self.export_selected(graph, roots, &graph.definitions().keys().cloned().collect())
+        // Types describe the JSON itself, so they keep the wire's names.
+        self.export_selected(
+            graph,
+            roots,
+            &graph.definitions().keys().cloned().collect(),
+            names::Properties::Wire,
+        )
     }
 
     /// Contracts select DTOs reachable from their public signatures, excluding
@@ -108,6 +114,7 @@ impl Typescript {
         graph: &Graph,
         roots: &[Root],
         selected: &BTreeSet<DefinitionId>,
+        properties: names::Properties,
     ) -> Result<Artifact, Error> {
         for id in self.overrides.keys() {
             if !graph.definitions().contains_key(id) {
@@ -115,7 +122,7 @@ impl Typescript {
             }
         }
         for (id, definition) in graph.definitions() {
-            validate::shape(&definition.shape, id.direction, graph)?;
+            validate::shape(&definition.shape, id.direction, graph, properties)?;
         }
         let symbols = names::assign(graph, selected, &self.overrides)?;
         let mut declarations = BTreeMap::new();
@@ -142,7 +149,7 @@ impl Typescript {
             {
                 return Err(Error::SymbolCollision(root.symbol.clone()));
             }
-            validate::shape(&root.shape, root.direction, graph)?;
+            validate::shape(&root.shape, root.direction, graph, properties)?;
         }
         validate::cycles(graph)?;
 
@@ -159,7 +166,7 @@ impl Typescript {
             source.push_str("export type ");
             source.push_str(&symbol);
             source.push_str(" = ");
-            source.push_str(&render::shape(shape, &symbols, 0)?);
+            source.push_str(&render::shape_with(shape, &symbols, 0, properties)?);
             source.push_str(";\n\n");
         }
         if source.ends_with("\n\n") {

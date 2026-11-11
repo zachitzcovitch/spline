@@ -23,6 +23,7 @@ impl Schema for Input {
                     shape: Shape::Union(vec![Shape::String, Shape::Null]),
                     presence: Presence::Optional,
                     documentation: vec![],
+                    source_name: None,
                 },
                 Field::required(
                     "input",

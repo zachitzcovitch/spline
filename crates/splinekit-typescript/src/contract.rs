@@ -60,7 +60,8 @@ impl Typescript {
             select(&operation.output, schemas, &mut selected)?;
             select(&operation.error, schemas, &mut selected)?;
         }
-        let mut artifact = self.export_selected(schemas, &[], &selected)?;
+        let mut artifact =
+            self.export_selected(schemas, &[], &selected, crate::names::Properties::Idiomatic)?;
         let occupied: BTreeSet<_> = artifact.symbols.values().map(String::as_str).collect();
         // Promise is a global type dependency and Failure a local type parameter.
         // Reject shadowing instead of generating changed or invalid signatures.

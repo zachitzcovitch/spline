@@ -56,6 +56,9 @@ pub struct Field {
     pub custom_codec: bool,
     /// The Serde codec function for this direction, when the field has one.
     pub codec: Option<syn::ExprPath>,
+    /// The Rust field name (raw-identifier prefix removed); `None` for
+    /// positional fields.
+    pub source: Option<String>,
     pub transparent_member: bool,
 }
 

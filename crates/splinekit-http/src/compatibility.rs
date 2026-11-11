@@ -110,6 +110,7 @@ mod tests {
                         shape: Shape::String,
                         presence: Presence::Optional,
                         documentation: vec![],
+                        source_name: None,
                     }]
                 };
                 Ok(Shape::Object(Object {

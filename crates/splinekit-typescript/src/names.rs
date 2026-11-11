@@ -69,3 +69,50 @@ fn component(name: &Name) -> String {
         )
     }
 }
+
+/// The TypeScript property name for a field: camelCase of its authored
+/// (Rust) name, falling back to the wire name. Names without `_` or `-` are
+/// kept; leading and trailing underscores are preserved.
+pub(crate) fn field(field: &splinekit_schema::Field) -> String {
+    camel(field.source())
+}
+
+pub(crate) fn camel(name: &str) -> String {
+    let start = name.trim_start_matches('_');
+    let core = start.trim_end_matches('_');
+    if !core.contains(['_', '-']) {
+        return name.to_owned();
+    }
+    let mut output = "_".repeat(name.len() - start.len());
+    for (index, word) in core.split(['_', '-']).enumerate() {
+        if index == 0 {
+            output.push_str(word);
+            continue;
+        }
+        let mut characters = word.chars();
+        if let Some(first) = characters.next() {
+            output.extend(first.to_uppercase());
+            output.push_str(characters.as_str());
+        }
+    }
+    output.push_str(&"_".repeat(start.len() - core.len()));
+    output
+}
+
+/// Which property names a TypeScript declaration uses: the wire's, for types
+/// that describe raw JSON, or idiomatic ones, for API exports whose runtime
+/// maps between them and the wire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Properties {
+    Wire,
+    Idiomatic,
+}
+
+impl Properties {
+    pub(crate) fn of(self, field: &splinekit_schema::Field) -> String {
+        match self {
+            Self::Wire => field.name.clone(),
+            Self::Idiomatic => self::field(field),
+        }
+    }
+}

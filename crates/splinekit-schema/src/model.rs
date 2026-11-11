@@ -173,10 +173,15 @@ pub struct Object {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Field {
+    /// The name on the wire.
     pub name: String,
     pub shape: Shape,
     pub presence: Presence,
     pub documentation: Vec<String>,
+    /// The authored Rust field name, when known (the derive records it).
+    /// Exporters derive each language's idiomatic name from it, falling back
+    /// to the wire name.
+    pub source_name: Option<String>,
 }
 
 impl Field {
@@ -186,7 +191,14 @@ impl Field {
             shape,
             presence: Presence::Required,
             documentation: Vec::new(),
+            source_name: None,
         }
+    }
+
+    /// The authored name exporters start from: the Rust name if recorded,
+    /// otherwise the wire name.
+    pub fn source(&self) -> &str {
+        self.source_name.as_deref().unwrap_or(&self.name)
     }
 }
 

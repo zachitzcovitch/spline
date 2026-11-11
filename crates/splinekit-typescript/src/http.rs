@@ -118,7 +118,14 @@ impl Typescript {
                     .arguments
                     .iter()
                     .zip(contract::parameter_names(operation))
-                    .map(|(arg, name)| format!("[{}]: {}", render::string(&arg.name), name))
+                    // Keys are TypeScript property names; encoding maps them to the wire.
+                    .map(|(arg, name)| {
+                        format!(
+                            "[{}]: {}",
+                            render::string(&crate::names::camel(&arg.name)),
+                            name
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join(", ");
                 writeln!(methods, "{indent}[{}]: ({parameters}) => call<{}, {}>({{\n{indent}  method: {method:?}, path: {}, body: {body}, status: {}, paths: [{paths}], queries: [{queries}],\n{indent}  input: {}, output: {}, error: {},\n{indent}}}, {{ {fields} }}),",
@@ -179,8 +186,9 @@ fn wire(shape: &Shape) -> String {
                 .iter()
                 .map(|f| {
                     format!(
-                        "[{}, {}, {}]",
+                        "[{}, {}, {}, {}]",
                         render::string(&f.name),
+                        render::string(&crate::names::field(f)),
                         wire(&f.shape),
                         f.presence == Presence::Optional
                     )

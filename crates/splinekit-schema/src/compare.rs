@@ -43,6 +43,7 @@ fn equivalent(
                 && a.fields.len() == b.fields.len()
                 && a.fields.iter().zip(&b.fields).all(|(a, b)| {
                     a.name == b.name
+                        && a.source_name == b.source_name
                         && a.presence == b.presence
                         && equivalent(&a.shape, &b.shape, graph, visited)
                 })

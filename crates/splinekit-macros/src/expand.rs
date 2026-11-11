@@ -311,10 +311,17 @@ impl Emitter {
             quote_spanned!(ty.span()=> __splinekit_cx.field::<#ty>(#name, #rules)?)
         };
         let docs = attrs::docs(&field.attrs);
+        let source = match &field.source {
+            Some(source) => {
+                quote!(::core::option::Option::Some(::std::string::String::from(#source)))
+            }
+            None => quote!(::core::option::Option::None),
+        };
         Ok(quote!({
             let __splinekit_field = #call;
             __splinekit_field.map(|mut __splinekit_field| {
                 __splinekit_field.documentation = ::std::vec![#(::std::string::String::from(#docs)),*];
+                __splinekit_field.source_name = #source;
                 __splinekit_field
             })
         }))

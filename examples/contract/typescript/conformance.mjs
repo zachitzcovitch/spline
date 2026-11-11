@@ -84,6 +84,28 @@ for (const patch of [
 }
 assert.equal((await answering({ status: "suspended" }).formats(formats)).value.status, "suspended");
 
+// TypeScript uses camelCase names of the Rust fields; the wire keeps Serde's.
+const named = {
+  displayName: "Ada", kind: "admin", nestedItems: [{ itemCount: 1 }],
+  byKey: { snake_key: { itemCount: 2 } }, maybeValue: null,
+};
+let sentBody;
+const spying = createEchoClient(base, {
+  fetch: async (url, init) => { sentBody = JSON.parse(init.body); return fetch(url, init); },
+});
+assert.deepEqual(await spying.named(named), { ok: true, value: named });
+assert.deepEqual(sentBody, {
+  display_name: "Ada", type: "admin", nested_items: [{ item_count: 1 }],
+  by_key: { snake_key: { item_count: 2 } }, maybe_value: null,
+});
+for (const wrong of [{ ...named, display_name: "wire name" }, { ...named, type: "wire name" }, { ...named, extra: 1 }]) {
+  assert.equal((await echo.named(wrong)).error.kind, "encode", JSON.stringify(wrong));
+}
+const { maybeValue: _optional, ...withoutOptional } = named;
+assert.equal((await echo.named(withoutOptional)).ok, true, "an Option input may be omitted");
+const { displayName: _required, ...withoutRequired } = named;
+assert.equal((await echo.named(withoutRequired)).error.kind, "encode", "a required property stays required");
+
 let requests = 0;
 const checked = createUsersClient(base, { fetch: async (...args) => { requests++; return fetch(...args); } });
 assert.equal((await checked.get({ id: "wrong wrapper" })).error.kind, "encode");

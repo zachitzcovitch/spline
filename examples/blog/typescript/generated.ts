@@ -138,17 +138,17 @@ export function createBlogClient(
     | ["literal" | "ref", string]
     | ["array" | "map", __SplinekitWire]
     | ["tuple" | "union", __SplinekitWire[]]
-    | ["object", boolean, [string, __SplinekitWire, boolean][]];
+    | ["object", boolean, [string, string, __SplinekitWire, boolean][]];
   const definitions: { [name: string]: __SplinekitWire } = {
-    ["posts.create.Args (Deserialize)"]: ["object", false, [["input", ["ref", "splinekit_example_blog_contracts.posts.NewPost (Deserialize)"], false]]],
-    ["posts.get.Args (Deserialize)"]: ["object", false, [["id", ["string"], false]]],
-    ["posts.publish.Args (Deserialize)"]: ["object", false, [["id", ["string"], false]]],
-    ["splinekit_example_blog_contracts.posts.NewPost (Deserialize)"]: ["object", false, [["title", ["string"], false], ["body", ["string"], false]]],
-    ["splinekit_example_blog_contracts.posts.Post (Serialize)"]: ["object", false, [["id", ["string"], false], ["author", ["ref", "splinekit_example_blog_contracts.users.User (Serialize)"], false], ["title", ["string"], false], ["body", ["string"], false], ["published", ["boolean"], false]]],
-    ["splinekit_example_blog_contracts.posts.PostError (Serialize)"]: ["union", [["object", false, [["kind", ["literal", "not_found"], false]]], ["object", false, [["kind", ["literal", "forbidden"], false]]], ["object", false, [["kind", ["literal", "invalid_title"], false]]]]],
-    ["splinekit_example_blog_contracts.users.User (Serialize)"]: ["object", false, [["id", ["string"], false], ["displayName", ["string"], false]]],
-    ["splinekit_example_blog_contracts.users.UserError (Serialize)"]: ["union", [["object", false, [["kind", ["literal", "not_found"], false]]]]],
-    ["users.get.Args (Deserialize)"]: ["object", false, [["id", ["string"], false]]],
+    ["posts.create.Args (Deserialize)"]: ["object", false, [["input", "input", ["ref", "splinekit_example_blog_contracts.posts.NewPost (Deserialize)"], false]]],
+    ["posts.get.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
+    ["posts.publish.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
+    ["splinekit_example_blog_contracts.posts.NewPost (Deserialize)"]: ["object", false, [["title", "title", ["string"], false], ["body", "body", ["string"], false]]],
+    ["splinekit_example_blog_contracts.posts.Post (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["author", "author", ["ref", "splinekit_example_blog_contracts.users.User (Serialize)"], false], ["title", "title", ["string"], false], ["body", "body", ["string"], false], ["published", "published", ["boolean"], false]]],
+    ["splinekit_example_blog_contracts.posts.PostError (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "not_found"], false]]], ["object", false, [["kind", "kind", ["literal", "forbidden"], false]]], ["object", false, [["kind", "kind", ["literal", "invalid_title"], false]]]]],
+    ["splinekit_example_blog_contracts.users.User (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["displayName", "displayName", ["string"], false]]],
+    ["splinekit_example_blog_contracts.users.UserError (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "not_found"], false]]]]],
+    ["users.get.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
   };
   const object = (value: unknown): value is { [name: string]: unknown } =>
     value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
@@ -223,7 +223,7 @@ export function createBlogClient(
         && schema[1].every((s, i) => child(value[i], s));
       case "union": return schema[1].some(s => child(value, s));
       case "object": return object(value)
-        && schema[2].every(([name, type, optional]) => owns(value, name) ? child(value[name], type) : optional)
+        && schema[2].every(([name, , type, optional]) => owns(value, name) ? child(value[name], type) : optional)
         && (schema[1] || globalThis.Object.keys(value).every(name => schema[2].some(f => f[0] === name)));
     }
   };
@@ -235,11 +235,13 @@ export function createBlogClient(
     return object(a) && object(b) && globalThis.Object.keys(a).length === globalThis.Object.keys(b).length
       && globalThis.Object.keys(a).every(key => owns(b, key) && same(a[key], b[key]));
   };
-  // Undefined is a failure sentinel: parsed JSON cannot contain it. Projection
-  // prevents extra fields from leaking into returned values or strict Rust DTOs.
-  const project = (value: unknown, schema: __SplinekitWire, depth = 0): unknown => {
+  // Undefined is a failure sentinel: parsed JSON cannot contain it. Decoding
+  // projects wire names onto TypeScript property names and keeps extra fields
+  // from leaking into returned values or strict Rust DTOs; encoding maps
+  // property names back to the wire and refuses unknown properties.
+  const walk = (value: unknown, schema: __SplinekitWire, encoding: boolean, depth = 0): unknown => {
     if (depth >= 256) return undefined;
-    const child = (value: unknown, schema: __SplinekitWire): unknown => project(value, schema, depth + 1);
+    const child = (value: unknown, schema: __SplinekitWire): unknown => walk(value, schema, encoding, depth + 1);
     switch (schema[0]) {
       case "ref": {
         const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
@@ -247,19 +249,21 @@ export function createBlogClient(
       }
       case "object": {
         if (!object(value)) return undefined;
-        const known = new globalThis.Set(schema[2].map(f => f[0]));
-        if (responsePolicy === "strict" && !schema[1]
+        const [from, to] = encoding ? [1, 0] as const : [0, 1] as const;
+        const known = new globalThis.Set(schema[2].map(f => f[from]));
+        const written = new globalThis.Set(schema[2].map(f => f[to]));
+        if ((encoding || responsePolicy === "strict") && !schema[1]
             && globalThis.Object.keys(value).some(name => !known.has(name))) return undefined;
         const entries: [string, unknown][] = schema[1]
-          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name)) : [];
-        for (const [name, type, optional] of schema[2]) {
-          if (!owns(value, name)) {
-            if (!optional) return undefined;
+          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name) && !written.has(name)) : [];
+        for (const field of schema[2]) {
+          if (!owns(value, field[from])) {
+            if (!field[3]) return undefined;
             continue;
           }
-          const decoded = child(value[name], type);
-          if (decoded === undefined) return undefined;
-          entries.push([name, decoded]);
+          const result = child(value[field[from]], field[2]);
+          if (result === undefined) return undefined;
+          entries.push([field[to], result]);
         }
         // fromEntries creates own data properties even for names like __proto__.
         return globalThis.Object.fromEntries(entries);
@@ -298,6 +302,7 @@ export function createBlogClient(
       default: return valid(value, schema, depth) ? value : undefined;
     }
   };
+  const project = (value: unknown, schema: __SplinekitWire): unknown => walk(value, schema, false);
   type __SplinekitPlan = {
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string; body: string | null; status: number;
@@ -313,10 +318,11 @@ export function createBlogClient(
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
-      // Validate the JSON representation, including omitted undefined properties.
-      const encoded = globalThis.JSON.stringify(argumentsObject);
-      const input: unknown = globalThis.JSON.parse(encoded);
-      if (!object(input) || !valid(input, plan.input)) {
+      // Encode the JSON representation, including omitted undefined properties,
+      // onto wire names while validating it.
+      const normalized: unknown = globalThis.JSON.parse(globalThis.JSON.stringify(argumentsObject));
+      const input = walk(normalized, plan.input, true);
+      if (!object(input)) {
         return { ok: false, error: { kind: "encode", message: "arguments do not match the input schema" } };
       }
       let path = plan.path;

@@ -113,6 +113,7 @@ impl Context<'_> {
                 Presence::Required
             },
             documentation: Vec::new(),
+            source_name: None,
         }
     }
 }

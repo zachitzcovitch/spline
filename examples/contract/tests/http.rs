@@ -39,6 +39,27 @@ pub struct EchoValue {
     pub note: Option<String>,
 }
 
+/// Snake-case wire names and an explicit rename: TypeScript sees camelCase
+/// names of the Rust fields, the wire keeps Serde's names.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
+#[splinekit(name = "conformance.Named")]
+#[serde(deny_unknown_fields)]
+pub struct Named {
+    pub display_name: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub nested_items: Vec<NamedItem>,
+    pub by_key: std::collections::BTreeMap<String, NamedItem>,
+    pub maybe_value: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
+#[splinekit(name = "conformance.NamedItem")]
+#[serde(deny_unknown_fields)]
+pub struct NamedItem {
+    pub item_count: i32,
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
 #[splinekit(name = "conformance.Status")]
 #[serde(rename_all = "snake_case")]
@@ -101,6 +122,10 @@ pub trait Echo {
     #[mutation]
     #[http(post = "/formats", body = "input")]
     async fn formats(&self, input: Formats) -> Result<Formats, ()>;
+
+    #[mutation]
+    #[http(post = "/named", body = "input")]
+    async fn named(&self, input: Named) -> Result<Named, ()>;
 }
 pub type Empty = ();
 struct EchoService;
@@ -137,6 +162,10 @@ impl Echo for EchoService {
     }
 
     async fn formats(&self, input: Formats) -> Result<Formats, ()> {
+        Ok(input)
+    }
+
+    async fn named(&self, input: Named) -> Result<Named, ()> {
         Ok(input)
     }
 }

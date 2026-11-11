@@ -52,6 +52,30 @@ errors. It omits generated dispatch argument wrappers. The full directional grap
 and schema validation rules remain available to the runtime. This permits clean
 names without weakening request validation or response projection.
 
+## Property names
+
+The wire keeps one naming convention, whatever Serde produces; each language sees
+its own idiom. Contract, application and HTTP client exports name properties in
+camelCase, derived from the Rust field name:
+
+| Rust field | Wire (Serde) | TypeScript |
+| --- | --- | --- |
+| `display_name: String` | `display_name` | `displayName` |
+| `#[serde(rename = "type")] kind: String` | `type` | `kind` |
+| `display_name` under `rename_all = "camelCase"` | `displayName` | `displayName` |
+| `r#ref: String` | `ref` | `ref` |
+
+The generated HTTP client maps between them while it validates: arguments go
+out under the wire names, responses come back under the TypeScript names, and an
+argument object using a wire name or an unknown property is refused. Map keys and
+enum values are data and are never renamed. Two fields whose TypeScript names
+would match are an export error.
+
+`Typescript::export` is different: it describes the JSON itself, for code that
+reads the wire directly, so its types keep the wire names. Hand-written schemas
+without a recorded Rust name fall back to the wire name. OpenAPI always describes
+the wire.
+
 Names are deterministic for the same exported graph. Introducing an opposite
 direction with a differing shape can change `User` to `UserInput`/`UserOutput`;
 that is an intentional distinction. Adding a type with the same short name produces

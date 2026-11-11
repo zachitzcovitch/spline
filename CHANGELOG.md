@@ -68,6 +68,15 @@ release yet; the workspace version is a development version.
   adds arrive as `Open::Unknown(String)` (Rust) or the plain string (TypeScript
   `E | (string & {})`) instead of a protocol failure, and round-trip unchanged.
   New `Shape::Open`; OpenAPI lists the known values alongside any string.
+- Idiomatic TypeScript property names: contract, application and HTTP client
+  exports use camelCase of the Rust field name (`display_name` → `displayName`,
+  `#[serde(rename = "type")] kind` → `kind`) while the wire keeps Serde's names.
+  The derive records each field's Rust name (`Field::source_name`); the HTTP
+  runtime renames keys in the same pass that validates arguments and decodes
+  responses, refusing wire names and unknown properties in arguments. Map keys
+  and enum values are never renamed; fields that would share a TypeScript name
+  are an export error. `Typescript::export` (types for raw JSON) keeps wire
+  names.
 
 ### Maintenance
 

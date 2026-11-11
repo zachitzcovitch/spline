@@ -104,18 +104,18 @@ export function createEvolutionV1Client(
     | ["literal" | "ref", string]
     | ["array" | "map", __SplinekitWire]
     | ["tuple" | "union", __SplinekitWire[]]
-    | ["object", boolean, [string, __SplinekitWire, boolean][]];
+    | ["object", boolean, [string, string, __SplinekitWire, boolean][]];
   const definitions: { [name: string]: __SplinekitWire } = {
-    ["evolution.Create (Deserialize)"]: ["object", false, [["displayName", ["string"], false], ["state", ["ref", "evolution.State (Deserialize)"], false]]],
-    ["evolution.Error (Serialize)"]: ["union", [["object", false, [["kind", ["literal", "missing"], false], ["details", ["object", false, [["message", ["string"], false]]], false]]], ["object", false, [["kind", ["literal", "rejected"], false]]]]],
-    ["evolution.Event (Serialize)"]: ["union", [["object", false, [["item", ["object", false, [["id", ["string"], false]]], false]]], ["object", false, [["other", ["object", false, [["id", ["string"], false]]], false]]]]],
-    ["evolution.Profile (Serialize)"]: ["object", false, [["displayName", ["string"], false]]],
+    ["evolution.Create (Deserialize)"]: ["object", false, [["displayName", "displayName", ["string"], false], ["state", "state", ["ref", "evolution.State (Deserialize)"], false]]],
+    ["evolution.Error (Serialize)"]: ["union", [["object", false, [["kind", "kind", ["literal", "missing"], false], ["details", "details", ["object", false, [["message", "message", ["string"], false]]], false]]], ["object", false, [["kind", "kind", ["literal", "rejected"], false]]]]],
+    ["evolution.Event (Serialize)"]: ["union", [["object", false, [["item", "item", ["object", false, [["id", "id", ["string"], false]]], false]]], ["object", false, [["other", "other", ["object", false, [["id", "id", ["string"], false]]], false]]]]],
+    ["evolution.Profile (Serialize)"]: ["object", false, [["displayName", "displayName", ["string"], false]]],
     ["evolution.State (Deserialize)"]: ["union", [["literal", "active"], ["literal", "inactive"]]],
     ["evolution.State (Serialize)"]: ["union", [["literal", "active"], ["literal", "inactive"]]],
-    ["evolution.User (Serialize)"]: ["object", false, [["id", ["string"], false], ["profile", ["ref", "evolution.Profile (Serialize)"], false], ["history", ["array", ["ref", "evolution.Profile (Serialize)"]], false], ["profiles", ["map", ["ref", "evolution.Profile (Serialize)"]], false], ["counters", ["map", ["integer", false, 32]], false], ["nickname", ["union", [["string"], ["null"]]], false], ["state", ["ref", "evolution.State (Serialize)"], false]]],
-    ["evolution.users.create.Args (Deserialize)"]: ["object", false, [["input", ["ref", "evolution.Create (Deserialize)"], false]]],
-    ["evolution.users.event.Args (Deserialize)"]: ["object", false, [["id", ["string"], false]]],
-    ["evolution.users.get.Args (Deserialize)"]: ["object", false, [["id", ["string"], false]]],
+    ["evolution.User (Serialize)"]: ["object", false, [["id", "id", ["string"], false], ["profile", "profile", ["ref", "evolution.Profile (Serialize)"], false], ["history", "history", ["array", ["ref", "evolution.Profile (Serialize)"]], false], ["profiles", "profiles", ["map", ["ref", "evolution.Profile (Serialize)"]], false], ["counters", "counters", ["map", ["integer", false, 32]], false], ["nickname", "nickname", ["union", [["string"], ["null"]]], false], ["state", "state", ["ref", "evolution.State (Serialize)"], false]]],
+    ["evolution.users.create.Args (Deserialize)"]: ["object", false, [["input", "input", ["ref", "evolution.Create (Deserialize)"], false]]],
+    ["evolution.users.event.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
+    ["evolution.users.get.Args (Deserialize)"]: ["object", false, [["id", "id", ["string"], false]]],
   };
   const object = (value: unknown): value is { [name: string]: unknown } =>
     value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
@@ -190,7 +190,7 @@ export function createEvolutionV1Client(
         && schema[1].every((s, i) => child(value[i], s));
       case "union": return schema[1].some(s => child(value, s));
       case "object": return object(value)
-        && schema[2].every(([name, type, optional]) => owns(value, name) ? child(value[name], type) : optional)
+        && schema[2].every(([name, , type, optional]) => owns(value, name) ? child(value[name], type) : optional)
         && (schema[1] || globalThis.Object.keys(value).every(name => schema[2].some(f => f[0] === name)));
     }
   };
@@ -202,11 +202,13 @@ export function createEvolutionV1Client(
     return object(a) && object(b) && globalThis.Object.keys(a).length === globalThis.Object.keys(b).length
       && globalThis.Object.keys(a).every(key => owns(b, key) && same(a[key], b[key]));
   };
-  // Undefined is a failure sentinel: parsed JSON cannot contain it. Projection
-  // prevents extra fields from leaking into returned values or strict Rust DTOs.
-  const project = (value: unknown, schema: __SplinekitWire, depth = 0): unknown => {
+  // Undefined is a failure sentinel: parsed JSON cannot contain it. Decoding
+  // projects wire names onto TypeScript property names and keeps extra fields
+  // from leaking into returned values or strict Rust DTOs; encoding maps
+  // property names back to the wire and refuses unknown properties.
+  const walk = (value: unknown, schema: __SplinekitWire, encoding: boolean, depth = 0): unknown => {
     if (depth >= 256) return undefined;
-    const child = (value: unknown, schema: __SplinekitWire): unknown => project(value, schema, depth + 1);
+    const child = (value: unknown, schema: __SplinekitWire): unknown => walk(value, schema, encoding, depth + 1);
     switch (schema[0]) {
       case "ref": {
         const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
@@ -214,19 +216,21 @@ export function createEvolutionV1Client(
       }
       case "object": {
         if (!object(value)) return undefined;
-        const known = new globalThis.Set(schema[2].map(f => f[0]));
-        if (responsePolicy === "strict" && !schema[1]
+        const [from, to] = encoding ? [1, 0] as const : [0, 1] as const;
+        const known = new globalThis.Set(schema[2].map(f => f[from]));
+        const written = new globalThis.Set(schema[2].map(f => f[to]));
+        if ((encoding || responsePolicy === "strict") && !schema[1]
             && globalThis.Object.keys(value).some(name => !known.has(name))) return undefined;
         const entries: [string, unknown][] = schema[1]
-          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name)) : [];
-        for (const [name, type, optional] of schema[2]) {
-          if (!owns(value, name)) {
-            if (!optional) return undefined;
+          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name) && !written.has(name)) : [];
+        for (const field of schema[2]) {
+          if (!owns(value, field[from])) {
+            if (!field[3]) return undefined;
             continue;
           }
-          const decoded = child(value[name], type);
-          if (decoded === undefined) return undefined;
-          entries.push([name, decoded]);
+          const result = child(value[field[from]], field[2]);
+          if (result === undefined) return undefined;
+          entries.push([field[to], result]);
         }
         // fromEntries creates own data properties even for names like __proto__.
         return globalThis.Object.fromEntries(entries);
@@ -265,6 +269,7 @@ export function createEvolutionV1Client(
       default: return valid(value, schema, depth) ? value : undefined;
     }
   };
+  const project = (value: unknown, schema: __SplinekitWire): unknown => walk(value, schema, false);
   type __SplinekitPlan = {
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     path: string; body: string | null; status: number;
@@ -280,10 +285,11 @@ export function createEvolutionV1Client(
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
-      // Validate the JSON representation, including omitted undefined properties.
-      const encoded = globalThis.JSON.stringify(argumentsObject);
-      const input: unknown = globalThis.JSON.parse(encoded);
-      if (!object(input) || !valid(input, plan.input)) {
+      // Encode the JSON representation, including omitted undefined properties,
+      // onto wire names while validating it.
+      const normalized: unknown = globalThis.JSON.parse(globalThis.JSON.stringify(argumentsObject));
+      const input = walk(normalized, plan.input, true);
+      if (!object(input)) {
         return { ok: false, error: { kind: "encode", message: "arguments do not match the input schema" } };
       }
       let path = plan.path;

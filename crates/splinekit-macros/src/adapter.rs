@@ -84,6 +84,10 @@ fn field(field: &ast::Field<'_>, mode: Mode) -> Field {
             Mode::Serialize => field.attrs.serialize_with().cloned(),
             Mode::Deserialize => field.attrs.deserialize_with().cloned(),
         },
+        source: match &field.member {
+            syn::Member::Named(ident) => Some(syn::ext::IdentExt::unraw(ident).to_string()),
+            syn::Member::Unnamed(_) => None,
+        },
         transparent_member: field.attrs.transparent(),
     }
 }
