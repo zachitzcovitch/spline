@@ -16,13 +16,15 @@ pub fn shape(
         Shape::String | Shape::Formatted(_) => "string".into(),
         Shape::Integer { .. } | Shape::Number { .. } => "number".into(),
         Shape::Literal(value) => string(value),
+        // `string & {}` keeps the known values as editor suggestions.
+        Shape::Open(known) => format!("{} | (string & {{}})", shape(known, symbols, indent)?),
         Shape::Ref(id) => symbols
             .get(id)
             .ok_or_else(|| Error::MissingReference(id.clone()))?
             .clone(),
         Shape::Array(element) => {
             let rendered = shape(element, symbols, indent)?;
-            if matches!(element.as_ref(), Shape::Union(_)) {
+            if matches!(element.as_ref(), Shape::Union(_) | Shape::Open(_)) {
                 format!("({rendered})[]")
             } else {
                 format!("{rendered}[]")

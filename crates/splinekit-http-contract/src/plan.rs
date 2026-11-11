@@ -189,7 +189,9 @@ fn scalar(
             visited.remove(id);
             result
         }
-        Shape::String | Shape::Formatted(_) | Shape::Literal(_) => (Some(Scalar::String), false),
+        Shape::String | Shape::Formatted(_) | Shape::Literal(_) | Shape::Open(_) => {
+            (Some(Scalar::String), false)
+        }
         Shape::Boolean => (Some(Scalar::Boolean), false),
         Shape::Integer { signed, bits } => (
             Some(Scalar::Integer {

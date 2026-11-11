@@ -110,7 +110,9 @@ pub fn shape(value: &Shape, direction: Direction, graph: &Graph) -> Result<(), E
                 return Err(Error::MissingReference(id.clone()));
             }
         }
-        Shape::Array(element) | Shape::Map(element) => shape(element, direction, graph)?,
+        Shape::Array(element) | Shape::Map(element) | Shape::Open(element) => {
+            shape(element, direction, graph)?
+        }
         Shape::Tuple(elements) | Shape::Union(elements) => {
             if matches!(value, Shape::Union(_)) && elements.is_empty() {
                 return Err(Error::InvalidShape("cannot export an empty union".into()));
@@ -161,6 +163,7 @@ pub fn cycles(graph: &Graph) -> Result<(), Error> {
             Shape::Ref(id) => {
                 edges.insert(id.clone());
             }
+            Shape::Open(known) => unguarded(known, edges),
             Shape::Union(values) => {
                 for value in values {
                     unguarded(value, edges);

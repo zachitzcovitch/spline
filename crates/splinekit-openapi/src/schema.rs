@@ -110,6 +110,7 @@ impl<'a> Schemas<'a> {
             Shape::Boolean => json!({"type":"boolean"}),
             Shape::String => json!({"type":"string"}),
             Shape::Formatted(format) => formatted(*format),
+            Shape::Open(known) => json!({"anyOf":[self.render(known)?, {"type":"string"}]}),
             Shape::Literal(value) => json!({"type":"string","const":value}),
             Shape::Integer { signed, bits } => {
                 let Some((min, max)) = splinekit_schema::integer_bounds(*signed, *bits) else {
@@ -250,7 +251,9 @@ fn select(
                 select(&definition.shape, direction, graph, selected)?;
             }
         }
-        Shape::Array(value) | Shape::Map(value) => select(value, direction, graph, selected)?,
+        Shape::Array(value) | Shape::Map(value) | Shape::Open(value) => {
+            select(value, direction, graph, selected)?
+        }
         Shape::Tuple(values) | Shape::Union(values) => {
             for value in values {
                 select(value, direction, graph, selected)?;
@@ -270,6 +273,7 @@ fn cycles(graph: &Graph, selected: &BTreeSet<DefinitionId>) -> Result<()> {
     fn edges(shape: &Shape, children: &mut Vec<DefinitionId>) {
         match shape {
             Shape::Ref(id) => children.push(id.clone()),
+            Shape::Open(known) => edges(known, children),
             Shape::Union(shapes) => {
                 for shape in shapes {
                     edges(shape, children);

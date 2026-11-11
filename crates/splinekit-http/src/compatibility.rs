@@ -79,7 +79,12 @@ fn compatible(
         (Shape::Tuple(a), Shape::Tuple(b)) => {
             a.len() == b.len() && a.iter().zip(b).all(|(a, b)| check(a, b))
         }
-        (Shape::Literal(_) | Shape::Formatted(_), Shape::String) => true,
+        (Shape::Literal(_) | Shape::Formatted(_) | Shape::Open(_), Shape::String) => true,
+        // An open consumer accepts every string a producer can send.
+        (
+            Shape::String | Shape::Literal(_) | Shape::Formatted(_) | Shape::Open(_),
+            Shape::Open(_),
+        ) => true,
         _ => source == target,
     }
 }

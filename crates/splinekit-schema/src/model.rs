@@ -114,6 +114,10 @@ pub enum Shape {
         bits: u8,
     },
     Literal(String),
+    /// One of the inner shape's known string values, or any other string: a
+    /// forward-compatible enum. The inner shape must consist of string
+    /// literals (directly, in a union, or through references).
+    Open(Box<Shape>),
     Array(Box<Shape>),
     Tuple(Vec<Shape>),
     Map(Box<Shape>),

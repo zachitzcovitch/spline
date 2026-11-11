@@ -95,6 +95,14 @@ years 0000–9999; chrono writes other years with a sign, which the check refuse
 splinekit = { version = "0.1", features = ["http", "uuid", "chrono"] }
 ```
 
+## Open enums
+
+`splinekit::Open<E>` wraps a string enum so that values a newer server adds pass
+through instead of failing: `Open::Known(Status::Active)` or
+`Open::Unknown("paused")`. TypeScript sees `Status | (string & {})`, which keeps
+the known values as editor suggestions while accepting any string. See
+[contract evolution](contract-evolution.md#open-enums).
+
 ## Declaring a type's wire form
 
 A type whose Serde form isn't its Rust shape names its wire description with

@@ -247,7 +247,39 @@ fn validate_shape(
         {
             return Err(Error::Unsupported(format!("{bits}-bit integer string")));
         }
+        Shape::Open(inner) => {
+            validate_shape(inner, direction, definitions)?;
+            if !string_values(inner, definitions, 0) {
+                return Err(Error::InvalidShape(
+                    "an open enum's known values must be string literals".into(),
+                ));
+            }
+        }
         _ => {}
     }
     Ok(())
+}
+
+/// Whether every value of `shape` is a string literal, following references.
+fn string_values(
+    shape: &Shape,
+    definitions: &BTreeMap<DefinitionId, Definition>,
+    depth: usize,
+) -> bool {
+    if depth > 64 {
+        return false;
+    }
+    match shape {
+        Shape::Literal(_) => true,
+        Shape::Union(values) => {
+            !values.is_empty()
+                && values
+                    .iter()
+                    .all(|value| string_values(value, definitions, depth + 1))
+        }
+        Shape::Ref(id) => definitions
+            .get(id)
+            .is_some_and(|definition| string_values(&definition.shape, definitions, depth + 1)),
+        _ => false,
+    }
 }

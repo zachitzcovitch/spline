@@ -318,3 +318,40 @@ fn empty_exports_are_still_modules() {
         .source
         .ends_with("export {};\n"));
 }
+
+#[test]
+fn open_enums_keep_their_known_values_as_suggestions() {
+    #[derive(splinekit::Schema)]
+    #[splinekit(name = "test.Status")]
+    #[serde(rename_all = "snake_case")]
+    #[allow(dead_code)]
+    enum Status {
+        Active,
+        PastDue,
+    }
+    let mut registry = Registry::new();
+    let current = registry
+        .register::<splinekit::Open<Status>>(Direction::Serialize)
+        .unwrap();
+    let history = registry
+        .register::<Vec<splinekit::Open<Status>>>(Direction::Serialize)
+        .unwrap();
+    let graph = registry.finish().unwrap();
+    let source = Typescript::new()
+        .export(
+            &graph,
+            &[
+                Root::new("Current", Direction::Serialize, current),
+                Root::new("History", Direction::Serialize, history),
+            ],
+        )
+        .unwrap()
+        .source;
+    for expected in [
+        "export type Current = Status | (string & {});",
+        "export type History = (Status | (string & {}))[];",
+        "export type Status = \"active\" | \"past_due\";",
+    ] {
+        assert!(source.contains(expected), "missing {expected}:\n{source}");
+    }
+}

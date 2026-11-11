@@ -36,7 +36,7 @@ pub fn matches(graph: &Graph, shape: &Shape, value: &Value) -> bool {
             Shape::Null => value.is_null(),
             Shape::Boolean => value.is_boolean(),
             // Lexical formats are checked by the schema crate's oracle.
-            Shape::String | Shape::Formatted(_) => value.is_string(),
+            Shape::String | Shape::Formatted(_) | Shape::Open(_) => value.is_string(),
             Shape::Number { bits } => value
                 .as_f64()
                 .is_some_and(|n| n.is_finite() && (*bits == 64 || n.abs() <= f64::from(f32::MAX))),

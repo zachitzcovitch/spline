@@ -424,3 +424,37 @@ fn formatted_strings_floats_and_safe_integers_keep_their_constraints() {
         ]),
     );
 }
+
+#[test]
+fn open_enums_list_their_known_values_and_accept_any_string() {
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(name = "test.Status")]
+    #[serde(rename_all = "snake_case")]
+    #[allow(dead_code)]
+    enum Status {
+        Active,
+        PastDue,
+    }
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(name = "test.Plan")]
+    #[allow(dead_code)]
+    struct Plan {
+        status: splinekit::Open<Status>,
+    }
+    let doc = OpenApi::new("Open", "1")
+        .export_contract(&binding::<Plan>())
+        .unwrap();
+    assert_eq!(
+        doc.as_json()["components"]["schemas"]["Plan"]["properties"]["status"],
+        json!({"anyOf":[{"$ref":"#/components/schemas/Status"},{"type":"string"}]})
+    );
+    independent(
+        &doc,
+        json!([
+            {"pointer":"#/components/schemas/Plan","value":{"status":"active"},"valid":true},
+            {"pointer":"#/components/schemas/Plan","value":{"status":"paused"},"valid":true},
+            {"pointer":"#/components/schemas/Plan","value":{"status":7},"valid":false},
+            {"pointer":"#/components/schemas/Status","value":"paused","valid":false}
+        ]),
+    );
+}

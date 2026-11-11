@@ -344,7 +344,7 @@ pub fn matches(graph: &Graph, shape: &Shape, value: &Value) -> bool {
         match shape {
             Shape::Null => value.is_null(),
             Shape::Boolean => value.is_boolean(),
-            Shape::String => value.is_string(),
+            Shape::String | Shape::Open(_) => value.is_string(),
             Shape::Formatted(format) => value.as_str().is_some_and(|text| lexical(*format, text)),
             Shape::Number { bits } => value
                 .as_f64()

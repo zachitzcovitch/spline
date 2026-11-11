@@ -156,6 +156,8 @@ fn wire(shape: &Shape) -> String {
             }
         },
         Shape::Number { bits } => format!("[\"number\", {bits}]"),
+        // Any string: unknown values pass through to the caller.
+        Shape::Open(_) => "[\"string\"]".into(),
         Shape::Boolean => "[\"boolean\"]".into(),
         Shape::Integer { signed, bits } => format!("[\"integer\", {signed}, {bits}]"),
         Shape::Literal(value) => format!("[\"literal\", {}]", render::string(value)),

@@ -39,6 +39,14 @@ pub struct EchoValue {
     pub note: Option<String>,
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
+#[splinekit(name = "conformance.Status")]
+#[serde(rename_all = "snake_case")]
+pub enum EchoStatus {
+    Active,
+    PastDue,
+}
+
 /// Every formatted wire value, round-tripped through both generated clients.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
 #[splinekit(name = "conformance.Formats")]
@@ -63,6 +71,7 @@ pub struct Formats {
     pub total: u64,
     #[serde(with = "splinekit::codec::safe_number::option")]
     pub limit: Option<i64>,
+    pub status: splinekit::Open<EchoStatus>,
 }
 
 #[splinekit::contract(namespace = "echo", module = "echo")]
@@ -182,12 +191,14 @@ async fn rust_and_generated_typescript_clients_call_the_same_server() {
         ratio: 0.25,
         total: u64::MAX,
         limit: None,
+        status: splinekit::Open::Unknown("paused".into()),
     };
     let echo_client = echo::http::Client::new(&server.base).unwrap();
     let echoed = echo_client.formats(formats).await.unwrap();
     assert_eq!(echoed.big, "18446744073709551615");
     assert_eq!(echoed.safe, -9_007_199_254_740_991);
     assert_eq!((echoed.total, echoed.limit), (u64::MAX, None));
+    assert_eq!(echoed.status, splinekit::Open::Unknown("paused".into()));
 
     let native = tokio::time::timeout(
         Duration::from_secs(20),

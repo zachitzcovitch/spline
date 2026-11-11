@@ -3,8 +3,10 @@
 extern crate self as splinekit;
 
 pub mod codec;
+mod open;
 mod patch;
 
+pub use open::Open;
 pub use patch::Patch;
 pub use splinekit_contract as contract;
 pub use splinekit_macros::{api, contract, Schema};

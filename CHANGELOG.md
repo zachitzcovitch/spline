@@ -64,6 +64,10 @@ release yet; the workspace version is a development version.
   Decimal strings accept only canonical digits; safe numbers refuse values
   JavaScript would round, in both directions. Bare wide integers and other
   codecs without a schema now point to these codecs in their errors.
+- `splinekit::Open<E>`, a forward-compatible string enum: values a newer server
+  adds arrive as `Open::Unknown(String)` (Rust) or the plain string (TypeScript
+  `E | (string & {})`) instead of a protocol failure, and round-trip unchanged.
+  New `Shape::Open`; OpenAPI lists the known values alongside any string.
 
 ### Maintenance
 

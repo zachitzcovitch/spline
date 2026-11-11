@@ -225,7 +225,9 @@ fn select(
                 select(&definition.shape, graph, selected)?;
             }
         }
-        Shape::Array(child) | Shape::Map(child) => select(child, graph, selected)?,
+        Shape::Array(child) | Shape::Map(child) | Shape::Open(child) => {
+            select(child, graph, selected)?
+        }
         Shape::Tuple(children) | Shape::Union(children) => {
             for child in children {
                 select(child, graph, selected)?;

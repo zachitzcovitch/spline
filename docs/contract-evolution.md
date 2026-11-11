@@ -14,7 +14,8 @@ Generated HTTP clients now default to **compatible response decoding**:
   data, not an unknown DTO field.
 - Preserve explicitly open objects according to their schema.
 - Keep generated enums closed: unknown variants are protocol failures, including
-  newly emitted application-error variants.
+  newly emitted application-error variants. A string enum wrapped in
+  `splinekit::Open<E>` is the opt-in exception (below).
 
 This applies to success bodies and application-error payloads. Request validation
 continues to follow the authored input schema and Serde behavior. Receiver
@@ -103,8 +104,18 @@ untyped application error: it becomes `Protocol` / `kind: "protocol"`.
 Known variants with added object fields can evolve through projection. If multiple
 union alternatives match but produce different projected values, both clients
 reject the ambiguity. Equivalent alternatives, such as repeated null branches in
-nested Options, are allowed. An opt-in unknown-variant representation would need
-an explicit public type and is separate future work.
+nested Options, are allowed.
+
+### Open enums
+
+For a string enum that a server may extend, such as a status, wrap the field in
+`splinekit::Open<E>`. An older client then receives a value it doesn't know as
+`Open::Unknown("paused")` in Rust, or as the plain string in TypeScript
+(`Status | (string & {})`), instead of a protocol failure, and sends it back
+unchanged. `E` must be a unit-only enum that Serde writes as strings; anything
+else is a registration error. OpenAPI lists the known values alongside any
+string. Use it where a client can sensibly handle "something new"; keep closed
+enums where an unknown value must stop the client.
 
 ## Versioned evidence
 

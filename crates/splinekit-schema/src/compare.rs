@@ -29,9 +29,9 @@ fn equivalent(
                 && (!visited.insert((a.clone(), b.clone()))
                     || equivalent(&left.shape, &right.shape, graph, visited))
         }
-        (Shape::Array(a), Shape::Array(b)) | (Shape::Map(a), Shape::Map(b)) => {
-            equivalent(a, b, graph, visited)
-        }
+        (Shape::Array(a), Shape::Array(b))
+        | (Shape::Map(a), Shape::Map(b))
+        | (Shape::Open(a), Shape::Open(b)) => equivalent(a, b, graph, visited),
         (Shape::Tuple(a), Shape::Tuple(b)) | (Shape::Union(a), Shape::Union(b)) => {
             a.len() == b.len()
                 && a.iter()

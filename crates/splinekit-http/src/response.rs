@@ -47,7 +47,9 @@ fn project_at(
         Shape::Null if value.is_null() => Ok(Value::Null),
         Shape::Boolean if value.is_boolean() => Ok(value.clone()),
         // Formats are checked by Serde when the Rust DTO decodes.
-        Shape::String | Shape::Formatted(_) if value.is_string() => Ok(value.clone()),
+        Shape::String | Shape::Formatted(_) | Shape::Open(_) if value.is_string() => {
+            Ok(value.clone())
+        }
         Shape::Number { .. } if value.is_number() => Ok(value.clone()),
         Shape::Literal(literal) if value.as_str() == Some(literal.as_str()) => Ok(value.clone()),
         Shape::Integer { signed, bits } => {
