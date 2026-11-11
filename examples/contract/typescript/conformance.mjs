@@ -53,7 +53,14 @@ const formats = {
 };
 assert.deepEqual(await echo.formats(formats), { ok: true, value: formats });
 for (const [field, value] of [
-  ["id", "0191f1b2"], ["at", "2026-11-11 05:06"], ["day", "2026-02-30"], ["link", "relative"],
+  ["at", "2026-11-11T05:06:53.123456789Z"], ["at", "2016-12-31T23:59:60+05:30"], ["day", "2024-02-29"],
+]) {
+  assert.equal((await echo.formats({ ...formats, [field]: value })).ok, true, `${field}=${value}`);
+}
+for (const [field, value] of [
+  ["id", "0191f1b2"], ["at", "2026-11-11 05:06"], ["at", "2026-02-30T00:00:00Z"], ["at", "2026-11-11T24:00:00Z"],
+  ["at", "2026-11-11T05:06:53+24:00"], ["day", "2026-02-30"], ["day", "2026-02-29"], ["day", "2026-13-01"],
+  ["link", "relative"],
   ["amount", "1e5"], ["amount", "01.5"], ["big", "18446744073709551616"], ["big", "-1"],
   ["safe", 9007199254740992], ["ratio", Infinity],
 ]) {

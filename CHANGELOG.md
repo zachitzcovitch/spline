@@ -51,6 +51,12 @@ release yet; the workspace version is a development version.
   and bounds; the generated TypeScript client checks them in arguments and
   responses. `splinekit::wire` descriptions let a type declare these forms through
   `#[splinekit(schema = ...)]`. See the new [wire types](docs/wire-types.md) guide.
+- Optional `uuid`, `chrono`, `url` and `rust_decimal` features describe
+  `uuid::Uuid`, `DateTime<Utc>`/`DateTime<FixedOffset>`, `NaiveDate`, `url::Url`
+  and `rust_decimal::Decimal` by their Serde forms, checked against real
+  serialization. Generated TypeScript checks dates by calendar (leap years, leap
+  seconds, offsets) rather than `Date.parse`, which differs between engines and
+  accepts impossible dates.
 
 ### Maintenance
 

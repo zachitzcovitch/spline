@@ -43,6 +43,28 @@ as formatted strings (`Shape::Formatted`) and JavaScript-safe integers, so that:
 | `splinekit::wire::IntegerString<u64>` (also `i64`, `u128`, `i128`, `usize`, `isize`) | base-10 digits within the type's range | `string` |
 | `splinekit::wire::SafeInteger<i64>` (same types) | JSON integer within ±(2^53 − 1) | `number` |
 
+## Ecosystem types
+
+Enable a feature on `splinekit` (or `splinekit-schema`) to use these types
+directly. Each description matches the type's own Serde form.
+
+| Feature | Rust | JSON form |
+| --- | --- | --- |
+| `uuid` | `uuid::Uuid` | hyphenated lowercase UUID string |
+| `chrono` | `DateTime<Utc>`, `DateTime<FixedOffset>` | RFC 3339 date-time with `Z` or the offset |
+| `chrono` | `NaiveDate` | `YYYY-MM-DD` |
+| `url` | `url::Url` | the absolute URL |
+| `rust_decimal` | `rust_decimal::Decimal` | exact decimal string, such as `-12.50` |
+
+Some of these accept more on input than they produce: `Uuid` also reads other
+UUID spellings, and `Decimal` also reads JSON numbers. The description advertises
+the canonical form, which is what generated clients send. Dates are checked for
+years 0000–9999; chrono writes other years with a sign, which the check refuses.
+
+```toml
+splinekit = { version = "0.1", features = ["http", "uuid", "chrono"] }
+```
+
 ## Declaring a type's wire form
 
 A type whose Serde form isn't its Rust shape names its wire description with

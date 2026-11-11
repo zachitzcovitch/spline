@@ -11,6 +11,10 @@ description = "Rust-authored API contracts and schemas"
 [features]
 default = []
 http = ["dep:splinekit-http"]
+uuid = ["splinekit-schema/uuid"]
+chrono = ["splinekit-schema/chrono"]
+url = ["splinekit-schema/url"]
+rust_decimal = ["splinekit-schema/rust_decimal"]
 
 [dependencies]
 splinekit-schema.workspace = true

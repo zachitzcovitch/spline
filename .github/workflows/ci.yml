@@ -40,6 +40,8 @@ jobs:
         run: cargo run --locked -p splinekit --no-default-features --example neutral
       - name: Run Rust and cross-language HTTP tests
         run: cargo test --locked --workspace
+      - name: Check ecosystem type integrations
+        run: cargo test --locked -p splinekit-schema --all-features --test ecosystem
       - name: Run multi-crate blog workflow
         run: npm run test:blog
       - name: Check schema artifact freshness

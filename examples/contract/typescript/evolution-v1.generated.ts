@@ -127,18 +127,28 @@ export function createEvolutionV1Client(
     i128: "170141183460469231731687303715884105727",
     n128: "170141183460469231731687303715884105728",
   };
+  // Calendar check without Date, whose parsers differ between engines and
+  // accept impossible dates such as February 30.
+  const day = (year: string, month: string, date: string): boolean => {
+    const y = +year, m = +month, d = +date;
+    const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+    return days !== undefined && d >= 1 && d <= days;
+  };
   const formatted = (
     value: string,
     schema: ["string", "uuid" | "date-time" | "date" | "uri" | "decimal"] | ["string", "integer", boolean, number],
   ): boolean => {
     switch (schema[1]) {
       case "uuid": return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
-      case "date-time": return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value)
-        && globalThis.Number.isFinite(globalThis.Date.parse(value));
+      case "date-time": {
+        const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-](\d{2}):(\d{2}))$/.exec(value);
+        return m !== null && day(m[1]!, m[2]!, m[3]!) && +m[4]! <= 23 && +m[5]! <= 59 && +m[6]! <= 60
+          && (m[8] === "Z" || (+m[9]! <= 23 && +m[10]! <= 59));
+      }
       case "date": {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-        const time = globalThis.Date.parse(`${value}T00:00:00Z`);
-        return globalThis.Number.isFinite(time) && new globalThis.Date(time).toISOString().startsWith(value);
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        return m !== null && day(m[1]!, m[2]!, m[3]!);
       }
       case "uri": try { new globalThis.URL(value); return true; } catch { return false; }
       case "decimal": return /^-?(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value);

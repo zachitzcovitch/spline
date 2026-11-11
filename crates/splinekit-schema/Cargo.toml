@@ -8,7 +8,25 @@ repository.workspace = true
 readme.workspace = true
 description = "Directional JSON schema descriptions and registration for Splinekit"
 
+[features]
+default = []
+# Schemas for common ecosystem types; see docs/wire-types.md.
+uuid = ["dep:uuid"]
+chrono = ["dep:chrono"]
+url = ["dep:url"]
+rust_decimal = ["dep:rust_decimal"]
+
+[dependencies]
+uuid = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+rust_decimal = { workspace = true, optional = true }
+
 [dev-dependencies]
+uuid = { workspace = true, features = ["serde"] }
+chrono = { workspace = true, features = ["serde"] }
+url = { workspace = true, features = ["serde"] }
+rust_decimal = { workspace = true, features = ["serde", "std"] }
 serde.workspace = true
 serde_json.workspace = true
 proc-macro2 = { workspace = true, features = ["span-locations"] }

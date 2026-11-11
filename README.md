@@ -237,6 +237,7 @@ From the repository root:
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
 cargo test --locked --workspace
+cargo test --locked -p splinekit-schema --all-features --test ecosystem
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo check --locked -p splinekit --no-default-features

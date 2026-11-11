@@ -49,6 +49,7 @@ cargo check --locked -p splinekit --no-default-features
 npm run check:neutral
 cargo run --locked -p splinekit --no-default-features --example neutral
 cargo test --locked --workspace
+cargo test --locked -p splinekit-schema --all-features --test ecosystem
 cargo run --locked -p splinekit-typescript --example export -- --check
 cargo run --locked -p splinekit-example-contract -- --check
 cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check

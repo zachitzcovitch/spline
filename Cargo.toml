@@ -40,3 +40,8 @@ quote = "1"
 syn = { version = "3.0.3", features = ["full", "visit"] }
 serde_derive_internals = "=0.30.0"
 trybuild = "1"
+# Optional ecosystem integrations: Schema only names these types, so no
+# default features are needed.
+uuid = { version = "1.29.2", default-features = false }
+chrono = { version = "0.4.45", default-features = false }
+rust_decimal = { version = "1.43.0", default-features = false }

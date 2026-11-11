@@ -7,6 +7,7 @@
 
 mod builtins;
 mod compare;
+mod ecosystem;
 mod field;
 mod model;
 mod registry;
