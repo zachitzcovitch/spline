@@ -12,6 +12,8 @@ mod extensions;
 mod response;
 #[cfg(feature = "server")]
 pub mod server;
+#[cfg(feature = "client")]
+pub mod transport;
 
 #[cfg(feature = "server")]
 pub use axum;
@@ -30,6 +32,8 @@ pub use response::ResponsePolicy;
 pub use server::RequestContext;
 pub use splinekit_http_contract as contract;
 pub use splinekit_macros::HttpError as Error;
+#[cfg(feature = "client")]
+pub use transport::{HttpRequest, HttpResponse, ReqwestTransport, Transport};
 
 use std::fmt;
 
@@ -85,8 +89,11 @@ impl std::error::Error for BuildError {}
 pub enum CallError<E> {
     Application(E),
     Framework(Fault),
-    Http { status: u16 },
-    Transport(reqwest::Error),
+    Http {
+        status: u16,
+    },
+    /// The transport failed to send the request or read the response.
+    Transport(tower::BoxError),
     Protocol(String),
     Encode(String),
 }

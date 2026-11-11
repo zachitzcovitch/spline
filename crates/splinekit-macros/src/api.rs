@@ -52,6 +52,7 @@ impl Parse for Api {
             if [
                 "new",
                 "with_http",
+                "with_transport",
                 "with_response_policy",
                 "__from_inner",
                 "clone",
@@ -235,6 +236,13 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
                     -> ::core::result::Result<Self, __runtime::http::BuildError>
                 {
                     Self::__from_inner(__runtime::http::Client::for_application_with_http(base_url, &describe()?, http)?)
+                }
+                /// Send through a Tower transport, such as `ReqwestTransport` wrapped in
+                /// authentication, retry or timeout layers.
+                pub fn with_transport<T: __runtime::http::Transport>(base_url: &str, transport: T)
+                    -> ::core::result::Result<Self, __runtime::http::BuildError>
+                {
+                    Self::__from_inner(__runtime::http::Client::for_application_with_transport(base_url, &describe()?, transport)?)
                 }
                 fn __from_inner(inner: __runtime::http::Client) -> ::core::result::Result<Self, __runtime::http::BuildError> {
                     Ok(Self { #(#groups: #local::http::Client::__from_inner(inner.clone())?,)* })

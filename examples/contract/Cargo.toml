@@ -22,3 +22,6 @@ tokio.workspace = true
 
 [dev-dependencies]
 splinekit-openapi.workspace = true
+# Writing a client transport layer in tests.
+http.workspace = true
+bytes.workspace = true

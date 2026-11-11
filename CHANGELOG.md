@@ -80,6 +80,13 @@ release yet; the workspace version is a development version.
 - TypeScript methods, resource groups and parameters are camelCase too
   (`no_content` → `noContent()`, `user_id` → `userId`); names that would collide
   are an export error. Operation identities are unchanged.
+- Rust clients send through a Tower transport: `Client::with_transport` (and the
+  generated clients' `with_transport`) takes any service from `HttpRequest`
+  (`http::Request<Bytes>`) to `HttpResponse`, with `ReqwestTransport` as the
+  default, so authentication, session refresh, retries and timeouts are layers.
+  Works on wasm32 (no `Send` requirement there). `CallError::Transport` now
+  carries a boxed error. The HTTP guide shows the same controls for TypeScript
+  through the injected `fetch`.
 - The HTTP binding splits by side: `http-client` (reqwest; builds for
   `wasm32-unknown-unknown`) and `http-server` (Axum), with `http` meaning both.
   Generated contracts and applications emit the client and router behind the

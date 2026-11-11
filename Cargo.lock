@@ -1368,6 +1368,8 @@ dependencies = [
 name = "splinekit-example-contract"
 version = "0.1.0"
 dependencies = [
+ "bytes",
+ "http",
  "serde",
  "serde_json",
  "splinekit",
@@ -1381,6 +1383,7 @@ name = "splinekit-http"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "bytes",
  "http",
  "percent-encoding",
  "reqwest",
@@ -1392,6 +1395,7 @@ dependencies = [
  "splinekit-runtime",
  "splinekit-schema",
  "tokio",
+ "tower",
  "url",
 ]
 

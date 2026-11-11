@@ -213,6 +213,7 @@ pub fn generate(
         if [
             "new",
             "with_http",
+            "with_transport",
             "with_response_policy",
             "__from_inner",
             "Client",
@@ -403,6 +404,13 @@ pub fn generate(
                 -> ::core::result::Result<Self, #runtime::http::BuildError>
             {
                 Self::__from_inner(#runtime::http::Client::with_http(base_url, &describe()?, client)?)
+            }
+            /// Send through a Tower transport, such as `ReqwestTransport` wrapped in
+            /// authentication, retry or timeout layers.
+            pub fn with_transport<T: #runtime::http::Transport>(base_url: &str, transport: T)
+                -> ::core::result::Result<Self, #runtime::http::BuildError>
+            {
+                Self::__from_inner(#runtime::http::Client::with_transport(base_url, &describe()?, transport)?)
             }
             #[doc(hidden)]
             pub fn __from_inner(inner: #runtime::http::Client) -> ::core::result::Result<Self, #runtime::http::BuildError> {

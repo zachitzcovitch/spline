@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::sync::Arc;
 
-use reqwest::header;
+use bytes::Bytes;
+use http::header;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use splinekit_contract::Operation;
@@ -10,6 +12,7 @@ use splinekit_http_contract::{
 };
 use splinekit_schema::{Graph, Shape};
 
+use crate::transport::{erase, Erased, ReqwestTransport, Transport};
 use crate::{
     json_content_type, response, BuildError, CallError, Fault, ResponsePolicy, ERROR_HEADER,
 };
@@ -20,13 +23,23 @@ const PATH_COMPONENT: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHA
     .remove(b'_')
     .remove(b'~');
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Client {
     base: url::Url,
-    http: reqwest::Client,
+    transport: Arc<dyn Erased>,
     plans: Arc<BTreeMap<String, CallPlan>>,
     schemas: Arc<Graph>,
     response_policy: ResponsePolicy,
+}
+
+impl fmt::Debug for Client {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Client")
+            .field("base", &self.base.as_str())
+            .field("operations", &self.plans.keys().collect::<Vec<_>>())
+            .field("response_policy", &self.response_policy)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -46,12 +59,23 @@ impl Client {
         contract: &ContractDescription,
         http: reqwest::Client,
     ) -> Result<Self, BuildError> {
+        Self::with_transport(base, contract, ReqwestTransport::new(http))
+    }
+
+    /// Send through any [`Transport`]: a Tower service, typically
+    /// [`ReqwestTransport`] wrapped in layers for authentication, retries or
+    /// timeouts.
+    pub fn with_transport<T: Transport>(
+        base: &str,
+        contract: &ContractDescription,
+        transport: T,
+    ) -> Result<Self, BuildError> {
         Self::build(
             base,
             contract.contract().schemas(),
             contract.contract().operations().values(),
             contract.plans(),
-            http,
+            erase(transport),
         )
     }
 
@@ -67,12 +91,20 @@ impl Client {
         application: &ApplicationDescription,
         http: reqwest::Client,
     ) -> Result<Self, BuildError> {
+        Self::for_application_with_transport(base, application, ReqwestTransport::new(http))
+    }
+
+    pub fn for_application_with_transport<T: Transport>(
+        base: &str,
+        application: &ApplicationDescription,
+        transport: T,
+    ) -> Result<Self, BuildError> {
         Self::build(
             base,
             application.application().schemas(),
             application.application().operations(),
             application.plans(),
-            http,
+            erase(transport),
         )
     }
 
@@ -81,7 +113,7 @@ impl Client {
         schemas: &Graph,
         operations: impl Iterator<Item = &'a Operation>,
         bindings: &BTreeMap<String, HttpPlan>,
-        http: reqwest::Client,
+        transport: Arc<dyn Erased>,
     ) -> Result<Self, BuildError> {
         let base =
             url::Url::parse(base).map_err(|error| BuildError::Configuration(error.to_string()))?;
@@ -117,7 +149,7 @@ impl Client {
             .collect::<Result<_, _>>()?;
         Ok(Self {
             base,
-            http,
+            transport,
             plans: Arc::new(plans),
             schemas: Arc::new(schemas.clone()),
             response_policy: ResponsePolicy::default(),
@@ -172,21 +204,38 @@ impl Client {
             let text = scalar_text(value, parameter.scalar).map_err(CallError::Encode)?;
             url.query_pairs_mut().append_pair(&parameter.name, &text);
         }
-        let mut request = match plan.binding.method {
-            HttpMethod::Get => self.http.get(url),
-            HttpMethod::Post => self.http.post(url),
-            HttpMethod::Put => self.http.put(url),
-            HttpMethod::Patch => self.http.patch(url),
-            HttpMethod::Delete => self.http.delete(url),
-        }
-        .header(header::ACCEPT, "application/json");
-        if let Some(body) = &plan.binding.body {
-            let value = values
-                .get(body)
-                .ok_or_else(|| CallError::Encode("missing body argument".into()))?;
-            request = request.json(value);
-        }
-        let response = request.send().await.map_err(CallError::Transport)?;
+        let method = match plan.binding.method {
+            HttpMethod::Get => http::Method::GET,
+            HttpMethod::Post => http::Method::POST,
+            HttpMethod::Put => http::Method::PUT,
+            HttpMethod::Patch => http::Method::PATCH,
+            HttpMethod::Delete => http::Method::DELETE,
+        };
+        let mut request = http::Request::builder()
+            .method(method)
+            .uri(url.as_str())
+            .header(header::ACCEPT, "application/json");
+        let body = match &plan.binding.body {
+            Some(body) => {
+                let value = values
+                    .get(body)
+                    .ok_or_else(|| CallError::Encode("missing body argument".into()))?;
+                request = request.header(header::CONTENT_TYPE, "application/json");
+                Bytes::from(
+                    serde_json::to_vec(value)
+                        .map_err(|error| CallError::Encode(error.to_string()))?,
+                )
+            }
+            None => Bytes::new(),
+        };
+        let request = request
+            .body(body)
+            .map_err(|error| CallError::Encode(error.to_string()))?;
+        let response = self
+            .transport
+            .send(request)
+            .await
+            .map_err(CallError::Transport)?;
         let status = response.status().as_u16();
         let error_kind = response
             .headers()
@@ -207,8 +256,7 @@ impl Client {
                 {
                     return Err(CallError::Protocol("invalid 204 response headers".into()));
                 }
-                let bytes = response.bytes().await.map_err(CallError::Transport)?;
-                if !bytes.is_empty() {
+                if !response.body().is_empty() {
                     return Err(CallError::Protocol(
                         "204 response must have an empty body".into(),
                     ));
@@ -223,8 +271,7 @@ impl Client {
                     "invalid success response headers".into(),
                 ));
             }
-            let bytes = response.bytes().await.map_err(CallError::Transport)?;
-            let value: Value = serde_json::from_slice(&bytes)
+            let value: Value = serde_json::from_slice(response.body())
                 .map_err(|error| CallError::Protocol(error.to_string()))?;
             let value =
                 response::project(&value, &call.output, &self.schemas, self.response_policy)
@@ -240,8 +287,7 @@ impl Client {
         if !json || error_kind.is_none() {
             return Err(CallError::Http { status });
         }
-        let bytes = response.bytes().await.map_err(CallError::Transport)?;
-        let value: Value = serde_json::from_slice(&bytes)
+        let value: Value = serde_json::from_slice(response.body())
             .map_err(|error| CallError::Protocol(error.to_string()))?;
         match (
             error_kind.as_deref(),

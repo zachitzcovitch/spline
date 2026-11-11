@@ -239,6 +239,26 @@ let created = client.create(new_user).await?;
 default headers, timeouts, and other transport policies. The default constructor
 disables redirects. No automatic retries are added by Splinekit.
 
+### Transports and layers
+
+`Client::with_transport(base, transport)` sends through any Tower service from
+`splinekit::http::HttpRequest` (an `http::Request<Bytes>`) to `HttpResponse`.
+`ReqwestTransport` is the default. Authentication, session refresh, retries and
+timeouts are layers around it, written once for every generated client:
+
+```rust
+// Send the session token; on 401, refresh it once and re-send the same request.
+let transport = RefreshOnce { inner: ReqwestTransport::new(reqwest::Client::new()), token };
+let client = users::http::Client::with_transport("https://api.example.com", transport)?;
+```
+
+The request body is `Bytes`, so a layer can re-send it without copying. A
+transport must be `Clone`; on native targets it and its futures must also be
+`Send` (and `Sync`), on wasm32 they needn't be, since browser futures aren't.
+`examples/contract/tests/http.rs` has a complete refresh-once layer. Whether a
+request is safe to repeat is the application's call: the client sends each
+generated call exactly once.
+
 The generated methods return `Result<Output, splinekit::http::CallError<ApiError>>`:
 
 | Variant | Meaning |
@@ -246,7 +266,7 @@ The generated methods return `Result<Output, splinekit::http::CallError<ApiError
 | `Application(E)` | A decoded, declared application error. |
 | `Framework(Fault)` | A structured framework failure, retaining status/code/message. |
 | `Http { status }` | An unmarked/unrecognized HTTP failure response. |
-| `Transport(reqwest::Error)` | Network or response-body transport failure. |
+| `Transport(BoxError)` | The transport failed to send the request or read the response. |
 | `Protocol(String)` | Unexpected success status, invalid headers/envelope, or invalid response data. |
 | `Encode(String)` | Arguments could not be encoded for their binding. |
 
@@ -300,6 +320,31 @@ to typed result unions; URL/header configuration errors can throw when the clien
 is constructed. The failure union includes application, framework, HTTP,
 transport, protocol, and encode categories. The default fetch binding uses manual
 redirect handling.
+
+The injected `fetch` is where an application adds the same controls as a Rust
+transport layer: a session token, one refresh on 401, retries, timeouts:
+
+```typescript
+let token = await getSession();
+const client = createUsersClient(base, {
+  fetch: async (url, init) => {
+    const send = (t: string) => {
+      const headers = new Headers(init?.headers);
+      headers.set("authorization", `Bearer ${t}`);
+      return fetch(url, { ...init, headers });
+    };
+    const response = await send(token);
+    if (response.status !== 401) return response;
+    token = await refreshSession();
+    return send(token); // the body is a string, so it can be sent again
+  },
+});
+```
+
+The generated client touches no browser-only globals and returns plain JSON data
+(strings for dates, decimals and 64-bit integers), so it works the same in
+browsers, Node and React Server Components, and results can cross a
+server/client boundary as they are.
 
 Generated DTOs use clean public names such as `User`, `NewUser`, and `ApiError`.
 Signatures reference those types directly and preserve normal argument names.

@@ -581,3 +581,121 @@ async fn http_accepts_the_same_typed_operation_middleware_and_maps_service_failu
         Err(CallError::Framework(http::Fault { status: 500, code, .. })) if code == "service_failure")
     );
 }
+
+/// A transport layer that sends the current session token and, when the server
+/// answers 401, refreshes it once and re-sends the same request.
+#[derive(Clone)]
+struct RefreshOnce<S> {
+    inner: S,
+    token: Arc<std::sync::Mutex<String>>,
+    refreshes: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl<S> splinekit::runtime::tower::Service<http::HttpRequest> for RefreshOnce<S>
+where
+    S: splinekit::runtime::tower::Service<
+            http::HttpRequest,
+            Response = http::HttpResponse,
+            Error = reqwest::Error,
+        > + Clone
+        + Send
+        + Sync
+        + 'static,
+    S::Future: Send,
+{
+    type Response = http::HttpResponse;
+    type Error = splinekit::runtime::BoxError;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
+
+    fn poll_ready(
+        &mut self,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, request: http::HttpRequest) -> Self::Future {
+        use splinekit::runtime::tower::ServiceExt;
+        let inner = self.inner.clone();
+        let token = Arc::clone(&self.token);
+        let refreshes = Arc::clone(&self.refreshes);
+        Box::pin(async move {
+            let (parts, body) = request.into_parts();
+            let send = |token: String| {
+                let mut request = ::http::Request::new(body.clone());
+                *request.method_mut() = parts.method.clone();
+                *request.uri_mut() = parts.uri.clone();
+                *request.headers_mut() = parts.headers.clone();
+                request.headers_mut().insert(
+                    ::http::header::AUTHORIZATION,
+                    format!("Bearer {token}").parse().unwrap(),
+                );
+                inner.clone().oneshot(request)
+            };
+            let current = token.lock().unwrap().clone();
+            let response = send(current).await?;
+            if response.status() != ::http::StatusCode::UNAUTHORIZED {
+                return Ok(response);
+            }
+            refreshes.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let fresh = String::from("fresh");
+            *token.lock().unwrap() = fresh.clone();
+            Ok(send(fresh).await?)
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_transport_layer_refreshes_a_session_once_and_resends_the_request() {
+    use axum::response::IntoResponse;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let seen = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&seen);
+    let router = echo::http::router(EchoService, |_: &()| axum::http::StatusCode::BAD_REQUEST)
+        .unwrap()
+        .layer(axum::middleware::from_fn(
+            move |request: axum::extract::Request, next: axum::middleware::Next| {
+                let counted = Arc::clone(&counted);
+                async move {
+                    counted.fetch_add(1, Ordering::SeqCst);
+                    let authorized = request
+                        .headers()
+                        .get(axum::http::header::AUTHORIZATION)
+                        .is_some_and(|value| value == "Bearer fresh");
+                    if authorized {
+                        next.run(request).await
+                    } else {
+                        axum::http::StatusCode::UNAUTHORIZED.into_response()
+                    }
+                }
+            },
+        ));
+    let server = serve(router).await;
+    let refreshes = Arc::new(AtomicUsize::new(0));
+    let transport = RefreshOnce {
+        inner: http::ReqwestTransport::new(reqwest::Client::new()),
+        token: Arc::new(std::sync::Mutex::new("stale".into())),
+        refreshes: Arc::clone(&refreshes),
+    };
+    let client = echo::http::Client::with_transport(&server.base, transport).unwrap();
+    let value = client
+        .inspect("body".into(), 3, true, Some("note".into()))
+        .await
+        .unwrap();
+    assert_eq!(value.count, 3);
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        2,
+        "one 401, then the same request again"
+    );
+    assert_eq!(refreshes.load(Ordering::SeqCst), 1);
+    client.health().await.unwrap();
+    assert_eq!(
+        seen.load(Ordering::SeqCst),
+        3,
+        "the refreshed token is reused"
+    );
+    assert_eq!(refreshes.load(Ordering::SeqCst), 1);
+}
