@@ -3,8 +3,8 @@ mod service;
 
 use std::sync::Arc;
 
-use spline::http::{axum, DeclaredErrors, HttpFactoryExt};
-use spline_example_blog_contracts::api;
+use splinekit::http::{axum, DeclaredErrors, HttpFactoryExt};
+use splinekit_example_blog_contracts::api;
 use tokio::sync::RwLock;
 
 use service::{Session, Store};

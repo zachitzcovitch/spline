@@ -15,13 +15,13 @@ the HTTP binding for export tooling. The generator emits
 Start the server in one terminal:
 
 ```sh
-cargo run --locked -p spline-example-contract --bin server -- 127.0.0.1:3000
+cargo run --locked -p splinekit-example-contract --bin server -- 127.0.0.1:3000
 ```
 
 Then run the clients:
 
 ```sh
-cargo run --locked -p spline-example-contract --bin rust-client -- http://127.0.0.1:3000
+cargo run --locked -p splinekit-example-contract --bin rust-client -- http://127.0.0.1:3000
 node examples/contract/typescript/client.mjs http://127.0.0.1:3000
 ```
 
@@ -30,7 +30,7 @@ profile, partially updates it, and deletes it with a bodyless 204. The clients a
 handle a typed NotFound error. Node 25.2.1 is the tested runtime for executing the
 generated TypeScript directly.
 
-`UserPatch` uses `spline::Patch<T>`: an omitted field stays unchanged, a supplied
+`UserPatch` uses `splinekit::Patch<T>`: an omitted field stays unchanged, a supplied
 value replaces it, and `bio: null` clears the nullable bio. A null display name is
 invalid. PUT uses a complete replacement DTO, so its omitted bio becomes null.
 See [updates and no-content responses](../../docs/http-updates.md) for the wire rules.
@@ -38,10 +38,10 @@ See [updates and no-content responses](../../docs/http-updates.md) for the wire 
 From the repository root:
 
 ```sh
-cargo run --locked -p spline-example-contract -- --write
-cargo run --locked -p spline-example-contract -- --check
-cargo test --locked -p spline-example-contract
-npm run check --workspace spline-contract-typescript-checks
+cargo run --locked -p splinekit-example-contract -- --write
+cargo run --locked -p splinekit-example-contract -- --check
+cargo test --locked -p splinekit-example-contract
+npm run check --workspace splinekit-contract-typescript-checks
 ```
 
 The HTTP suite starts ephemeral loopback servers and executes both clients, plus
@@ -57,8 +57,8 @@ exact variant/status mappings. The [blog tutorial](../blog/README.md) demonstrat
 declared defaults.
 
 ```sh
-cargo run --locked -p spline-example-contract --example contract-openapi -- --write
-cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --write
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --check
 npm run check:openapi
 ```
 
@@ -74,7 +74,7 @@ The same generator command also maintains
 TypeScript and executed by the test suite.
 
 ```sh
-cargo test --locked -p spline-example-contract --test evolution
+cargo test --locked -p splinekit-example-contract --test evolution
 ```
 
 Compatible response decoding is the default in both clients. The tests cover
@@ -84,12 +84,12 @@ required-field changes. See [the evolution guide](../../docs/contract-evolution.
 ## Application composition fixtures
 
 [fixtures/application.rs](fixtures/application.rs) composes `Users` and `Posts`
-with `spline::api!`, a shared store, request-scoped authentication, and different
+with `splinekit::api!`, a shared store, request-scoped authentication, and different
 resource error types. The existing generator also maintains
 [application.generated.ts](typescript/application.generated.ts).
 
 ```sh
-cargo test --locked -p spline-example-contract --test application
+cargo test --locked -p splinekit-example-contract --test application
 ```
 
 The test starts an authenticated application server and executes grouped Rust and

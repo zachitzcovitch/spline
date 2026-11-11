@@ -3,12 +3,12 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use spline::{
+use splinekit::{
     http::{self, axum, reqwest, CallError},
     Schema,
 };
-use spline_example_contract::users::http as users;
-use spline_example_contract::{error_status, ApiError, DemoUsers, NewUser, UserId};
+use splinekit_example_contract::users::http as users;
+use splinekit_example_contract::{error_status, ApiError, DemoUsers, NewUser, UserId};
 
 struct Running {
     base: String,
@@ -30,7 +30,7 @@ async fn serve(router: axum::Router) -> Running {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-#[spline(name = "conformance.Echo")]
+#[splinekit(name = "conformance.Echo")]
 #[serde(deny_unknown_fields)]
 pub struct EchoValue {
     pub value: String,
@@ -39,7 +39,7 @@ pub struct EchoValue {
     pub note: Option<String>,
 }
 
-#[spline::contract(namespace = "echo", module = "echo")]
+#[splinekit::contract(namespace = "echo", module = "echo")]
 pub trait Echo {
     #[query]
     #[http(get = "/health")]
@@ -160,7 +160,7 @@ async fn rust_and_generated_typescript_clients_call_the_same_server() {
         .join(server.base.rsplit(':').next().unwrap());
     std::fs::create_dir_all(&directory).unwrap();
     std::fs::write(directory.join("package.json"), "{\"type\":\"module\"}").unwrap();
-    let generated = spline_typescript::Typescript::new()
+    let generated = splinekit_typescript::Typescript::new()
         .export_http_client(&echo::http::describe().unwrap(), "Echo")
         .unwrap()
         .source;
@@ -432,7 +432,7 @@ pub struct Asymmetric {
     value: String,
 }
 
-#[spline::contract(namespace = "broken", module = "broken")]
+#[splinekit::contract(namespace = "broken", module = "broken")]
 pub trait Broken {
     #[mutation]
     #[http(post = "/broken", body = "input")]
@@ -460,12 +460,13 @@ fn native_client_checks_shared_dto_compatibility_and_base_url() {
 
 #[tokio::test]
 async fn http_accepts_the_same_typed_operation_middleware_and_maps_service_failures() {
-    use spline::runtime::tower::{self, ServiceExt};
-    let service = spline_example_contract::users::get::Service::new(Arc::new(DemoUsers::default()))
-        .map_request(|mut input: spline_example_contract::users::get::Input| {
-            input.id = UserId("user_1".into());
-            input
-        });
+    use splinekit::runtime::tower::{self, ServiceExt};
+    let service =
+        splinekit_example_contract::users::get::Service::new(Arc::new(DemoUsers::default()))
+            .map_request(|mut input: splinekit_example_contract::users::get::Input| {
+                input.id = UserId("user_1".into());
+                input
+            });
     let server = serve(users::get::router(service, error_status).unwrap()).await;
     assert_eq!(
         users::Client::new(&server.base)
@@ -477,8 +478,8 @@ async fn http_accepts_the_same_typed_operation_middleware_and_maps_service_failu
         "Zach"
     );
 
-    let failed = tower::service_fn(|_: spline_example_contract::users::get::Input| async {
-        Err::<Result<spline_example_contract::User, ApiError>, _>(std::io::Error::other(
+    let failed = tower::service_fn(|_: splinekit_example_contract::users::get::Input| async {
+        Err::<Result<splinekit_example_contract::User, ApiError>, _>(std::io::Error::other(
             "middleware failed",
         ))
     });

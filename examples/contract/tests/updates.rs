@@ -2,12 +2,14 @@ use std::io::{Read, Write};
 use std::time::Duration;
 
 use serde_json::json;
-use spline::{
+use splinekit::{
     http::{self, axum, reqwest, CallError},
     Patch,
 };
-use spline_example_contract::users::http as users;
-use spline_example_contract::{error_status, DemoUsers, NewUser, ReplaceUser, UserId, UserPatch};
+use splinekit_example_contract::users::http as users;
+use splinekit_example_contract::{
+    error_status, DemoUsers, NewUser, ReplaceUser, UserId, UserPatch,
+};
 
 struct Running {
     base: String,
@@ -220,8 +222,8 @@ async fn native_client_rejects_wrong_status_and_noncompliant_no_content_framing(
         b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nContent-Type: application/json\r\nConnection: close\r\n\r\nnull",
         b"HTTP/1.1 204 No Content\r\nContent-Length: 4\r\nConnection: close\r\n\r\nnull",
         b"HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n0\r\n\r\n",
-        b"HTTP/1.1 204 No Content\r\nx-spline-error: application\r\nConnection: close\r\n\r\n",
-        b"HTTP/1.1 204 No Content\r\nx-spline-error: \xff\r\nConnection: close\r\n\r\n",
+        b"HTTP/1.1 204 No Content\r\nx-splinekit-error: application\r\nConnection: close\r\n\r\n",
+        b"HTTP/1.1 204 No Content\r\nx-splinekit-error: \xff\r\nConnection: close\r\n\r\n",
     ];
     for &raw in responses {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

@@ -1,6 +1,6 @@
 # Neutral execution and protocol bindings
 
-Spline contracts and application composition describe operations independently
+Splinekit contracts and application composition describe operations independently
 of their transport. Typed execution uses Tower; protocol bindings own routing,
 request context, codecs, binding validation, and transport failures.
 
@@ -14,12 +14,12 @@ Rust traits + DTOs
 
 ## What the neutral core contains
 
-`spline-contract` owns operation IDs, kinds, argument order, documentation,
+`splinekit-contract` owns operation IDs, kinds, argument order, documentation,
 input/output/error shapes, and composed resource/schema descriptions. `Operation`
 has no HTTP fields. Contract/application construction validates identities and
 schema ownership, not route/status/body mappings.
 
-`spline-runtime` depends on the neutral contract model and Tower. The default
+`splinekit-runtime` depends on the neutral contract model and Tower. The default
 facade has no dependency on Axum, reqwest, HTTP binding metadata, or HTTP runtime
 libraries. The schema profile remains a Serde-oriented JSON wire-shape model;
 neutral execution itself does not serialize values.
@@ -46,7 +46,7 @@ selects no adapter.
 For a reusable implementation, choose the adapter through its extension trait:
 
 ```rust
-use spline::http::HttpExt;
+use splinekit::http::HttpExt;
 
 let router = api::shared(implementation).http(error_statuses)?;
 ```
@@ -54,7 +54,7 @@ let router = api::shared(implementation).http(error_statuses)?;
 For request-scoped HTTP implementations, choose HTTP before supplying the factory:
 
 ```rust
-use spline::http::HttpFactoryExt;
+use splinekit::http::HttpFactoryExt;
 
 let router = api::contract().http_with(
     move |context| {
@@ -75,7 +75,7 @@ and execution ordering match the lower-level `::http::router_with` API.
 For direct typed calls:
 
 ```rust
-use spline::runtime::InProcessExt;
+use splinekit::runtime::InProcessExt;
 
 let client = api::shared(implementation).in_process()?;
 let user = client.users().get(id).await?;
@@ -87,7 +87,7 @@ the implementation nor definition needs `Clone`; only their shared handle is clo
 Adapter selection performs its appropriate validation: in-process selection checks
 neutral metadata, while HTTP selection also checks routes, statuses, and body maps.
 
-`HttpExt`/`HttpFactoryExt` belong to `spline-http`, and `InProcessExt` belongs to
+`HttpExt`/`HttpFactoryExt` belong to `splinekit-http`, and `InProcessExt` belongs to
 the neutral runtime. Generated adapter bridges supply each definition's concrete
 service and policy bounds. The extension methods retain compile-time checking of
 resource implementations and application-error policies.
@@ -97,7 +97,7 @@ resource implementations and application-error policies.
 Each operation module exposes:
 
 - `Input`: the owned, named argument object.
-- `Operation`: implements `spline::runtime::Operation`, with associated input,
+- `Operation`: implements `splinekit::runtime::Operation`, with associated input,
   output, and application-error types, logical ID, and query/mutation kind.
 - `Service<S>`: a cloneable Tower adapter over `Arc<S>` implementing the authored
   resource trait. Cloning it shares the implementation and does not require `S: Clone`.
@@ -106,7 +106,7 @@ For example:
 
 ```rust
 let service = users::get::Service::new(std::sync::Arc::new(implementation));
-let value = spline::runtime::invoke(service, users::get::Input { id }).await?;
+let value = splinekit::runtime::invoke(service, users::get::Input { id }).await?;
 ```
 
 The base adapter is always ready because the authored `&self` trait has no readiness
@@ -123,14 +123,14 @@ operational failures. `invoke` uses Tower's `oneshot`: it waits for readiness an
 calls the same service instance that acquired it. It does not clone after acquiring
 readiness or introduce retries.
 
-`spline::runtime::CallError<E>` distinguishes `Application(E)` from
+`splinekit::runtime::CallError<E>` distinguishes `Application(E)` from
 `Service(BoxError)`. Keeping application failures in the response preserves their
 types through middleware whose operational errors are boxed.
 
 ### Configure operation middleware
 
 ```rust
-use spline::runtime::tower::ServiceExt;
+use splinekit::runtime::tower::ServiceExt;
 
 let service = users::get::Service::new(std::sync::Arc::new(implementation))
     .map_request(move |mut input: users::get::Input| {
@@ -138,7 +138,7 @@ let service = users::get::Service::new(std::sync::Arc::new(implementation))
         input.id = canonical_id.clone();
         input
     });
-let value = spline::runtime::invoke(service, input).await?;
+let value = splinekit::runtime::invoke(service, input).await?;
 ```
 
 Configure stateful layers on the service once, then clone the configured service
@@ -184,7 +184,7 @@ let router = api::http::router_with(session_factory, error_statuses)?;
 let client = api::http::Client::new(base_url)?;
 ```
 
-`spline-http-contract` owns binding descriptions and validation. It is std-only
+`splinekit-http-contract` owns binding descriptions and validation. It is std-only
 apart from the neutral schema/contract crates, allowing exporters to use binding
 metadata without importing Axum or reqwest. A bound description contains the
 neutral description and a separate map of operation IDs to validated HTTP plans.
@@ -197,7 +197,7 @@ application-error response metadata. Routers use this policy-aware path; ordinar
 `describe()` makes no static error-status claim. [Declared HTTP errors](http-errors.md)
 explains the opt-in error derive, `DeclaredErrors`, and opaque/custom policies.
 
-`spline-http` owns HTTP execution: Axum routing, request context, decoding, response
+`splinekit-http` owns HTTP execution: Axum routing, request context, decoding, response
 envelopes, reqwest calls, and HTTP-specific failures. Factories authenticate/create
 the implementation before argument decoding. The handler then creates the neutral
 operation adapter, invokes it through Tower, and maps the result into HTTP.
@@ -228,7 +228,7 @@ Neutral `export_contract`/`export_application` consume neutral descriptions.
 `::http::describe()`. HTTP-specific no-content results become `void` only in that
 binding's export; the neutral unit shape remains JSON `null`.
 
-`spline-openapi` consumes the same selected HTTP descriptions, preferably through
+`splinekit-openapi` consumes the same selected HTTP descriptions, preferably through
 `::http::describe_with(&policy)` for declared error statuses. Its normal dependency
 graph contains metadata and JSON/URL tooling, with no execution runtime. See
 [OpenAPI export](openapi.md) for document configuration and independent validation.
@@ -237,9 +237,9 @@ graph contains metadata and JSON/URL tooling, with no execution runtime. See
 
 ```sh
 npm run check:neutral
-cargo run --locked -p spline --no-default-features --example neutral
-cargo test --locked -p spline-runtime
-cargo test --locked -p spline --no-default-features --test in_process
+cargo run --locked -p splinekit --no-default-features --example neutral
+cargo test --locked -p splinekit-runtime
+cargo test --locked -p splinekit --no-default-features --test in_process
 ```
 
 CI checks the no-HTTP normal dependency graph and runs the neutral example, including
@@ -250,6 +250,6 @@ and HTTP tests apply middleware to typed inputs and preserve typed application e
 For existing code, change HTTP setup from `api::router_with`/`api::Client` to
 `api::http::router_with`/`api::http::Client`, and export HTTP clients from
 `api::http::describe()`. Core `describe()` is neutral. Move manual HTTP planning
-from core builders to `spline-http-contract` builders over the sealed neutral
+from core builders to `splinekit-http-contract` builders over the sealed neutral
 description. File/inline module authoring, positional calls, operation IDs, JSON
 payloads, and clean TypeScript names retain their authored meaning.

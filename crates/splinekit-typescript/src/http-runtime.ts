@@ -1,0 +1,237 @@
+export type __PREFIX__HttpFailure =
+  | { kind: "transport" | "protocol" | "encode"; message: string }
+  | { kind: "http"; status: number }
+  | { kind: "framework"; status: number; code: string; message: string };
+
+export type __PREFIX__HttpOptions = {
+  fetch?: typeof globalThis.fetch;
+  headers?: { [name: string]: string };
+  /** Compatible projects closed response objects onto known fields. Requests remain schema-checked. */
+  responsePolicy?: "compatible" | "strict";
+};
+
+export type __PREFIX__Client = __PREFIX__Calls<__PREFIX__HttpFailure>;
+
+/** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
+export function create__PREFIX__Client(
+  baseUrl: string,
+  options: __PREFIX__HttpOptions = {},
+): __PREFIX__Client {
+  const base = new globalThis.URL(baseUrl);
+  if (!["http:", "https:"].includes(base.protocol) || base.href.includes("?") || base.href.includes("#")
+      || base.username || base.password) {
+    throw new globalThis.TypeError("base URL must be HTTP(S), without credentials, query, or fragment");
+  }
+  const fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
+  const defaultHeaders = new globalThis.Headers(options.headers);
+  const responsePolicy = options.responsePolicy ?? "compatible";
+  if (responsePolicy !== "compatible" && responsePolicy !== "strict") {
+    throw new globalThis.TypeError("responsePolicy must be compatible or strict");
+  }
+
+  type __SplinekitWire =
+    | ["null" | "string" | "boolean"]
+    | ["integer", boolean, number]
+    | ["literal" | "ref", string]
+    | ["array" | "map", __SplinekitWire]
+    | ["tuple" | "union", __SplinekitWire[]]
+    | ["object", boolean, [string, __SplinekitWire, boolean][]];
+  const definitions: { [name: string]: __SplinekitWire } = /*__DEFINITIONS__*/;
+  const object = (value: unknown): value is { [name: string]: unknown } =>
+    value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
+  const owns = (value: object, name: string): boolean => globalThis.Object.prototype.hasOwnProperty.call(value, name);
+  const valid = (value: unknown, schema: __SplinekitWire, depth = 0): boolean => {
+    if (depth > 256) return false;
+    const child = (value: unknown, schema: __SplinekitWire): boolean => valid(value, schema, depth + 1);
+    switch (schema[0]) {
+      case "null": return value === null;
+      case "string": return typeof value === "string";
+      case "boolean": return typeof value === "boolean";
+      case "integer": {
+        const bound = 2 ** (schema[2] - (schema[1] ? 1 : 0));
+        return typeof value === "number" && globalThis.Number.isInteger(value)
+          && value >= (schema[1] ? -bound : 0) && value < bound;
+      }
+      case "literal": return value === schema[1];
+      case "ref": {
+        const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
+        return target !== undefined && child(value, target);
+      }
+      case "array": return globalThis.Array.isArray(value) && value.every(v => child(v, schema[1]));
+      case "map": return object(value) && globalThis.Object.values(value).every(v => child(v, schema[1]));
+      case "tuple": return globalThis.Array.isArray(value) && value.length === schema[1].length
+        && schema[1].every((s, i) => child(value[i], s));
+      case "union": return schema[1].some(s => child(value, s));
+      case "object": return object(value)
+        && schema[2].every(([name, type, optional]) => owns(value, name) ? child(value[name], type) : optional)
+        && (schema[1] || globalThis.Object.keys(value).every(name => schema[2].some(f => f[0] === name)));
+    }
+  };
+  const same = (a: unknown, b: unknown): boolean => {
+    if (a === b) return true;
+    if (globalThis.Array.isArray(a) && globalThis.Array.isArray(b)) {
+      return a.length === b.length && a.every((v, i) => same(v, b[i]));
+    }
+    return object(a) && object(b) && globalThis.Object.keys(a).length === globalThis.Object.keys(b).length
+      && globalThis.Object.keys(a).every(key => owns(b, key) && same(a[key], b[key]));
+  };
+  // Undefined is a failure sentinel: parsed JSON cannot contain it. Projection
+  // prevents extra fields from leaking into returned values or strict Rust DTOs.
+  const project = (value: unknown, schema: __SplinekitWire, depth = 0): unknown => {
+    if (depth >= 256) return undefined;
+    const child = (value: unknown, schema: __SplinekitWire): unknown => project(value, schema, depth + 1);
+    switch (schema[0]) {
+      case "ref": {
+        const target = owns(definitions, schema[1]) ? definitions[schema[1]] : undefined;
+        return target === undefined ? undefined : child(value, target);
+      }
+      case "object": {
+        if (!object(value)) return undefined;
+        const known = new globalThis.Set(schema[2].map(f => f[0]));
+        if (responsePolicy === "strict" && !schema[1]
+            && globalThis.Object.keys(value).some(name => !known.has(name))) return undefined;
+        const entries: [string, unknown][] = schema[1]
+          ? globalThis.Object.entries(value).filter(([name]) => !known.has(name)) : [];
+        for (const [name, type, optional] of schema[2]) {
+          if (!owns(value, name)) {
+            if (!optional) return undefined;
+            continue;
+          }
+          const decoded = child(value[name], type);
+          if (decoded === undefined) return undefined;
+          entries.push([name, decoded]);
+        }
+        // fromEntries creates own data properties even for names like __proto__.
+        return globalThis.Object.fromEntries(entries);
+      }
+      case "map": {
+        if (!object(value)) return undefined;
+        const entries: [string, unknown][] = [];
+        for (const [name, entry] of globalThis.Object.entries(value)) {
+          const decoded = child(entry, schema[1]);
+          if (decoded === undefined) return undefined;
+          entries.push([name, decoded]);
+        }
+        return globalThis.Object.fromEntries(entries);
+      }
+      case "array": {
+        if (!globalThis.Array.isArray(value)) return undefined;
+        const decoded = value.map(v => child(v, schema[1]));
+        return decoded.some(v => v === undefined) ? undefined : decoded;
+      }
+      case "tuple": {
+        if (!globalThis.Array.isArray(value) || value.length !== schema[1].length) return undefined;
+        const decoded = schema[1].map((s, i) => child(value[i], s));
+        return decoded.some(v => v === undefined) ? undefined : decoded;
+      }
+      case "union": {
+        let result: unknown;
+        for (const alternative of schema[1]) {
+          const candidate = child(value, alternative);
+          if (candidate !== undefined) {
+            if (result !== undefined && !same(result, candidate)) return undefined;
+            result = candidate;
+          }
+        }
+        return result;
+      }
+      default: return valid(value, schema, depth) ? value : undefined;
+    }
+  };
+  type __SplinekitPlan = {
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string; body: string | null; status: number;
+    paths: string[]; queries: [string, boolean][];
+    input: __SplinekitWire; output: __SplinekitWire; error: __SplinekitWire;
+  };
+  const message = (error: unknown): string => error instanceof globalThis.Error ? error.message : globalThis.String(error);
+  const jsonType = (response: globalThis.Response): boolean => {
+    const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+    return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
+  };
+  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<__PREFIX__Result<O, E, __PREFIX__HttpFailure>> => {
+    let url: globalThis.URL;
+    let init: globalThis.RequestInit;
+    try {
+      // Validate the JSON representation, including omitted undefined properties.
+      const encoded = globalThis.JSON.stringify(argumentsObject);
+      const input: unknown = globalThis.JSON.parse(encoded);
+      if (!object(input) || !valid(input, plan.input)) {
+        return { ok: false, error: { kind: "encode", message: "arguments do not match the input schema" } };
+      }
+      let path = plan.path;
+      for (const name of plan.paths) {
+        const value = globalThis.String(input[name]);
+        if (!value || value === "." || value === "..") throw new globalThis.TypeError("invalid path argument");
+        path = path.replace(`{${name}}`, globalThis.encodeURIComponent(value));
+      }
+      url = new globalThis.URL(base.toString());
+      url.pathname = base.pathname.replace(/\/+$/, "") + path;
+      for (const [name, optional] of plan.queries) {
+        const value = input[name];
+        if ((value === null || value === undefined) && optional) continue;
+        url.searchParams.append(name, globalThis.String(value));
+      }
+      const headers = new globalThis.Headers(defaultHeaders);
+      headers.set("accept", "application/json");
+      init = { method: plan.method, headers, redirect: "manual" };
+      if (plan.body !== null) {
+        const body = globalThis.JSON.stringify(input[plan.body]);
+        if (body === undefined) throw new globalThis.TypeError("missing body argument");
+        headers.set("content-type", "application/json");
+        init.body = body;
+      }
+    } catch (error) {
+      return { ok: false, error: { kind: "encode", message: message(error) } };
+    }
+    let response: globalThis.Response;
+    try { response = await fetcher(url, init); }
+    catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
+    const marker = response.headers.get("x-splinekit-error");
+    const success = response.status === plan.status;
+    if (success && response.status === 204) {
+      if (marker !== null || response.headers.has("content-length") || response.headers.has("transfer-encoding")) {
+        return { ok: false, error: { kind: "protocol", message: "invalid 204 response headers" } };
+      }
+      let text: string;
+      try { text = await response.text(); }
+      catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
+      return text.length === 0
+        ? { ok: true, value: undefined as O }
+        : { ok: false, error: { kind: "protocol", message: "204 response must have an empty body" } };
+    }
+    if (success && (!jsonType(response) || marker !== null)) {
+      return { ok: false, error: { kind: "protocol", message: "invalid success response headers" } };
+    }
+    if (!success && response.status < 400) {
+      return { ok: false, error: { kind: "protocol", message: `unexpected success/redirect status ${response.status}` } };
+    }
+    if (!success && (!jsonType(response) || marker === null)) {
+      return { ok: false, error: { kind: "http", status: response.status } };
+    }
+    let text: string;
+    try { text = await response.text(); }
+    catch (error) { return { ok: false, error: { kind: "transport", message: message(error) } }; }
+    let value: unknown;
+    try { value = globalThis.JSON.parse(text); }
+    catch (error) { return { ok: false, error: { kind: "protocol", message: message(error) } }; }
+    if (success) {
+      const decoded = project(value, plan.output);
+      return decoded !== undefined
+        ? { ok: true, value: decoded as O }
+        : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
+    }
+    if (object(value) && marker === "application" && value.kind === "application" && owns(value, "value")) {
+      const decoded = project(value.value, plan.error);
+      if (decoded !== undefined) return { ok: false, error: { kind: "application", value: decoded as E } };
+    }
+    if (object(value) && marker === "framework" && value.kind === "framework"
+        && typeof value.code === "string" && typeof value.message === "string") {
+      return { ok: false, error: { kind: "framework", status: response.status, code: value.code, message: value.message } };
+    }
+    return { ok: false, error: { kind: "protocol", message: "unrecognized error envelope" } };
+  };
+  return {
+/*__METHODS__*/
+  };
+}

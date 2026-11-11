@@ -1,5 +1,5 @@
 name: Feature request
-description: Describe a use case or an improvement to Spline's API or tooling.
+description: Describe a use case or an improvement to Splinekit's API or tooling.
 body:
   - type: textarea
     id: use-case

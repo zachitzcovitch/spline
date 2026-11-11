@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use spline::http::{reqwest, CallError};
-use spline_example_blog_contracts::{api, NewPost, PostError};
+use splinekit::http::{reqwest, CallError};
+use splinekit_example_blog_contracts::{api, NewPost, PostError};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -35,7 +35,7 @@ async fn run(base_url: &str) -> Result<()> {
     // -------- Create and read a draft --------
 
     let new_post = NewPost {
-        title: "Hello from Spline".into(),
+        title: "Hello from Splinekit".into(),
         body: "One Rust contract, two typed clients.".into(),
     };
     let draft = alice.posts().create(new_post).await?;

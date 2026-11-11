@@ -1,6 +1,6 @@
 # TypeScript clients and public types
 
-Spline exports ordinary DTO names and signatures intended for direct imports and
+Splinekit exports ordinary DTO names and signatures intended for direct imports and
 editor use. For the blog application:
 
 ```typescript
@@ -30,7 +30,7 @@ completion follows those concrete types.
 
 ## Default names
 
-`#[spline(name = "blog.UserError")]` assigns a logical identity used by the schema
+`#[splinekit(name = "blog.UserError")]` assigns a logical identity used by the schema
 graph and runtime. The TypeScript name comes from its final component: `UserError`.
 Inferred Rust crate/module-qualified identities use the same final-component rule.
 
@@ -63,8 +63,8 @@ If `billing.User` and `accounts.User` are exported together, both would default 
 `User`. Give one or both a deliberate name in the Rust exporter:
 
 ```rust
-use spline::{DefinitionId, Direction};
-use spline_typescript::Typescript;
+use splinekit::{DefinitionId, Direction};
+use splinekit_typescript::Typescript;
 
 let exporter = Typescript::new().name(
     DefinitionId {

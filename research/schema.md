@@ -3,13 +3,13 @@
 Reviewed: 2026-10-12.
 
 **Workspace update:** this is a historical design note. Direct Serde behavior
-checks now run in [`spline-schema/tests/serde_behavior.rs`](../crates/spline-schema/tests/serde_behavior.rs)
+checks now run in [`splinekit-schema/tests/serde_behavior.rs`](../crates/splinekit-schema/tests/serde_behavior.rs)
 using the root toolchain/dependencies. See the [research index](README.md) for the
 migration and the [current guides](../README.md) for implemented APIs.
 
-This note builds on the [design discussion](../DESIGN.md#spline-owned-schema-layer).
+This note builds on the [design discussion](../DESIGN.md#splinekit-owned-schema-layer).
 It records primary-source findings, behavior probes, and recommendations for the
-next design discussion. The proposed Spline interfaces below are not implemented.
+next design discussion. The proposed Splinekit interfaces below are not implemented.
 
 Follow-up: the [Serde internals reuse evaluation](serde-internals-reuse.md) now
 contains a working private-adapter experiment and recommends reuse for the next
@@ -60,7 +60,7 @@ The [`ServiceGenerator` interface][prost-build] takes service metadata and emits
 application-specific interfaces or implementations. Its documentation explicitly
 describes generating a service trait and dispatch glue for an RPC framework.
 
-**Lesson for Spline:** contract metadata should be usable by code generators and
+**Lesson for Splinekit:** contract metadata should be usable by code generators and
 documentation tooling without putting those tools on every request's execution
 path. A typed execution interface and a descriptor model serve different uses.
 
@@ -76,7 +76,7 @@ The [CSV serializer][csv] has separate `SeRecord` and `SeHeader` serializers.
 explicit state machine. The implementation rejects unsupported forms such as maps
 and certain nested/header combinations, with tests for those boundaries.
 
-**Lesson for Spline:** Serde's serialization interface can expose useful information
+**Lesson for Splinekit:** Serde's serialization interface can expose useful information
 about a value, and format-specific support can be narrow and well defined. The CSV
 header mechanism does not establish a complete schema for all possible values of
 a type, all enum variants, or both serialization directions.
@@ -88,7 +88,7 @@ from a simpler, normalized `Hir`. Parsing and translation are separate steps;
 downstream consumers can work with the simpler representation. It also preserves
 useful error reporting and has deliberate handling of deep structures.
 
-**Lesson for Spline:** use a private representation for Rust syntax and Serde
+**Lesson for Splinekit:** use a private representation for Rust syntax and Serde
 attributes, then produce a normalized schema graph. TypeScript and specification
 exporters should not each reinterpret Serde attributes. This is an architectural
 analogy; `regex-syntax` is not itself a Rust type-schema system.
@@ -99,7 +99,7 @@ Serde's [`Container::from_ast`][serde-ast] converts a Syn AST into its own conta
 variant, and field model. It applies naming rules and runs validation before code
 generation. Its [`Ctxt`][serde-ctxt] collects and combines span-aware errors.
 
-**Lesson for Spline:** parse, validate, and generate in distinct stages. Attach
+**Lesson for Splinekit:** parse, validate, and generate in distinct stages. Attach
 diagnostics to the relevant field or attribute, and report multiple useful errors
 together where possible.
 
@@ -107,7 +107,7 @@ An especially relevant discovery: Schemars [uses][schemars-ast]
 [`serde_derive_internals`][serde-internals] to interpret Serde syntax. The crate
 lists David Tolnay (`dtolnay`) as its owner and is explicitly described as unstable.
 
-We can own Spline's schema graph and exporters while evaluating this helper behind
+We can own Splinekit's schema graph and exporters while evaluating this helper behind
 a private, version-controlled adapter. The tradeoff is closer reuse of Serde's
 attribute handling versus dependency on an unstable internal API. A small owned
 parser for a documented subset is the other option. The subsequent
@@ -128,10 +128,10 @@ The [generator][schemars-generator] provides several particularly useful details
 - Definitions and exported names are tracked separately.
 
 [Serialize and deserialize settings][schemars-directions] affect field names,
-presence, and skipped fields. This is concrete precedent for Spline's directional
+presence, and skipped fields. This is concrete precedent for Splinekit's directional
 model, rather than treating direction as a future extension.
 
-Schemars emits JSON Schema directly. For Spline, a smaller owned graph could feed
+Schemars emits JSON Schema directly. For Splinekit, a smaller owned graph could feed
 both TypeScript and JSON Schema/OpenAPI exporters. That graph's exact scope needs
 to be chosen against the examples below.
 
@@ -141,7 +141,7 @@ to be chosen against the examples below.
 of samples and/or exercising deserialization visitors. It is a valuable example of
 using Serde as a source of structural information.
 
-Its documented limits are directly relevant to Spline: tagged/flattened forms,
+Its documented limits are directly relevant to Splinekit: tagged/flattened forms,
 multiple instantiations of a generic type in a tracing session, colliding container
 names, and some recursive types. Serialization samples also cannot reveal unseen
 enum variants or the element type of every empty collection.
@@ -158,9 +158,9 @@ one type for both directions.
 
 It also exposes a choice for how large integers appear in TypeScript. That is an
 important reminder that a TypeScript declaration and a working JSON codec are
-separate pieces. Spline needs to check their agreement.
+separate pieces. Splinekit needs to check their agreement.
 
-## Proposed Spline model
+## Proposed Splinekit model
 
 ### Pipeline
 
@@ -257,7 +257,7 @@ equivalent.
 
 ### 1. A struct: missing, nullable, and omitted are different
 
-The [Rust behavior tests](../crates/spline-schema/tests/serde_behavior.rs) use this shape:
+The [Rust behavior tests](../crates/splinekit-schema/tests/serde_behavior.rs) use this shape:
 
 ```rust
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -290,7 +290,7 @@ type UserOutput = {
 };
 ```
 
-These are manually reasoned examples, not output from a Spline generator.
+These are manually reasoned examples, not output from a Splinekit generator.
 The probes confirm that a missing `nickname` becomes `None`, but serialization
 emits `"nickname": null`; missing `tags` defaults to `[]`, but explicit `null` is
 rejected; `bio: None` is omitted during serialization.
@@ -371,7 +371,7 @@ as the optional/defaulted fields above demonstrate.
 ### The JSON/TypeScript numeric policy must be explicit
 
 The Rust probe confirms that raw `u64::MAX` becomes an unquoted JSON number. The
-[JavaScript precision checks](../crates/spline-typescript/typescript/json-numbers.mjs) confirm that ordinary
+[JavaScript precision checks](../crates/splinekit-typescript/typescript/json-numbers.mjs) confirm that ordinary
 `JSON.parse` loses precision for that value, and conversion to `bigint` afterward
 cannot recover it. Ordinary `JSON.stringify` also rejects a `bigint` value.
 
@@ -391,7 +391,7 @@ The probe demonstrates that `serde_json` can deserialize a named struct from a J
 array as well as its usual object form. Default unknown-field handling is also
 permissive unless `deny_unknown_fields` is used.
 
-Spline should distinguish its documented canonical wire shapes from every
+Splinekit should distinguish its documented canonical wire shapes from every
 incidental form a decoder may accept. The proposed first profile uses object form
 for named structs and records unknown-field policy. Whether bindings additionally
 enforce canonical forms is a separate decision.
@@ -420,7 +420,7 @@ This is a proposal for a small implementation slice, not a compatibility promise
 | Large integers, platform-sized integers, floats, non-string map keys | Require a documented profile/codec policy before claiming support. |
 
 An owned type can provide a manual schema implementation. Foreign types can use
-local wrappers, field adapters, or integrations provided by Spline; ordinary Rust
+local wrappers, field adapters, or integrations provided by Splinekit; ordinary Rust
 orphan rules still apply.
 
 The derive can detect unsupported visible attributes, but it cannot inspect every
@@ -438,8 +438,8 @@ pins and source snapshots above describe the historical research run.
 From the repository root:
 
 ```sh
-cargo test --locked -p spline-schema --test serde_behavior
-node crates/spline-typescript/typescript/json-numbers.mjs
+cargo test --locked -p splinekit-schema --test serde_behavior
+node crates/splinekit-typescript/typescript/json-numbers.mjs
 ```
 
 The research run used rustc 1.95.0-nightly (859951e3c, 2026-02-24) and Node v25.2.1:

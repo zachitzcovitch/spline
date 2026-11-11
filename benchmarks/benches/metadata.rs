@@ -2,17 +2,17 @@ use std::hint::black_box;
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use spline::http::contract::{HttpBinding, HttpMethod};
-use spline::{
+use splinekit::http::contract::{HttpBinding, HttpMethod};
+use splinekit::{
     contract::{ApplicationBuilder, ApplicationDescription, OperationKind},
     Direction, Registry, Schema,
 };
-use spline_example_blog_contracts::{api, users, Post, PostError};
-use spline_typescript::Typescript;
+use splinekit_example_blog_contracts::{api, users, Post, PostError};
+use splinekit_typescript::Typescript;
 
 #[allow(dead_code)]
 #[derive(Schema)]
-#[spline(name = "bench.Tree")]
+#[splinekit(name = "bench.Tree")]
 struct Tree {
     label: String,
     children: Vec<Tree>,
@@ -39,8 +39,8 @@ fn application(resources: usize) -> ApplicationDescription {
     builder.finish().unwrap()
 }
 
-fn http_application(resources: usize) -> spline::http::contract::ApplicationDescription {
-    let mut builder = spline::http::contract::ApplicationBuilder::new(application(resources));
+fn http_application(resources: usize) -> splinekit::http::contract::ApplicationDescription {
+    let mut builder = splinekit::http::contract::ApplicationBuilder::new(application(resources));
     for index in 0..resources {
         builder
             .bind(

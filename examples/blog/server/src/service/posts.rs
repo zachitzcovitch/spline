@@ -1,4 +1,4 @@
-use spline_example_blog_contracts::{NewPost, Post, PostError, Posts};
+use splinekit_example_blog_contracts::{NewPost, Post, PostError, Posts};
 
 use super::Session;
 

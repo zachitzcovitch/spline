@@ -1,6 +1,6 @@
-use spline::http::CallError;
-use spline::Patch;
-use spline_example_contract::{users, ApiError, NewUser, ReplaceUser, UserId, UserPatch};
+use splinekit::http::CallError;
+use splinekit::Patch;
+use splinekit_example_contract::{users, ApiError, NewUser, ReplaceUser, UserId, UserPatch};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -20,7 +20,7 @@ its serialized arguments and decoded response shapes using the schema graph.
 
 ```rust
 // users.rs, loaded by `pub mod users;`
-#[spline::contract]
+#[splinekit::contract]
 pub trait Users {
     #[query]
     #[http(get = "/users/{id}")]
@@ -84,7 +84,7 @@ including read-only searches. PUT/PATCH/DELETE must be mutations; PUT and PATCH
 require a body mapping, and DELETE is bodyless in this profile. Every operation
 in a selected HTTP contract needs a binding. Incomplete mappings do not invalidate
 neutral composition or in-process calls; selecting `::http::describe()` returns a
-missing-binding error. The base `spline` crate remains
+missing-binding error. The base `splinekit` crate remains
 usable without its optional `http` feature for neutral contracts and typed execution.
 
 Path/query arguments support strings, booleans, the evaluated fixed-width integer
@@ -101,7 +101,7 @@ argument overlap are outside this initial profile.
 Binding validation checks argument mappings, scalar shapes, and ambiguous route
 patterns before router registration. The same dynamic route with different
 placeholder names is rejected, including when the HTTP verbs differ, because
-Axum cannot merge those patterns safely. [`spline::api!`](application-composition.md)
+Axum cannot merge those patterns safely. [`splinekit::api!`](application-composition.md)
 validates these conflicts across all declared resources before merging routers.
 Additional routes merged manually outside that application remain governed by Axum.
 
@@ -122,7 +122,7 @@ An application error uses the status supplied by the server's error policy:
 ```http
 HTTP/1.1 404 Not Found
 Content-Type: application/json
-x-spline-error: application
+x-splinekit-error: application
 
 {"kind":"application","value":{"kind":"not_found"}}
 ```
@@ -132,7 +132,7 @@ Framework failures, including malformed input and request-factory rejection, use
 ```http
 HTTP/1.1 400 Bad Request
 Content-Type: application/json
-x-spline-error: framework
+x-splinekit-error: framework
 
 {"kind":"framework","code":"invalid_request","message":"..."}
 ```
@@ -140,7 +140,7 @@ x-spline-error: framework
 The marker header and envelope kind must agree. This distinguishes declared
 application errors from framework failures and unmarked proxy/server responses.
 For cross-origin browser use, the application's CORS layer must allow the desired
-origins/headers and expose `x-spline-error` to fetch.
+origins/headers and expose `x-splinekit-error` to fetch.
 
 JSON request bodies accept `application/json` and application subtypes ending in
 `+json`, including content-type parameters. A missing/wrong media type receives
@@ -157,7 +157,7 @@ additional status codes, and per-operation response headers remain follow-on wor
 
 ## Server and request context
 
-Enable `spline`'s `http` Cargo feature, then:
+Enable `splinekit`'s `http` Cargo feature, then:
 
 ```rust
 let router = users::http::router(DemoUsers::default(), error_status)?;
@@ -167,7 +167,7 @@ axum::serve(listener, router).await?;
 The protocol-owned extension form is:
 
 ```rust
-use spline::http::HttpExt;
+use splinekit::http::HttpExt;
 let router = users::shared(DemoUsers::default()).http(error_status)?;
 ```
 
@@ -181,7 +181,7 @@ serialization failures produce a framework 500. A closure implements
 `ErrorPolicy<E>`; a custom policy type can implement the trait for several error
 types when a contract uses different errors per operation.
 
-Error types can opt into `#[derive(spline::http::Error)]` with
+Error types can opt into `#[derive(splinekit::http::Error)]` with
 `#[http(status = StatusCode::NOT_FOUND)]` on each variant. `DeclaredErrors` selects
 these defaults, and `::http::describe_with(&policy)` collects their per-status
 response shapes. Custom executable policies remain available and opaque unless
@@ -221,9 +221,9 @@ let created = client.create(new_user).await?;
 
 `Client::with_http(base, reqwest_client)` accepts a configured reqwest client for
 default headers, timeouts, and other transport policies. The default constructor
-disables redirects. No automatic retries are added by Spline.
+disables redirects. No automatic retries are added by Splinekit.
 
-The generated methods return `Result<Output, spline::http::CallError<ApiError>>`:
+The generated methods return `Result<Output, splinekit::http::CallError<ApiError>>`:
 
 | Variant | Meaning |
 | --- | --- |
@@ -262,7 +262,7 @@ The exporter has separate entry points:
 
 HTTP exporters receive the bound description from `::http::describe()`. Neutral
 exporters receive `::describe()`. HTTP metadata and validation live in the lightweight
-`spline-http-contract` crate, while Axum/reqwest execution remains in `spline-http`.
+`splinekit-http-contract` crate, while Axum/reqwest execution remains in `splinekit-http`.
 Dispatch invokes the same typed Tower services used in process. See
 [execution and bindings](execution-bindings.md) for the protocol boundary and
 per-operation HTTP routers over configured middleware.
@@ -311,13 +311,13 @@ the conformance suite.
 In one terminal:
 
 ```sh
-cargo run --locked -p spline-example-contract --bin server -- 127.0.0.1:3000
+cargo run --locked -p splinekit-example-contract --bin server -- 127.0.0.1:3000
 ```
 
 In another:
 
 ```sh
-cargo run --locked -p spline-example-contract --bin rust-client -- http://127.0.0.1:3000
+cargo run --locked -p splinekit-example-contract --bin rust-client -- http://127.0.0.1:3000
 node examples/contract/typescript/client.mjs http://127.0.0.1:3000
 ```
 
@@ -364,10 +364,10 @@ generated-artifact freshness pass.
 cargo test --locked --workspace
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo check --locked -p spline --no-default-features
-cargo run --locked -p spline-typescript --example export -- --check
-cargo run --locked -p spline-example-contract -- --check
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
+cargo check --locked -p splinekit --no-default-features
+cargo run --locked -p splinekit-typescript --example export -- --check
+cargo run --locked -p splinekit-example-contract -- --check
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check
 npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 npm run test:blog

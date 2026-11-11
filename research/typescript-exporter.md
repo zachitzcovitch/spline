@@ -3,13 +3,13 @@
 Implemented: 2026-10-13.
 
 **Workspace update:** code, tests, and artifacts now live in
-[`crates/spline-typescript`](../crates/spline-typescript). The
+[`crates/splinekit-typescript`](../crates/splinekit-typescript). The
 [workspace guide](../docs/workspace-contracts.md) covers the current commands and
 new operation-signature export. The prototype commands below are historical.
 
 ## Result
 
-The [exporter implementation](../crates/spline-typescript) completes the first
+The [exporter implementation](../crates/splinekit-typescript) completes the first
 path from Rust data types to a generated artifact checked by another language:
 
 ```text
@@ -22,9 +22,9 @@ TypeScript exporter
 generated.ts + compiler assertions
 ```
 
-The checked-in [generated types](../crates/spline-typescript/typescript/generated.ts)
+The checked-in [generated types](../crates/splinekit-typescript/typescript/generated.ts)
 are produced by the executable Rust example. The example also serializes real
-Serde values into [wire-samples.ts](../crates/spline-typescript/typescript/wire-samples.ts),
+Serde values into [wire-samples.ts](../crates/splinekit-typescript/typescript/wire-samples.ts),
 where TypeScript checks them with `satisfies` against those types.
 
 Verification passed: **14 Rust tests**, TypeScript **5.9.3** in strict mode with

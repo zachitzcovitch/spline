@@ -1,18 +1,18 @@
-use spline_example_blog_contracts::api;
-use spline_openapi::OpenApi;
-use spline_typescript::Typescript;
+use splinekit_example_blog_contracts::api;
+use splinekit_openapi::OpenApi;
+use splinekit_typescript::Typescript;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let mode = match args.as_slice() {
         [mode] if mode == "--write" || mode == "--check" => mode,
         _ => return Err(
-            "usage: cargo run -p spline-example-blog-contracts --example blog-export -- --write|--check"
+            "usage: cargo run -p splinekit-example-blog-contracts --example blog-export -- --write|--check"
                 .into(),
         ),
     };
 
-    let binding = api::http::describe_with(&spline::http::DeclaredErrors)?;
+    let binding = api::http::describe_with(&splinekit::http::DeclaredErrors)?;
     let typescript = Typescript::new()
         .export_http_application(&binding, "Blog")?
         .source;
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if mode == "--write" {
             std::fs::write(path, source)?;
         } else if std::fs::read_to_string(path)? != source {
-            return Err(format!("Blog artifact {name} is stale; run cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write").into());
+            return Err(format!("Blog artifact {name} is stale; run cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --write").into());
         }
     }
     println!(

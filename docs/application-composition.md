@@ -1,6 +1,6 @@
 # Application composition
 
-Spline can combine resource contracts into one application router and grouped
+Splinekit can combine resource contracts into one application router and grouped
 Rust/TypeScript clients. Enable the facade's `http` feature for the generated
 HTTP execution API. `api::describe()` and the in-process adapter remain neutral;
 HTTP selection is explicit under `api::http`.
@@ -8,10 +8,10 @@ HTTP selection is explicit under `api::http`.
 ## Declare the application
 
 Define HTTP-bound `Users` and `Posts` traits in ordinary `users` and `posts`
-modules using `#[spline::contract]`, then list those resource modules explicitly:
+modules using `#[splinekit::contract]`, then list those resource modules explicitly:
 
 ```rust
-spline::api! {
+splinekit::api! {
     /// The public application API.
     pub mod api {
         users: crate::users,
@@ -53,8 +53,8 @@ The generated module exposes:
 Select an adapter through its extension trait:
 
 ```rust
-use spline::http::HttpExt;
-use spline::runtime::InProcessExt;
+use splinekit::http::HttpExt;
+use splinekit::runtime::InProcessExt;
 
 let bundle = api::shared(implementation);
 let local = bundle.clone().in_process()?;
@@ -72,7 +72,7 @@ directly or delegate to resource-specific implementations. For request-scoped
 authentication, use a lightweight session implementing those traits:
 
 ```rust
-use spline::http::HttpFactoryExt;
+use splinekit::http::HttpFactoryExt;
 
 let router = api::contract().http_with(
     move |context| {
@@ -103,7 +103,7 @@ operation dispatch. Authentication and shared state remain outside serialized DT
 One error policy is shared across the routes. A function/closure works when all
 operations use the same application error; a policy struct can implement
 `ErrorPolicy<UserError>` and `ErrorPolicy<PostError>` for different resource errors.
-For error types deriving `spline::http::Error`, the reusable `DeclaredErrors` policy
+For error types deriving `splinekit::http::Error`, the reusable `DeclaredErrors` policy
 selects their defaults across all resources. `api::http::describe_with(&policy)`
 collects the selected policy's response metadata; see [declared errors](http-errors.md).
 The service, factory, and policy do not need `Clone`: the generated router shares
@@ -141,7 +141,7 @@ application and each resource's native DTO compatibility.
 Generate one TypeScript module:
 
 ```rust
-let artifact = spline_typescript::Typescript::new()
+let artifact = splinekit_typescript::Typescript::new()
     .export_http_application(&api::http::describe()?, "Api")?;
 ```
 
@@ -179,7 +179,7 @@ The generated resource module exposes `register(&mut builder, group)` for toolin
 that wants to compose metadata without generating an HTTP application module:
 
 ```rust
-let mut builder = spline::contract::ApplicationBuilder::new("Application docs");
+let mut builder = splinekit::contract::ApplicationBuilder::new("Application docs");
 users::register(&mut builder, "users")?;
 posts::register(&mut builder, "posts")?;
 let application = builder.finish()?;
@@ -233,8 +233,8 @@ assertions. Verification also covers Clippy with warnings denied, formatting,
 neutral facade/dependency checks, and generated-artifact freshness commands.
 
 ```sh
-cargo test --locked -p spline-example-contract --test application
-cargo run --locked -p spline-example-contract -- --check
+cargo test --locked -p splinekit-example-contract --test application
+cargo run --locked -p splinekit-example-contract -- --check
 npm run check
 npm run test:blog
 ```

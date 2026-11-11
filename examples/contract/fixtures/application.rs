@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use spline::{
+use splinekit::{
     http::{axum::http::StatusCode, ErrorPolicy},
     Schema,
 };
@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[spline(name = "composition.User")]
+#[splinekit(name = "composition.User")]
 pub struct User {
     pub id: String,
     pub display_name: String,
@@ -21,7 +21,7 @@ pub struct User {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(deny_unknown_fields)]
-#[spline(name = "composition.Post")]
+#[splinekit(name = "composition.Post")]
 pub struct Post {
     pub id: String,
     pub author: User,
@@ -31,21 +31,21 @@ pub struct Post {
 
 #[derive(Serialize, Deserialize, Schema)]
 #[serde(deny_unknown_fields)]
-#[spline(name = "composition.NewPost")]
+#[splinekit(name = "composition.NewPost")]
 pub struct NewPost {
     pub title: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-#[spline(name = "composition.UserError")]
+#[splinekit(name = "composition.UserError")]
 pub enum UserError {
     NotFound,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-#[spline(name = "composition.PostError")]
+#[splinekit(name = "composition.PostError")]
 pub enum PostError {
     NotFound,
     Forbidden,
@@ -53,7 +53,7 @@ pub enum PostError {
 }
 
 /// User operations in the shared application.
-#[spline::contract(namespace = "app.users", module = "users")]
+#[splinekit::contract(namespace = "app.users", module = "users")]
 pub trait Users {
     #[query]
     #[http(get = "/users/{id}")]
@@ -65,7 +65,7 @@ pub trait Users {
 }
 
 /// Post operations use the same authenticated session and user store.
-#[spline::contract(namespace = "app.posts", module = "posts")]
+#[splinekit::contract(namespace = "app.posts", module = "posts")]
 pub trait Posts {
     #[query]
     #[http(get = "/posts/{id}")]
@@ -84,7 +84,7 @@ pub trait Posts {
     async fn delete(&self, id: String) -> Result<(), PostError>;
 }
 
-spline::api! {
+splinekit::api! {
     /// Users and posts, composed with shared configuration.
     pub mod api {
         users: self::users,
@@ -93,7 +93,7 @@ spline::api! {
 }
 
 pub fn typescript() -> Result<String, Box<dyn std::error::Error>> {
-    Ok(spline_typescript::Typescript::new()
+    Ok(splinekit_typescript::Typescript::new()
         .export_http_application(&api::http::describe()?, "Api")?
         .source)
 }

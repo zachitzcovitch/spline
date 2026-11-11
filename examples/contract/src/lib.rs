@@ -1,17 +1,17 @@
 //! One resource contract with generated Rust and TypeScript HTTP clients.
 
 use serde::{Deserialize, Serialize};
-use spline::{Patch, Schema};
+use splinekit::{Patch, Schema};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(transparent)]
-#[spline(name = "example.UserId")]
+#[splinekit(name = "example.UserId")]
 pub struct UserId(pub String);
 
 /// A public user record.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[spline(name = "example.User")]
+#[splinekit(name = "example.User")]
 pub struct User {
     pub id: UserId,
     pub display_name: String,
@@ -21,7 +21,7 @@ pub struct User {
 /// Information supplied when creating a user.
 #[derive(Debug, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[spline(name = "example.NewUser")]
+#[splinekit(name = "example.NewUser")]
 pub struct NewUser {
     pub display_name: String,
     #[serde(default)]
@@ -31,7 +31,7 @@ pub struct NewUser {
 /// Complete replacement of the writable profile. An absent bio becomes null.
 #[derive(Debug, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[spline(name = "example.ReplaceUser")]
+#[splinekit(name = "example.ReplaceUser")]
 pub struct ReplaceUser {
     pub display_name: String,
     pub bio: Option<String>,
@@ -40,11 +40,11 @@ pub struct ReplaceUser {
 /// Partial update: omitted fields stay unchanged; null clears the nullable bio.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize, Schema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[spline(name = "example.UserPatch")]
+#[splinekit(name = "example.UserPatch")]
 pub struct UserPatch {
-    #[serde(default, skip_serializing_if = "spline::Patch::is_missing")]
+    #[serde(default, skip_serializing_if = "splinekit::Patch::is_missing")]
     pub display_name: Patch<String>,
-    #[serde(default, skip_serializing_if = "spline::Patch::is_missing")]
+    #[serde(default, skip_serializing_if = "splinekit::Patch::is_missing")]
     pub bio: Patch<Option<String>>,
 }
 
@@ -55,14 +55,14 @@ pub struct UserPatch {
     rename_all = "snake_case",
     deny_unknown_fields
 )]
-#[spline(name = "example.ApiError")]
+#[splinekit(name = "example.ApiError")]
 pub enum ApiError {
     NotFound,
     InvalidName { message: String },
 }
 
 /// Operations on user records.
-#[spline::contract(namespace = "users", module = "users")]
+#[splinekit::contract(namespace = "users", module = "users")]
 pub trait Users {
     /// Fetch an existing user.
     #[query]
@@ -190,8 +190,8 @@ impl Users for DemoUsers {
     }
 }
 
-pub fn error_status(error: &ApiError) -> spline::http::axum::http::StatusCode {
-    use spline::http::axum::http::StatusCode;
+pub fn error_status(error: &ApiError) -> splinekit::http::axum::http::StatusCode {
+    use splinekit::http::axum::http::StatusCode;
     match error {
         ApiError::NotFound => StatusCode::NOT_FOUND,
         ApiError::InvalidName { .. } => StatusCode::UNPROCESSABLE_ENTITY,
@@ -200,7 +200,7 @@ pub fn error_status(error: &ApiError) -> spline::http::axum::http::StatusCode {
 
 pub fn typescript() -> Result<String, Box<dyn std::error::Error>> {
     let description = users::http::describe()?;
-    Ok(spline_typescript::Typescript::new()
+    Ok(splinekit_typescript::Typescript::new()
         .export_http_client(&description, "Users")?
         .source)
 }
@@ -238,11 +238,11 @@ mod tests {
         assert_eq!(description.operations().len(), 5);
         assert_eq!(
             description.operations()["get"].kind,
-            spline::contract::OperationKind::Query
+            splinekit::contract::OperationKind::Query
         );
         assert_eq!(
             description.operations()["create"].kind,
-            spline::contract::OperationKind::Mutation
+            splinekit::contract::OperationKind::Mutation
         );
         assert_eq!(description.operations()["get"].id, "users.get");
         assert_eq!(

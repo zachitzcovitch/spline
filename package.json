@@ -1,8 +1,8 @@
 {
-  "name": "spline-workspace",
+  "name": "splinekit-workspace",
   "private": true,
   "license": "MIT OR Apache-2.0",
-  "workspaces": ["crates/spline-typescript/typescript", "examples/contract/typescript", "examples/blog/typescript"],
+  "workspaces": ["crates/splinekit-typescript/typescript", "examples/contract/typescript", "examples/blog/typescript"],
   "scripts": {
     "check": "npm run check --workspaces",
     "check:openapi": "node scripts/check-openapi.mjs",

@@ -33,28 +33,28 @@ jobs:
       - name: Check workspace lints
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Check neutral facade without HTTP
-        run: cargo check --locked -p spline --no-default-features
+        run: cargo check --locked -p splinekit --no-default-features
       - name: Check neutral dependency boundary
         run: npm run check:neutral
       - name: Run neutral typed execution
-        run: cargo run --locked -p spline --no-default-features --example neutral
+        run: cargo run --locked -p splinekit --no-default-features --example neutral
       - name: Run Rust and cross-language HTTP tests
         run: cargo test --locked --workspace
       - name: Run multi-crate blog workflow
         run: npm run test:blog
       - name: Check schema artifact freshness
-        run: cargo run --locked -p spline-typescript --example export -- --check
+        run: cargo run --locked -p splinekit-typescript --example export -- --check
       - name: Check contract artifact freshness
-        run: cargo run --locked -p spline-example-contract -- --check
+        run: cargo run --locked -p splinekit-example-contract -- --check
       - name: Check tutorial client freshness
-        run: cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
+        run: cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check
       - name: Check CRUD OpenAPI freshness
-        run: cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+        run: cargo run --locked -p splinekit-example-contract --example contract-openapi -- --check
       - name: Validate OpenAPI documents
         run: npm run check:openapi
       - name: Check generated TypeScript types
         run: npm run check
       - name: Check Rust benchmark fixtures
-        run: cargo bench --locked -p spline-benchmarks -- --test
+        run: cargo bench --locked -p splinekit-benchmarks -- --test
       - name: Check TypeScript benchmark fixtures
         run: npm run bench:typescript -- --check

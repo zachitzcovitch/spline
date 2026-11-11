@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use spline::http::StatusCode;
-use spline::Schema;
+use splinekit::http::StatusCode;
+use splinekit::Schema;
 
 use crate::User;
 
@@ -22,7 +22,7 @@ pub struct NewPost {
     pub body: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Schema, spline::http::Error)]
+#[derive(Debug, Serialize, Deserialize, Schema, splinekit::http::Error)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PostError {
     #[http(status = StatusCode::NOT_FOUND)]
@@ -34,7 +34,7 @@ pub enum PostError {
 }
 
 /// Drafts and publishing operations.
-#[spline::contract]
+#[splinekit::contract]
 pub trait Posts {
     /// Read a post. Authenticated readers can view drafts as well as published posts.
     #[query]

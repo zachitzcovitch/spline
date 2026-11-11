@@ -1,6 +1,6 @@
 # Changelog
 
-User-visible changes to Spline are recorded here. The project has no published
+User-visible changes to Splinekit are recorded here. The project has no published
 release yet; the workspace version is a development version.
 
 ## Unreleased
@@ -14,7 +14,7 @@ release yet; the workspace version is a development version.
   executable TypeScript fetch clients with typed failures.
 - PUT/PATCH/DELETE, `Patch<T>` omission semantics, and bodyless 204 responses.
 - Compatible/strict response policies and old-contract/new-server conformance.
-- `spline::api!` application composition, shared schemas/configuration, grouped
+- `splinekit::api!` application composition, shared schemas/configuration, grouped
   clients, and cross-resource namespace/schema/route checks.
 - A multi-crate blog tutorial with matching Rust and TypeScript workflows.
 - Pinned toolchains, artifact-freshness checks, cross-language tests, contributor
@@ -23,21 +23,21 @@ release yet; the workspace version is a development version.
   client benchmarks with fixture checks in CI and documented timing boundaries.
 - Protocol-neutral typed Tower operation services and grouped in-process clients,
   including readiness, shared concurrency/backpressure, and cancellation checks.
-- A lightweight `spline-http-contract` crate for HTTP descriptions and validation,
+- A lightweight `splinekit-http-contract` crate for HTTP descriptions and validation,
   separate from neutral contracts and the Axum/reqwest runtime.
 - Neutral definition/service-bundle values and adapter-owned extension traits:
   `.http(policy)`, `.http_with(factory, policy)`, and `.in_process()`. Resource and
   application adapters preserve concrete service/policy bounds and shared state.
 - Adapter entry points use `shared(implementation)` for a reusable instance and
   `contract()` for factory-supplied implementations, clarifying their lifetimes.
-- An opt-in `spline::http::Error` derive with named `StatusCode` constants and
+- An opt-in `splinekit::http::Error` derive with named `StatusCode` constants and
   compile-time status validation. `DeclaredErrors` selects the derived defaults.
 - Policy-aware `::http::describe_with(&policy)` descriptions with per-status
   serialized application-error envelopes, headers, and content types. Custom
   policies remain supported and opaque unless they declare their response mapping.
 - Neutral source-variant schema identities, preserving associations through Serde
   renames/tagging without adding HTTP fields to the schema or contract model.
-- A standalone `spline-openapi` exporter producing inspectable, deterministic
+- A standalone `splinekit-openapi` exporter producing inspectable, deterministic
   OpenAPI 3.1.2 documents from bound resources/applications. It preserves directional
   schemas, recursive/generic components, positional argument wire mappings, PATCH,
   204, and combined application/framework responses.
@@ -55,6 +55,11 @@ release yet; the workspace version is a development version.
 
 ### Changed
 
+- The project is now Splinekit: every crate is published under the `splinekit`
+  name (`splinekit`, `splinekit-schema`, `splinekit-http`, …) because `spline` is
+  taken on crates.io. Code imports `splinekit::`; the HTTP error marker header is
+  `x-splinekit-error`, the OpenAPI extension `x-splinekit-error-policy`, and the
+  partial-update schema `splinekit.Patch`. Regenerate clients and artifacts.
 - TypeScript exports use short public DTO names and authored parameter names.
   Equivalent directions share one declaration; differing nested wire shapes keep
   `Input`/`Output` distinctions. Collisions require explicit exporter overrides.
@@ -65,14 +70,14 @@ release yet; the workspace version is a development version.
   against the generated blog client using the TypeScript language service.
 - The blog tutorial relies on inferred DTO schema identities, demonstrating clean
   TypeScript names without explicit naming annotations.
-- `#[spline::contract]` now exposes generated support in the trait's existing Rust
+- `#[splinekit::contract]` now exposes generated support in the trait's existing Rust
   module and infers the namespace from that module. Optional `module` preserves
   separate companion generation; optional `namespace` pins logical identities.
   The blog tutorial uses normal `users.rs`/`posts.rs` resource modules with no options.
 - Generated operation arguments retain documentation on their schema fields while
   consuming parameter doc attributes before lowering to Rust function signatures.
 - HTTP entry points and client/export configuration now use explicit `::http`
-  modules. `describe()` and `spline::api!` compose neutral operations independently
+  modules. `describe()` and `splinekit::api!` compose neutral operations independently
   of HTTP routing; bound descriptions contain a separate HTTP plan map.
 - HTTP dispatch invokes the same typed Tower adapters used in process. Configured
   operation services can be attached through `resource::http::operation::router`.

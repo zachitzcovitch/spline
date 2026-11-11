@@ -1,6 +1,6 @@
 # Performance benchmarks
 
-These benchmarks establish local baselines for Spline's metadata, exporters, and
+These benchmarks establish local baselines for Splinekit's metadata, exporters, and
 clients. Run commands from the repository root with the pinned Rust/Node versions.
 Rust measurements use Criterion in Cargo's optimized bench profile. Criterion is
 a development dependency of this benchmark package only.
@@ -16,8 +16,8 @@ a development dependency of this benchmark package only.
 | `metadata/http_blog` | Describe the blog and validate its separate HTTP bindings. | None. |
 | `metadata/neutral_shared_dtos/{1,10,100}` | Build neutral synthetic applications with increasing operation counts and shared DTOs. | None. This isolates operation-count scaling, not schema-count scaling. |
 | `typescript/export_http/{blog,100_resources}` | Render types, plans, and the fetch runtime into one source string. | Contract description and exporter configuration; no filesystem writes. |
-| `http/loopback_get_post/{spline,reqwest_serde}/{128,16384}` | One sequential GET, server response serialization, HTTP, and typed response decoding. | Router/client construction, Tokio startup, and initial connection establishment. |
-| Node `spline_{compatible,strict}/{128,16384}` | Generated TS request construction, a fresh synthetic fetch response, parsing, validation/projection. | Generated module loading, client construction, fixture serialization. |
+| `http/loopback_get_post/{splinekit,reqwest_serde}/{128,16384}` | One sequential GET, server response serialization, HTTP, and typed response decoding. | Router/client construction, Tokio startup, and initial connection establishment. |
+| Node `splinekit_{compatible,strict}/{128,16384}` | Generated TS request construction, a fresh synthetic fetch response, parsing, validation/projection. | Generated module loading, client construction, fixture serialization. |
 | Node `response_json/{128,16384}` | Fresh Response construction and JSON parsing. | Fixture serialization. |
 
 HTTP and Node size labels are ASCII bytes in `Post.body`. Criterion's HTTP byte
@@ -31,8 +31,8 @@ The neutral metadata cases have new benchmark IDs because the earlier
 `metadata/blog`/`metadata/shared_dtos` cases included HTTP planning in the core
 description. Old measurements of those cases have a different timed boundary.
 
-The reqwest comparison talks to the **same Spline server** and decodes the same
-Rust DTO, but does not perform Spline response-schema checks. It provides context
+The reqwest comparison talks to the **same Splinekit server** and decodes the same
+Rust DTO, but does not perform Splinekit response-schema checks. It provides context
 for the additional client work; the difference is not a pure isolated overhead
 measurement because network scheduling and allocation also contribute.
 
@@ -45,15 +45,15 @@ concurrent server capacity test.
 ## Run
 
 ```sh
-cargo bench --locked -p spline-benchmarks --bench metadata
-cargo bench --locked -p spline-benchmarks --bench http
+cargo bench --locked -p splinekit-benchmarks --bench metadata
+cargo bench --locked -p splinekit-benchmarks --bench http
 npm run bench:typescript
 ```
 
 For a quick exploratory run:
 
 ```sh
-cargo bench --locked -p spline-benchmarks -- --quick
+cargo bench --locked -p splinekit-benchmarks -- --quick
 npm run bench:typescript -- --quick
 ```
 
@@ -75,9 +75,9 @@ node --version
 git rev-parse HEAD
 git status --short
 
-cargo bench --locked -p spline-benchmarks -- --save-baseline before
+cargo bench --locked -p splinekit-benchmarks -- --save-baseline before
 # Apply the change, then compare using the same commands and environment.
-cargo bench --locked -p spline-benchmarks -- --baseline before
+cargo bench --locked -p splinekit-benchmarks -- --baseline before
 ```
 
 Use the normal sample sizes for comparisons, inspect distributions, and reproduce
@@ -90,7 +90,7 @@ these fixtures do not establish performance guarantees for other applications.
 CI validates the fixtures without asserting timing thresholds:
 
 ```sh
-cargo bench --locked -p spline-benchmarks -- --test
+cargo bench --locked -p splinekit-benchmarks -- --test
 npm run bench:typescript -- --check
 ```
 

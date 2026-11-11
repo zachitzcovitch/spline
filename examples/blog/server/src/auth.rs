@@ -1,4 +1,4 @@
-use spline::http::{Fault, RequestContext};
+use splinekit::http::{Fault, RequestContext};
 
 /// Two fixed demo tokens identify the seeded users in this local example.
 pub fn authenticate(context: &RequestContext) -> Result<&'static str, Fault> {

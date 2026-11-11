@@ -1,0 +1,26 @@
+[package]
+name = "splinekit"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Rust-authored API contracts and schemas"
+
+[features]
+default = []
+http = ["dep:splinekit-http"]
+
+[dependencies]
+splinekit-schema.workspace = true
+splinekit-contract.workspace = true
+splinekit-macros.workspace = true
+splinekit-runtime.workspace = true
+serde.workspace = true
+splinekit-http = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+trybuild.workspace = true
+tokio.workspace = true

@@ -20,8 +20,8 @@ test("the blog server and both README clients work across package boundaries", {
   const assertResponse = responseAssertions(document);
   const build = await execute(process.env.CARGO ?? "cargo", [
     "build", "--locked", "--message-format=json",
-    "-p", "spline-example-blog-server",
-    "-p", "spline-example-blog-client",
+    "-p", "splinekit-example-blog-server",
+    "-p", "splinekit-example-blog-client",
   ], { cwd: root, signal: t.signal, maxBuffer: 8 * 1024 * 1024 });
   const binaries = new Map();
   for (const line of build.stdout.split("\n").filter(Boolean)) {
@@ -79,7 +79,7 @@ test("the blog server and both README clients work across package boundaries", {
       await assertResponse("/posts/{id}", "get", response);
       const post = await response.json();
       assert.equal(post.author.id, "alice");
-      assert.equal(post.title, "Hello from Spline");
+      assert.equal(post.title, "Hello from Splinekit");
       assert.equal(post.body, "One Rust contract, two typed clients.");
       assert.equal(post.published, true);
     }
@@ -91,7 +91,7 @@ test("the blog server and both README clients work across package boundaries", {
     });
     assert.equal(response.status, 422);
     await assertResponse("/posts", "post", response);
-    assert.equal(response.headers.get("x-spline-error"), "application");
+    assert.equal(response.headers.get("x-splinekit-error"), "application");
     assert.deepEqual(await response.json(), { kind: "application", value: { kind: "invalid_title" } });
 
     // The derived defaults preserve the same status/envelope across both resources.
@@ -103,7 +103,7 @@ test("the blog server and both README clients work across package boundaries", {
       const response = await request(path, { method, headers: { authorization: "Bearer bob-token" } });
       assert.equal(response.status, status);
       await assertResponse(method === "POST" ? "/posts/{id}/publish" : path.startsWith("/users/") ? "/users/{id}" : "/posts/{id}", method, response);
-      assert.equal(response.headers.get("x-spline-error"), "application");
+      assert.equal(response.headers.get("x-splinekit-error"), "application");
       assert.deepEqual(await response.json(), { kind: "application", value: { kind } });
     }
   } finally {

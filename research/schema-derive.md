@@ -3,13 +3,13 @@
 Implemented: 2026-10-12.
 
 **Workspace update:** the implementation now lives in
-[`spline-macros`](../crates/spline-macros) and [`spline`](../crates/spline), with all
+[`splinekit-macros`](../crates/splinekit-macros) and [`splinekit`](../crates/splinekit), with all
 derive tests migrated. The [workspace guide](../docs/workspace-contracts.md) has
 current commands; the prototype commands below are historical.
 
 ## Result
 
-The [derive implementation](../crates/spline-macros) generates the typed
+The [derive implementation](../crates/splinekit-macros) generates the typed
 descriptions previously written by hand in the [registry prototype](schema-registry.md).
 Its facade re-exports the runtime API and `#[derive(Schema)]`.
 
@@ -19,13 +19,13 @@ Serde's internal AST. Generated descriptions call the runtime directly; they
 neither invoke the parser nor reference Serde's private runtime modules.
 
 This is implemented in an isolated research workspace. The syntax below works
-there; it is still a candidate API for the eventual Spline crates.
+there; it is still a candidate API for the eventual Splinekit crates.
 
 ## Authoring
 
 ```rust
 #[derive(serde::Serialize, serde::Deserialize, Schema)]
-#[spline(name = "api.User")]
+#[splinekit(name = "api.User")]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct User {
     display_name: String,
@@ -45,7 +45,7 @@ let input = registry.register::<User>(Direction::Deserialize)?;
 let output = registry.register::<User>(Direction::Serialize)?;
 ```
 
-### Spline attributes
+### Splinekit attributes
 
 All values in this first syntax are string literals. Type and crate-path values
 are parsed as Rust syntax and resolved by rustc in the caller's scope.
@@ -71,7 +71,7 @@ facade; it does not automatically inspect Cargo dependency aliases.
 
 ```rust
 #[serde(with = "decimal")]
-#[spline(schema = "String")]
+#[splinekit(schema = "String")]
 count: u64,
 ```
 

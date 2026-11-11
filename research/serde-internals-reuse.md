@@ -3,19 +3,19 @@
 Evaluated: 2026-10-12.
 
 **Workspace update:** the inspection adapter and its tests now live under
-[`spline-schema/tests`](../crates/spline-schema/tests). The old standalone package
+[`splinekit-schema/tests`](../crates/splinekit-schema/tests). The old standalone package
 and lockfile were removed; the evaluation below records the original findings.
 
 ## Recommendation
 
-**Reuse `serde_derive_internals` behind a private adapter in the next Spline schema
+**Reuse `serde_derive_internals` behind a private adapter in the next Splinekit schema
 prototype.** It provides useful, tested interpretation of Serde attributes and
-validation rules. Spline should own the schema graph, supported representation
+validation rules. Splinekit should own the schema graph, supported representation
 policy, type registration, and exporters.
 
-The [test-only inspection adapter](../crates/spline-schema/tests/support/parser) demonstrates that this
+The [test-only inspection adapter](../crates/splinekit-schema/tests/support/parser) demonstrates that this
 boundary is practical. All references to Serde's internal AST and Syn stay in
-`adapter.rs`; the returned metadata consists of owned Spline-defined types.
+`adapter.rs`; the returned metadata consists of owned Splinekit-defined types.
 
 The recommended production dependency is an exact pin to the evaluated release,
 with upgrades treated as explicit adapter changes. This is a recommendation for
@@ -98,7 +98,7 @@ Similarly, `#[serde(with = "decimal")]` on a `u64` field gives us the paths
 functions emit and accept a string, but the parser cannot infer that from their
 names or the field type.
 
-**Implication:** Spline must combine attribute facts with schema implementations
+**Implication:** Splinekit must combine attribute facts with schema implementations
 for referenced types and explicit descriptions for custom codecs. The helper
 does not resolve Rust types, inspect function bodies, or decide field presence on
 its own. Serde trait bounds are not automatically the right bounds for a future
@@ -117,7 +117,7 @@ belongs inside the version-pinned adapter. It does not emit calls to Serde's
 private runtime modules.
 
 **Implication:** the result is a Serde-oriented intermediate representation,
-including some implementation details. It should be translated into Spline's
+including some implementation details. It should be translated into Splinekit's
 own vocabulary before other code consumes it.
 
 ### 4. Validation happens at more than one stage
@@ -131,9 +131,9 @@ The three compiler-failure fixtures establish a useful distinction:
 | Nonexistent `deserialize_with` function | Parsing succeeds and retains the path. | Rust name resolution rejects the generated reference. |
 
 The helper also deliberately ignores attributes outside Serde's namespace. A
-misspelled setting inside `#[spline(...)]` is Spline's responsibility to validate.
+misspelled setting inside `#[splinekit(...)]` is Splinekit's responsibility to validate.
 
-**Implication:** keep actual compile tests alongside parser tests. Spline also
+**Implication:** keep actual compile tests alongside parser tests. Splinekit also
 needs its own support pass for representations such as flattening, custom codecs,
 and untagged variants before claiming that an operation is exportable.
 
@@ -171,25 +171,25 @@ a smaller integration surface.
 
 The inspected normal dependency tree consists of the parser, Syn, `quote`,
 `proc-macro2`, and their shared identifier dependency. Serde, serde_json, and
-trybuild are dev dependencies for this experiment. In Spline's eventual layout,
+trybuild are dev dependencies for this experiment. In Splinekit's eventual layout,
 the parser should be a macro-side dependency. No compile-time performance or MSRV
 compatibility beyond the executed toolchain is established by these tests.
 
 ## Proposed production boundary
 
 ```text
-Spline derive crate
+Splinekit derive crate
   rustc's input tokens
     -> Syn AST
     -> private serde_derive_internals adapter, per required direction
-    -> Spline-owned macro description + Spline support/override validation
+    -> Splinekit-owned macro description + Splinekit support/override validation
     -> generated Rust Schema implementations
 
-Spline schema crate
+Splinekit schema crate
   Schema trait + directional registry + normalized wire-shape graph
 
 Exporters
-  consume Spline's graph
+  consume Splinekit's graph
 ```
 
 The experiment's string-based `inspect` function is a convenient test interface.
@@ -203,7 +203,7 @@ Recommended dependency and upgrade policy:
 1. Pin `serde_derive_internals` exactly in the macro-side manifest. The experiment
    also pins Syn to make the evaluation reproducible.
 2. Keep upstream adaptation in one private module. Do not expose its types through
-   Spline's public API or emit references to Serde's private modules.
+   Splinekit's public API or emit references to Serde's private modules.
 3. Before upgrading, review the upstream AST/check changes, update the adapter,
    and run both behavior comparisons and compiler fixtures.
 4. Define and test a supported public Serde version window separately. Pinning the
@@ -217,9 +217,9 @@ Recommended dependency and upgrade policy:
 From the repository root:
 
 ```sh
-cargo test --locked -p spline-schema --test serde_inspection --test ui
+cargo test --locked -p splinekit-schema --test serde_inspection --test ui
 cargo fmt --all -- --check
-cargo clippy --locked -p spline-schema --all-targets -- -D warnings
+cargo clippy --locked -p splinekit-schema --all-targets -- -D warnings
 ```
 
 The expected result is 19 passing compatibility tests plus a passing trybuild test
@@ -243,7 +243,7 @@ calls. It records the resulting API proposal and verified cases.
 
 ## References
 
-- [Inspection adapter](../crates/spline-schema/tests/support/parser) and [comparison tests](../crates/spline-schema/tests/serde_inspection.rs).
+- [Inspection adapter](../crates/splinekit-schema/tests/support/parser) and [comparison tests](../crates/splinekit-schema/tests/serde_inspection.rs).
 - [0.30.0 container API](https://docs.rs/serde_derive_internals/0.30.0/serde_derive_internals/ast/struct.Container.html).
 - [0.29.1 container API](https://docs.rs/serde_derive_internals/0.29.1/serde_derive_internals/ast/struct.Container.html).
 - [0.30.0 published source](https://docs.rs/crate/serde_derive_internals/0.30.0/source/).

@@ -11,11 +11,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let mode = match args.as_slice() {
         [mode] if mode == "--check" || mode == "--write" => mode,
-        _ => return Err("usage: cargo run -p spline-example-contract -- --write|--check".into()),
+        _ => {
+            return Err("usage: cargo run -p splinekit-example-contract -- --write|--check".into())
+        }
     };
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("typescript");
     for (name, source) in [
-        ("generated.ts", spline_example_contract::typescript()?),
+        ("generated.ts", splinekit_example_contract::typescript()?),
         ("evolution-v1.generated.ts", evolution::typescript()?),
         ("application.generated.ts", application::typescript()?),
     ] {

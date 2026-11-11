@@ -1,6 +1,6 @@
-# A small blog built with Spline
+# A small blog built with Splinekit
 
-Start here to learn how to use Spline. This small monorepo connects **one shared
+Start here to learn how to use Splinekit. This small monorepo connects **one shared
 Rust contract crate** to a server crate, a Rust client crate, and a TypeScript package.
 
 The walkthrough reads Alice's profile, creates and fetches a draft, handles Bob's
@@ -55,9 +55,9 @@ server ──────→ contracts ←────── rust-client
 
 The three crates are members of the repository's **root Cargo workspace**, sharing
 its `Cargo.toml` and `Cargo.lock`. The TypeScript package belongs to the root npm
-workspace and shares `package-lock.json`. The exporter uses `spline-typescript`
-and `spline-openapi` as development dependencies of the contracts crate; application builds depend on
-the contracts' normal dependencies (`spline` with HTTP support and Serde).
+workspace and shares `package-lock.json`. The exporter uses `splinekit-typescript`
+and `splinekit-openapi` as development dependencies of the contracts crate; application builds depend on
+the contracts' normal dependencies (`splinekit` with HTTP support and Serde).
 
 ## Run the application
 
@@ -79,7 +79,7 @@ The generated TypeScript client is checked in, so the first run is ready to go.
 **Terminal 1 — start the server:**
 
 ```sh
-cargo run --locked -p spline-example-blog-server
+cargo run --locked -p splinekit-example-blog-server
 ```
 
 Wait for:
@@ -91,7 +91,7 @@ Blog API: http://127.0.0.1:3000/api
 **Terminal 2 — run the Rust client, then the TypeScript client:**
 
 ```sh
-cargo run --locked -p spline-example-blog-client
+cargo run --locked -p splinekit-example-blog-client
 node examples/blog/typescript/run.mjs
 ```
 
@@ -100,7 +100,7 @@ The first client prints:
 ```text
 User: Alice
 Created draft: post_1
-Read draft: Hello from Spline
+Read draft: Hello from Splinekit
 Bob cannot publish Alice's post (typed Forbidden)
 Published: post_1 (published=true)
 ```
@@ -119,8 +119,8 @@ and only a post's author may publish it.
 Supply the server's bind address and the clients' base URL, including `/api`:
 
 ```sh
-cargo run --locked -p spline-example-blog-server -- 127.0.0.1:3001
-cargo run --locked -p spline-example-blog-client -- http://127.0.0.1:3001/api
+cargo run --locked -p splinekit-example-blog-server -- 127.0.0.1:3001
+cargo run --locked -p splinekit-example-blog-client -- http://127.0.0.1:3001/api
 node examples/blog/typescript/run.mjs http://127.0.0.1:3001/api
 ```
 
@@ -145,7 +145,7 @@ unmatched route; an unavailable server gives a transport failure.
 | [openapi.json](openapi.json) | Paths, directional schemas, declared errors, and bearer authentication. |
 
 Server implementation lives in the server crate. Both Rust applications import
-`spline_example_blog_contracts`, and TypeScript imports
+`splinekit_example_blog_contracts`, and TypeScript imports
 [`generated.ts`](typescript/generated.ts). A four-line Node launcher,
 [`run.mjs`](typescript/run.mjs), supplies the base URL to the type-checked client.
 Node runs the `.ts` files directly using built-in type stripping.
@@ -158,12 +158,12 @@ and composes the resource modules into `api`. For a focused read, follow
 [`posts.rs`](contracts/src/posts.rs) →
 [`service/posts.rs`](server/src/service/posts.rs) → a client call.
 
-DTOs derive Serde's `Serialize`/`Deserialize` and Spline's `Schema`. Serde attributes
+DTOs derive Serde's `Serialize`/`Deserialize` and Splinekit's `Schema`. Serde attributes
 describe the wire names: `User.display_name` becomes `displayName` in JSON and
-TypeScript. Spline infers schema identities from the Rust types and exposes clean
+TypeScript. Splinekit infers schema identities from the Rust types and exposes clean
 TypeScript names such as `User`, `Post`, and `UserError` automatically.
 
-You can optionally add `#[spline(name = "blog.User")]` to pin a schema identity
+You can optionally add `#[splinekit(name = "blog.User")]` to pin a schema identity
 across Rust module moves or type renames. The example uses the defaults; see
 [the TypeScript guide](../../docs/typescript.md#default-names) for the naming rules.
 
@@ -172,7 +172,7 @@ needs no options:
 
 ```rust
 // contracts/src/posts.rs
-#[spline::contract]
+#[splinekit::contract]
 pub trait Posts {
     #[mutation]
     #[http(post = "/posts", body = "input", status = 201)]
@@ -181,7 +181,7 @@ pub trait Posts {
 }
 ```
 
-Spline exposes `posts::describe` and typed operation services directly in
+Splinekit exposes `posts::describe` and typed operation services directly in
 that existing module. Its default namespace is `posts`, giving identities such as
 `posts.create`. The same pattern works with an inline `pub mod posts { ... }` in
 one file.
@@ -210,7 +210,7 @@ The complete API has four operations:
 Finally, compose the resource modules:
 
 ```rust
-spline::api! {
+splinekit::api! {
     pub mod api {
         users: crate::users,
         posts: crate::posts,
@@ -236,8 +236,8 @@ The shared types live in `service/mod.rs`; `service/users.rs` and
 The server selects the HTTP adapter through its extension trait:
 
 ```rust
-use spline::http::HttpFactoryExt;
-use spline::http::DeclaredErrors;
+use splinekit::http::HttpFactoryExt;
+use splinekit::http::DeclaredErrors;
 
 let routes = api::contract().http_with(
     move |context| {
@@ -261,15 +261,15 @@ Importing `HttpFactoryExt` and calling `http_with` selects HTTP and gives the
 factory its inferred `RequestContext` type. For a single
 shared implementation, the corresponding flow is
 `api::shared(implementation).http(error_statuses)?` with `HttpExt`. Direct typed
-calls use `.in_process()?` with `spline::runtime::InProcessExt`.
+calls use `.in_process()?` with `splinekit::runtime::InProcessExt`.
 
-Both error types derive `spline::http::Error` and declare named statuses on their
+Both error types derive `splinekit::http::Error` and declare named statuses on their
 variants. For example, `posts.rs` contains:
 
 ```rust
-use spline::http::StatusCode;
+use splinekit::http::StatusCode;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, spline::Schema, spline::http::Error)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema, splinekit::http::Error)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PostError {
     #[http(status = StatusCode::NOT_FOUND)]
@@ -314,7 +314,7 @@ The two clients preserve the same authored positional arguments:
 ```rust
 let user = alice.users().get("alice".into()).await?;
 let new_post = NewPost {
-    title: "Hello from Spline".into(),
+    title: "Hello from Splinekit".into(),
     body: "One Rust contract, two typed clients.".into(),
 };
 let draft = alice.posts().create(new_post).await?;
@@ -323,7 +323,7 @@ let draft = alice.posts().create(new_post).await?;
 ```typescript
 const user = valueOrThrow(await alice.users.get("alice"), "Get user");
 const newPost = {
-  title: "Hello from Spline",
+  title: "Hello from Splinekit",
   body: "One Rust contract, two typed clients.",
 };
 const draft = valueOrThrow(await alice.posts.create(newPost), "Create draft");
@@ -355,7 +355,7 @@ as `User` or `UserError`; property completion follows the actual DTO fields. See
 and explicit names when resources have colliding short names.
 
 Authorization headers are configured once per client and apply to both groups.
-Spline builds request URLs, encodes arguments, validates/decodes responses, and
+Splinekit builds request URLs, encodes arguments, validates/decodes responses, and
 preserves each operation's error type.
 
 You can also see the plain HTTP representation:
@@ -374,8 +374,8 @@ After changing DTOs or operations in `contracts/src/users.rs` or
 `server/src/service/` and regenerate the TypeScript artifact:
 
 ```sh
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write
-npm run check --workspace spline-blog-client
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --write
+npm run check --workspace splinekit-blog-client
 npm run check:openapi
 npm run test:blog
 ```
@@ -404,7 +404,7 @@ name within the shared workspace; its source is `contracts/examples/export.rs`.
 Check freshness without rewriting the artifact:
 
 ```sh
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check
 ```
 
 `npm run test:blog` runs the workflow and editor checks.

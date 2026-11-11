@@ -1,10 +1,10 @@
-# Spline
+# Splinekit
 
 A Rust-first contract system for servers and clients. Define your operations and
 wire types once in Rust; implement the server traits and consume the same contract
 through typed Rust and TypeScript clients.
 
-Spline combines Serde serialization, a directional schema graph, typed Tower
+Splinekit combines Serde serialization, a directional schema graph, typed Tower
 execution, and generated clients with typed application errors. Resource contracts
 compose into a neutral application; the HTTP binding adds Axum routing, shared
 request context, and client configuration.
@@ -30,7 +30,7 @@ and typed error handling, with exact commands and a guided reading order.
 Declare the contract in a normal Rust resource module, for example `users.rs`:
 
 ```rust
-#[spline::contract]
+#[splinekit::contract]
 pub trait Users {
     /// Fetch an existing user.
     #[query]
@@ -44,7 +44,7 @@ pub trait Users {
 }
 ```
 
-DTOs use Serde and `#[derive(spline::Schema)]`. The macro generates:
+DTOs use Serde and `#[derive(splinekit::Schema)]`. The macro generates:
 
 - An implementable `Users: Send + Sync` trait with `Send` operation futures.
 - Typed argument structs and HTTP support in the existing `users` module.
@@ -63,7 +63,7 @@ Export the metadata:
 
 ```rust
 let contract = users::http::describe()?;
-let artifact = spline_typescript::Typescript::new()
+let artifact = splinekit_typescript::Typescript::new()
     .export_http_client(&contract, "Users")?;
 ```
 
@@ -87,7 +87,7 @@ if (created.ok) {
 }
 ```
 
-Enable the `spline` crate's `http` feature for bound contracts. The binding supports
+Enable the `splinekit` crate's `http` feature for bound contracts. The binding supports
 GET, POST, PUT, PATCH, and DELETE, scalar path/query parameters, selected JSON
 bodies, 200/201 JSON successes, and empty 204 successes. See the
 [HTTP guide](docs/http-binding.md) for the wire format, request-context factory,
@@ -107,7 +107,7 @@ error policies, and supported DTO compatibility.
 
 The evaluated numeric JSON profile uses 8/16/32-bit integers. Larger integers and
 floats need an explicit wire representation. Error types can opt into
-[`spline::http::Error`](docs/http-errors.md) to declare default HTTP statuses and
+[`splinekit::http::Error`](docs/http-errors.md) to declare default HTTP statuses and
 documented response shapes. [OpenAPI export](docs/openapi.md) consumes those same
 bound descriptions. Streaming is [follow-up work](ROADMAP.md).
 Each guide documents the supported surface and its boundaries.
@@ -128,14 +128,14 @@ the old-client/new-server guarantees and their boundaries.
 List the resource modules once:
 
 ```rust
-spline::api! {
+splinekit::api! {
     pub mod api {
         users: crate::users,
         posts: crate::posts,
     }
 }
 
-use spline::http::HttpFactoryExt;
+use splinekit::http::HttpFactoryExt;
 let router = api::contract().http_with(session_factory, error_policy)?;
 let client = api::http::Client::new("http://localhost:3000")?;
 let user = client.users().get(id).await?;
@@ -154,9 +154,9 @@ body, and status validation occurs in the separately selected HTTP binding. See
 [execution and bindings](docs/execution-bindings.md) for Tower middleware, readiness,
 and protocol boundaries.
 
-For shared implementations, import `spline::http::HttpExt` and select HTTP with
+For shared implementations, import `splinekit::http::HttpExt` and select HTTP with
 `api::shared(implementation).http(error_policy)?`. Import
-`spline::runtime::InProcessExt` to select `.in_process()?` on that same neutral
+`splinekit::runtime::InProcessExt` to select `.in_process()?` on that same neutral
 bundle. Adapter-specific methods become available through the corresponding trait.
 
 ## Export OpenAPI
@@ -164,10 +164,10 @@ bundle. Adapter-specific methods become available through the corresponding trai
 The tooling crate consumes the same policy-aware HTTP description:
 
 ```rust
-let document = spline_openapi::OpenApi::new("Blog API", "0.1.0")
+let document = splinekit_openapi::OpenApi::new("Blog API", "0.1.0")
     .server("/api")
     .bearer_auth("bearerAuth")
-    .export_application(&api::http::describe_with(&spline::http::DeclaredErrors)?)?;
+    .export_application(&api::http::describe_with(&splinekit::http::DeclaredErrors)?)?;
 std::fs::write("openapi.json", document.to_pretty_json()?)?;
 ```
 
@@ -179,15 +179,15 @@ for component names, error fallbacks, and development-only exporter setup.
 
 | Crate | Responsibility |
 | --- | --- |
-| `spline` | User-facing facade, macros, and generated-code integration. |
-| `spline-schema` | Schema trait, directional graph, and registry. |
-| `spline-contract` | Operation metadata and transactional contract construction. |
-| `spline-macros` | Schema derive and contract attribute; private Serde adapter. |
-| `spline-typescript` | Deterministic wire types and operation signatures. |
-| `spline-openapi` | OpenAPI 3.1.2 documents from selected HTTP descriptions. |
-| `spline-http` | Axum dispatch support, HTTP errors, and the reqwest client runtime. |
-| `spline-http-contract` | Lightweight HTTP binding descriptions and validation. |
-| `spline-runtime` | Protocol-neutral typed Tower execution and service failures. |
+| `splinekit` | User-facing facade, macros, and generated-code integration. |
+| `splinekit-schema` | Schema trait, directional graph, and registry. |
+| `splinekit-contract` | Operation metadata and transactional contract construction. |
+| `splinekit-macros` | Schema derive and contract attribute; private Serde adapter. |
+| `splinekit-typescript` | Deterministic wire types and operation signatures. |
+| `splinekit-openapi` | OpenAPI 3.1.2 documents from selected HTTP descriptions. |
+| `splinekit-http` | Axum dispatch support, HTTP errors, and the reqwest client runtime. |
+| `splinekit-http-contract` | Lightweight HTTP binding descriptions and validation. |
+| `splinekit-runtime` | Protocol-neutral typed Tower execution and service failures. |
 
 `examples/blog` is the guided multi-crate application tutorial. `examples/contract` contains
 the CRUD example and protocol/evolution/composition conformance fixtures. Packages
@@ -214,13 +214,13 @@ on pushes and pull requests.
 Start the server in one terminal:
 
 ```sh
-cargo run --locked -p spline-example-blog-server
+cargo run --locked -p splinekit-example-blog-server
 ```
 
 Then run either client:
 
 ```sh
-cargo run --locked -p spline-example-blog-client
+cargo run --locked -p splinekit-example-blog-client
 node examples/blog/typescript/run.mjs
 ```
 
@@ -238,13 +238,13 @@ npm ci --ignore-scripts --no-audit --no-fund
 cargo test --locked --workspace
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo check --locked -p spline --no-default-features
+cargo check --locked -p splinekit --no-default-features
 npm run check:neutral
-cargo run --locked -p spline --no-default-features --example neutral
-cargo run --locked -p spline-typescript --example export -- --check
-cargo run --locked -p spline-example-contract -- --check
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
-cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+cargo run --locked -p splinekit --no-default-features --example neutral
+cargo run --locked -p splinekit-typescript --example export -- --check
+cargo run --locked -p splinekit-example-contract -- --check
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --check
 npm run check
 npm run check:openapi
 npm run test:blog
@@ -264,7 +264,7 @@ client processing. It documents the fixtures and timing boundaries so you can
 build local baselines and compare changes:
 
 ```sh
-cargo bench --locked -p spline-benchmarks
+cargo bench --locked -p splinekit-benchmarks
 npm run bench:typescript
 ```
 

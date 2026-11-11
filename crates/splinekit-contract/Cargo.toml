@@ -1,0 +1,12 @@
+[package]
+name = "splinekit-contract"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Transport-neutral operation metadata backed by Splinekit schemas"
+
+[dependencies]
+splinekit-schema.workspace = true

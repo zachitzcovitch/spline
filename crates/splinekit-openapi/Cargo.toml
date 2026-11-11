@@ -1,0 +1,21 @@
+[package]
+name = "splinekit-openapi"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Deterministic OpenAPI 3.1 documents from Splinekit HTTP descriptions"
+
+[dependencies]
+splinekit-schema.workspace = true
+splinekit-contract.workspace = true
+splinekit-http-contract.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+splinekit = { workspace = true, features = ["http"] }
+tokio.workspace = true

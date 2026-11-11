@@ -12,7 +12,7 @@ use application::api::http as api;
 use application::{Database, Errors, NewPost, PostError, Session, User, UserError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use spline::{
+use splinekit::{
     http::{axum, reqwest, CallError, Fault, ResponsePolicy},
     Schema,
 };
@@ -213,7 +213,7 @@ async fn one_response_policy_applies_to_every_native_resource() {
     ));
 }
 
-#[spline::contract(namespace = "collision.routes", module = "routes")]
+#[splinekit::contract(namespace = "collision.routes", module = "routes")]
 pub trait Routes {
     #[query]
     #[http(get = "/users/{other}")]
@@ -226,13 +226,13 @@ impl Routes for Session {
 }
 
 #[derive(Serialize, Deserialize, Schema)]
-#[spline(name = "composition.User")]
+#[splinekit(name = "composition.User")]
 pub struct Impostor {
     pub id: String,
     pub display_name: String,
 }
 
-#[spline::contract(namespace = "collision.schemas", module = "schemas")]
+#[splinekit::contract(namespace = "collision.schemas", module = "schemas")]
 pub trait Schemas {
     #[query]
     #[http(get = "/impostor")]
@@ -244,9 +244,9 @@ impl Schemas for Session {
     }
 }
 
-spline::api! { mod bad_routes { users: application::users, other: self::routes } }
-spline::api! { mod bad_schemas { users: application::users, other: self::schemas } }
-spline::api! { mod bad_namespaces { users: application::users, people: application::users } }
+splinekit::api! { mod bad_routes { users: application::users, other: self::routes } }
+splinekit::api! { mod bad_schemas { users: application::users, other: self::schemas } }
+splinekit::api! { mod bad_namespaces { users: application::users, people: application::users } }
 
 #[test]
 fn application_collisions_fail_before_router_merge_or_client_construction() {
@@ -270,8 +270,8 @@ fn application_collisions_fail_before_router_merge_or_client_construction() {
     }
     assert!(matches!(
         bad_schemas::describe(),
-        Err(spline::contract::Error::Schema(
-            spline::Error::NameCollision { .. }
+        Err(splinekit::contract::Error::Schema(
+            splinekit::Error::NameCollision { .. }
         ))
     ));
     assert!(
@@ -282,14 +282,14 @@ fn application_collisions_fail_before_router_merge_or_client_construction() {
     assert!(bad_schemas::http::Client::new("http://localhost").is_err());
     assert!(matches!(
         bad_namespaces::describe(),
-        Err(spline::contract::Error::DuplicateNamespace(_))
+        Err(splinekit::contract::Error::DuplicateNamespace(_))
     ));
     assert!(bad_namespaces::http::router(session(), Errors).is_err());
     assert!(bad_namespaces::http::Client::new("http://localhost").is_err());
 }
 
 mod relative_paths {
-    use spline as renamed;
+    use splinekit as renamed;
     renamed::api! {
         crate = "renamed";
         pub mod grouped {
@@ -344,7 +344,7 @@ fn application_artifact_is_current_and_shared_dtos_are_emitted_once() {
 mod checks {
     use super::{Session, User, UserError};
 
-    #[spline::contract]
+    #[splinekit::contract]
     pub trait Checks {
         #[query(name = "get")]
         #[http(get = "/checks/{id}")]
@@ -358,7 +358,7 @@ mod checks {
     }
 }
 
-spline::api! {
+splinekit::api! {
     mod mixed {
         users: application::users,
         checks: self::checks,
@@ -386,7 +386,7 @@ async fn same_module_http_resources_work_directly_and_compose_with_explicit_comp
     assert_eq!(client.users().get("bob".into()).await.unwrap().id, "bob");
     let description = checks::describe().unwrap();
     assert_eq!(description.operations()["get"].id, "checks.get");
-    let source = spline_typescript::Typescript::new()
+    let source = splinekit_typescript::Typescript::new()
         .export_http_application(&mixed::http::describe().unwrap(), "Mixed")
         .unwrap()
         .source;
@@ -396,7 +396,7 @@ async fn same_module_http_resources_work_directly_and_compose_with_explicit_comp
 
 #[tokio::test]
 async fn the_same_application_executes_in_process_through_typed_tower_services() {
-    use spline::runtime::InProcessExt;
+    use splinekit::runtime::InProcessExt;
     let session = Session {
         database: Database::default(),
         principal: "alice".into(),
@@ -422,13 +422,15 @@ async fn the_same_application_executes_in_process_through_typed_tower_services()
     client.posts().delete(post.id.clone()).await.unwrap();
     assert!(matches!(
         client.posts().get(post.id).await,
-        Err(spline::runtime::CallError::Application(PostError::NotFound))
+        Err(splinekit::runtime::CallError::Application(
+            PostError::NotFound
+        ))
     ));
 }
 
 #[tokio::test]
 async fn protocol_extensions_share_a_nonclone_implementation_and_validate_only_when_selected() {
-    use spline::{http::HttpExt, runtime::InProcessExt};
+    use splinekit::{http::HttpExt, runtime::InProcessExt};
     let session = Session {
         database: Database::default(),
         principal: "alice".into(),
@@ -485,7 +487,7 @@ async fn protocol_extensions_share_a_nonclone_implementation_and_validate_only_w
 
 #[tokio::test]
 async fn factory_extensions_infer_http_context_and_run_authentication_before_decoding() {
-    use spline::http::HttpFactoryExt;
+    use splinekit::http::HttpFactoryExt;
     let count = Arc::new(AtomicUsize::new(0));
     let database = Database::default();
     let observed = count.clone();

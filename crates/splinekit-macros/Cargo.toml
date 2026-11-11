@@ -1,0 +1,18 @@
+[package]
+name = "splinekit-macros"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Schema derives and contract/application macros for Splinekit"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+serde_derive_internals.workspace = true
+syn.workspace = true

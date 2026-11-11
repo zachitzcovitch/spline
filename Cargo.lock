@@ -1151,81 +1151,81 @@ dependencies = [
 ]
 
 [[package]]
-name = "spline"
+name = "splinekit"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "spline-contract",
- "spline-http",
- "spline-macros",
- "spline-runtime",
- "spline-schema",
+ "splinekit-contract",
+ "splinekit-http",
+ "splinekit-macros",
+ "splinekit-runtime",
+ "splinekit-schema",
  "tokio",
  "trybuild",
 ]
 
 [[package]]
-name = "spline-benchmarks"
+name = "splinekit-benchmarks"
 version = "0.1.0"
 dependencies = [
  "criterion",
  "serde_json",
- "spline",
- "spline-example-blog-contracts",
- "spline-typescript",
+ "splinekit",
+ "splinekit-example-blog-contracts",
+ "splinekit-typescript",
  "tokio",
 ]
 
 [[package]]
-name = "spline-contract"
+name = "splinekit-contract"
 version = "0.1.0"
 dependencies = [
- "spline-schema",
+ "splinekit-schema",
 ]
 
 [[package]]
-name = "spline-example-blog-client"
+name = "splinekit-example-blog-client"
 version = "0.1.0"
 dependencies = [
- "spline",
- "spline-example-blog-contracts",
+ "splinekit",
+ "splinekit-example-blog-contracts",
  "tokio",
 ]
 
 [[package]]
-name = "spline-example-blog-contracts"
+name = "splinekit-example-blog-contracts"
 version = "0.1.0"
 dependencies = [
  "serde",
- "spline",
- "spline-openapi",
- "spline-typescript",
+ "splinekit",
+ "splinekit-openapi",
+ "splinekit-typescript",
 ]
 
 [[package]]
-name = "spline-example-blog-server"
+name = "splinekit-example-blog-server"
 version = "0.1.0"
 dependencies = [
- "spline",
- "spline-example-blog-contracts",
+ "splinekit",
+ "splinekit-example-blog-contracts",
  "tokio",
 ]
 
 [[package]]
-name = "spline-example-contract"
+name = "splinekit-example-contract"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "spline",
- "spline-openapi",
- "spline-typescript",
+ "splinekit",
+ "splinekit-openapi",
+ "splinekit-typescript",
  "tokio",
 ]
 
 [[package]]
-name = "spline-http"
+name = "splinekit-http"
 version = "0.1.0"
 dependencies = [
  "axum",
@@ -1233,25 +1233,25 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "spline-contract",
- "spline-http-contract",
- "spline-macros",
- "spline-runtime",
- "spline-schema",
+ "splinekit-contract",
+ "splinekit-http-contract",
+ "splinekit-macros",
+ "splinekit-runtime",
+ "splinekit-schema",
  "tokio",
  "url",
 ]
 
 [[package]]
-name = "spline-http-contract"
+name = "splinekit-http-contract"
 version = "0.1.0"
 dependencies = [
- "spline-contract",
- "spline-schema",
+ "splinekit-contract",
+ "splinekit-schema",
 ]
 
 [[package]]
-name = "spline-macros"
+name = "splinekit-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -1261,30 +1261,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "spline-openapi"
+name = "splinekit-openapi"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "spline",
- "spline-contract",
- "spline-http-contract",
- "spline-schema",
+ "splinekit",
+ "splinekit-contract",
+ "splinekit-http-contract",
+ "splinekit-schema",
  "tokio",
  "url",
 ]
 
 [[package]]
-name = "spline-runtime"
+name = "splinekit-runtime"
 version = "0.1.0"
 dependencies = [
- "spline-contract",
+ "splinekit-contract",
  "tokio",
  "tower",
 ]
 
 [[package]]
-name = "spline-schema"
+name = "splinekit-schema"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -1297,15 +1297,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "spline-typescript"
+name = "splinekit-typescript"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "spline",
- "spline-contract",
- "spline-http-contract",
- "spline-schema",
+ "splinekit",
+ "splinekit-contract",
+ "splinekit-http-contract",
+ "splinekit-schema",
 ]
 
 [[package]]

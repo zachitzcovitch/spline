@@ -48,15 +48,15 @@ example; the transport does not perform replacement automatically.
 PATCH uses an explicit field-wise DTO:
 
 ```rust
-use spline::{Patch, Schema};
+use splinekit::{Patch, Schema};
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Schema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct UserPatch {
-    #[serde(default, skip_serializing_if = "spline::Patch::is_missing")]
+    #[serde(default, skip_serializing_if = "splinekit::Patch::is_missing")]
     display_name: Patch<String>,
 
-    #[serde(default, skip_serializing_if = "spline::Patch::is_missing")]
+    #[serde(default, skip_serializing_if = "splinekit::Patch::is_missing")]
     bio: Patch<Option<String>>,
 }
 ```
@@ -90,7 +90,7 @@ The type's `Default` implementation does not require `T: Default`.
 This is a typed application JSON patch DTO, not an implicit implementation of
 JSON Merge Patch or JSON Patch. Nested objects/arrays are values of `T`; recursive
 merging and update application remain explicit application decisions. The helper
-is available from `spline` without enabling the HTTP feature.
+is available from `splinekit` without enabling the HTTP feature.
 
 ## Client usage
 
@@ -174,11 +174,11 @@ Evidence includes:
 
 ```sh
 cargo test --locked --workspace
-cargo test --locked -p spline --features http --test ui
+cargo test --locked -p splinekit --features http --test ui
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo check --locked -p spline --no-default-features
-cargo run --locked -p spline-example-contract -- --check
+cargo check --locked -p splinekit --no-default-features
+cargo run --locked -p splinekit-example-contract -- --check
 npm run check
 ```
 

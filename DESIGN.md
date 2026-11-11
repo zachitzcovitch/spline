@@ -1,4 +1,4 @@
-# Spline design notes
+# Splinekit design notes
 
 ## Status
 
@@ -18,7 +18,7 @@ remain closed even when additive object properties are tolerated.
 The [update profile](docs/http-updates.md) adds PUT/PATCH/DELETE, a typed `Patch<T>`
 field representation, and distinct 204/bodyless success handling in both clients.
 
-[Application composition](docs/application-composition.md) now provides `spline::api!`,
+[Application composition](docs/application-composition.md) now provides `splinekit::api!`,
 grouped native/TypeScript clients, a shared request-scoped service factory, and
 cross-resource schema/route validation. The [blog tutorial](examples/blog/README.md)
 demonstrates the application-facing API through separate contract, server, and
@@ -36,7 +36,7 @@ derives and policy-aware response metadata, shared by routing and export tooling
 
 ## Purpose
 
-Spline lets an application define its API contract in Rust and derive the pieces
+Splinekit lets an application define its API contract in Rust and derive the pieces
 needed to implement and consume it:
 
 - A server interface with typed operations.
@@ -60,7 +60,7 @@ calls cross a transport boundary.
 | First binding | HTTP + JSON, integrated with Axum. |
 | Composition | Use Tower at runtime composition boundaries. |
 | Serialization | Use Serde for encoding and decoding. |
-| Schema ownership | Use Spline's directional schema graph and derives, with a private Serde-internals adapter. |
+| Schema ownership | Use Splinekit's directional schema graph and derives, with a private Serde-internals adapter. |
 | Tooling | Generate clients and documentation from shared contract metadata; add specification exporters from that foundation. |
 
 Optional inline HTTP annotations, discriminated TypeScript results, explicit export
@@ -74,7 +74,7 @@ Smaller contracts give operations context and allow concise method names:
 
 ```rust
 // users.rs
-#[spline::contract]
+#[splinekit::contract]
 pub trait Users {
     /// Fetch a user by their ID.
     #[query]
@@ -88,7 +88,7 @@ pub trait Users {
 }
 
 // posts.rs
-#[spline::contract]
+#[splinekit::contract]
 pub trait Posts {
     /// Create a new post.
     #[mutation]
@@ -118,7 +118,7 @@ namespaces:
 | `posts.publish` | `POST /posts/{id}/publish` | `api.posts.publish(id)` |
 
 Rust and TypeScript clients preserve the authored positional method arguments.
-`spline::api!` combines explicitly listed resource modules and supplies
+`splinekit::api!` combines explicitly listed resource modules and supplies
 `client.users().get(id).await` in Rust and `client.users.get(id)` in TypeScript.
 Group names are explicit client accessors; resource namespaces retain the stable
 operation identities. Logical input objects remain named in metadata and are
@@ -236,7 +236,7 @@ operation services expose `Service<Input, Response = Result<Output, Error>,
 Error = Infallible>` over shared implementations. Outer Tower layers can add
 timeouts, concurrency limits, readiness, and operational errors.
 
-`spline::runtime::invoke` waits for readiness and invokes the same service instance.
+`splinekit::runtime::invoke` waits for readiness and invokes the same service instance.
 Its `CallError<E>` distinguishes typed `Application(E)` from `Service(BoxError)`;
 HTTP maps the latter to a framework response. The generated trait requires `Send`
 futures while implementations retain normal `async fn` methods. See
@@ -252,7 +252,7 @@ The implemented HTTP profile defines:
 - **Errors:** typed application-error envelopes with an executable status policy,
   separate from framework and unmarked HTTP failures.
 
-Error types can derive `spline::http::Error` with named status constants. The
+Error types can derive `splinekit::http::Error` with named status constants. The
 `DeclaredErrors` policy selects these defaults; `::http::describe_with(&policy)`
 records per-status serialized application-error envelopes and headers. Custom
 policies remain opaque unless they declare their static mapping. The OpenAPI
@@ -287,10 +287,10 @@ client also encounters transport, protocol, and framework-level failures.
 The generated Rust HTTP client returns:
 
 ```rust
-Result<User, spline::http::CallError<ApiError>>
+Result<User, splinekit::http::CallError<ApiError>>
 ```
 
-`spline::http::CallError` has application, framework, unmarked HTTP, transport,
+`splinekit::http::CallError` has application, framework, unmarked HTTP, transport,
 protocol, and encode variants. It is distinct from the neutral runtime's
 application/service error wrapper.
 
@@ -330,7 +330,7 @@ this with one `Session` implementing both resources. Neutral bundles use
 `api::shared(implementation)` and select `.in_process()` or `.http(policy)` through
 the respective extension traits; they contain no HTTP context.
 
-## Spline-owned schema layer
+## Splinekit-owned schema layer
 
 These components have been [promoted into workspace crates](docs/workspace-contracts.md#crate-boundaries).
 The research notes below preserve the supporting investigations and earlier API stages.
@@ -345,11 +345,11 @@ supported by behavior comparisons and compiler-failure fixtures.
 
 The [schema/registry investigation](research/schema-registry.md) established a
 two-required-method `Schema` API, directional type registration, field-presence
-composition, and explicit custom-codec descriptions. `spline-schema` implements
+composition, and explicit custom-codec descriptions. `splinekit-schema` implements
 that model with a std-only normal dependency graph.
 
 The [derive investigation](research/schema-derive.md) established the supported
-lowering and diagnostics now implemented in `spline-macros`: logical-name and
+lowering and diagnostics now implemented in `splinekit-macros`: logical-name and
 codec-schema overrides, directional shapes, and recursive/generic DTOs. A defaulted
 `Schema::missing_field()` query handles recursive transparent wrappers while
 preserving its two required methods.
@@ -364,13 +364,13 @@ The [HTTP implementation](docs/http-binding.md) consumes these schemas for URL
 planning, conservative native-client DTO compatibility checks, and generated
 TypeScript request/response validation.
 
-Serde remains responsible for serialization and deserialization. Spline's schema
+Serde remains responsible for serialization and deserialization. Splinekit's schema
 layer supplies the structural descriptions needed by exporters and tooling.
 
 An illustrative derive is:
 
 ```rust
-#[derive(serde::Serialize, serde::Deserialize, spline::Schema)]
+#[derive(serde::Serialize, serde::Deserialize, splinekit::Schema)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: UserId,
@@ -416,10 +416,10 @@ generated DTOs, operations, and specification schemas.
   schemas, error policies, and explicit deployment options. Independent tools and
   live responses verify the generated documents.
 - **OpenRPC:** appropriate if a future binding adopts JSON-RPC 2.0 specifically.
-- **Neutral tooling:** consume Spline's operation catalog and type descriptions.
+- **Neutral tooling:** consume Splinekit's operation catalog and type descriptions.
 
 The internal metadata model can evolve while the required exports are explored.
-Whether to publish and version a standalone Spline specification is an open
+Whether to publish and version a standalone Splinekit specification is an open
 question.
 
 ## Implemented milestones

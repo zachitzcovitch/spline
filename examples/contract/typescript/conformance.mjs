@@ -64,7 +64,7 @@ const emptyWithMetadata = createUsersClient(base, {
   fetch: async () => new Response(null, { status: 204, headers: { "content-type": "application/json" } }),
 });
 assert.deepEqual(await emptyWithMetadata.delete("x"), { ok: true, value: undefined });
-for (const headers of [{ "content-length": "0" }, { "transfer-encoding": "chunked" }, { "x-spline-error": "application" }]) {
+for (const headers of [{ "content-length": "0" }, { "transfer-encoding": "chunked" }, { "x-splinekit-error": "application" }]) {
   const bad204 = createUsersClient(base, { fetch: async () => new Response(null, { status: 204, headers }) });
   assert.equal((await bad204.delete("x")).error.kind, "protocol");
 }
@@ -84,16 +84,16 @@ for (const bad of [
   mock("{}"),
   mock("{"),
   mock(JSON.stringify({ id: "x", displayName: "x" }), 201),
-  mock(JSON.stringify({ kind: "application", value: 3 }), 404, { "x-spline-error": "application" }),
-  mock(JSON.stringify({ kind: "application" }), 404, { "x-spline-error": "application" }),
-  mock(JSON.stringify({ kind: "framework", code: "bad" }), 400, { "x-spline-error": "framework" }),
+  mock(JSON.stringify({ kind: "application", value: 3 }), 404, { "x-splinekit-error": "application" }),
+  mock(JSON.stringify({ kind: "application" }), 404, { "x-splinekit-error": "application" }),
+  mock(JSON.stringify({ kind: "framework", code: "bad" }), 400, { "x-splinekit-error": "framework" }),
 ]) {
   assert.equal((await bad.get("x")).error.kind, "protocol");
 }
 const unavailable = mock("proxy error", 503, { "content-type": "text/html" });
 assert.deepEqual(await unavailable.get("x"), { ok: false, error: { kind: "http", status: 503 } });
 const framework = mock(JSON.stringify({ kind: "framework", code: "unauthorized", message: "token required" }),
-  401, { "x-spline-error": "framework" });
+  401, { "x-splinekit-error": "framework" });
 assert.deepEqual(await framework.get("x"), {
   ok: false, error: { kind: "framework", status: 401, code: "unauthorized", message: "token required" },
 });

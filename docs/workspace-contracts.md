@@ -24,24 +24,24 @@ compare its TypeScript artifact with a fresh export.
 ## Crate boundaries
 
 ```text
-spline                         user-facing facade
-├── spline-schema              Schema, registry, directional graph
-├── spline-contract            operation metadata; depends on spline-schema
-├── spline-runtime             typed Tower services and invocation
-├── spline-macros              proc macros; private Serde-internals adapter
-└── serde                      generated request decoding / output trait checks
+splinekit                         user-facing facade
+├── splinekit-schema              Schema, registry, directional graph
+├── splinekit-contract            operation metadata; depends on splinekit-schema
+├── splinekit-runtime             typed Tower services and invocation
+├── splinekit-macros              proc macros; private Serde-internals adapter
+└── serde                         generated request decoding / output trait checks
 
-spline-http                    optional facade feature; Axum + reqwest + JSON
-└── spline-http-contract        separate HTTP descriptions and validation
+splinekit-http                    optional facade feature; Axum + reqwest + JSON
+└── splinekit-http-contract       separate HTTP descriptions and validation
 
-spline-typescript
-├── spline-schema
-├── spline-contract
-└── spline-http-contract        std-only binding metadata, not HTTP runtime
+splinekit-typescript
+├── splinekit-schema
+├── splinekit-contract
+└── splinekit-http-contract       std-only binding metadata, not HTTP runtime
 
-spline-openapi
-├── spline-schema / spline-contract / spline-http-contract
-└── serde / serde_json / url     document and deployment tooling, not HTTP execution
+splinekit-openapi
+├── splinekit-schema / splinekit-contract / splinekit-http-contract
+└── serde / serde_json / url      document and deployment tooling, not HTTP execution
 ```
 
 The schema, contract metadata, and TypeScript exporter normal dependency trees have no
@@ -51,7 +51,7 @@ external runtime dependencies. The proc-macro crate pins `serde_derive_internals
 One root Cargo lockfile now covers the workspace, and one npm workspace/lockfile
 covers the TypeScript checks, including the [blog tutorial](../examples/blog/README.md).
 The earlier standalone Serde behavior and internals probes have been promoted
-to test-only modules and integration tests in `spline-schema`. They use the root
+to test-only modules and integration tests in `splinekit-schema`. They use the root
 lockfile and run in CI; the schema runtime retains its std-only dependency graph.
 
 The [research index](../research/README.md) maps the former package locations to
@@ -62,7 +62,7 @@ recorded prototype commands are superseded by the root commands below.
 
 ```rust
 // users.rs, loaded by `pub mod users;`
-#[spline::contract]
+#[splinekit::contract]
 pub trait Users {
     #[query]
     async fn get(&self, id: UserId) -> Result<User, ApiError>;
@@ -175,7 +175,7 @@ outside the supported surface. Broader binding design questions are described in
 
 ## Metadata construction
 
-`spline-contract` provides an independent `ContractBuilder` for consumers that
+`splinekit-contract` provides an independent `ContractBuilder` for consumers that
 want to construct metadata directly. The macro's `describe()` uses this builder.
 
 An operation records:
@@ -205,7 +205,7 @@ for the generated router/grouped clients and metadata-only registration API.
 
 ```rust
 let description = users::describe()?;
-let artifact = spline_typescript::Typescript::new()
+let artifact = splinekit_typescript::Typescript::new()
     .export_contract(&description, "Users")?;
 ```
 
@@ -263,8 +263,8 @@ Node v25.2.1. This is the tested toolchain, not an MSRV commitment.
 cargo test --locked --workspace
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo run --locked -p spline-typescript --example export -- --check
-cargo run --locked -p spline-example-contract -- --check
+cargo run --locked -p splinekit-typescript --example export -- --check
+cargo run --locked -p splinekit-example-contract -- --check
 npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```

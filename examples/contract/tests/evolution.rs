@@ -6,7 +6,7 @@ use std::time::Duration;
 use axum::http::StatusCode;
 use fixtures::{required_input, v1, v2};
 use serde_json::{json, Value};
-use spline::http::{self, axum, reqwest, CallError, ResponsePolicy};
+use splinekit::http::{self, axum, reqwest, CallError, ResponsePolicy};
 
 struct Running {
     base: String,

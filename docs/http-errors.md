@@ -1,13 +1,13 @@
 # Declared HTTP application errors
 
 An API error type can declare its default HTTP statuses with the opt-in
-`spline::http::Error` derive. Enable the facade's `http` feature and use named
+`splinekit::http::Error` derive. Enable the facade's `http` feature and use named
 `StatusCode` constants:
 
 ```rust
-use spline::http::StatusCode;
+use splinekit::http::StatusCode;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, spline::Schema, spline::http::Error)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema, splinekit::http::Error)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PostError {
     #[http(status = StatusCode::NOT_FOUND)]
@@ -30,7 +30,7 @@ variants may share a status. Payloads use the same annotation:
 Invalid { field: String, message: String },
 ```
 
-The derive implements `spline::http::Error`, supplying both an exhaustive runtime
+The derive implements `splinekit::http::Error`, supplying both an exhaustive runtime
 match and its static mapping. It uses the type's `Schema` for the actual serialized
 representation. Serde remains responsible for encoding.
 
@@ -39,13 +39,13 @@ representation. Serde remains responsible for encoding.
 `DeclaredErrors` is a reusable policy selecting each error type's declared defaults:
 
 ```rust
-use spline::http::{DeclaredErrors, HttpExt, HttpFactoryExt};
+use splinekit::http::{DeclaredErrors, HttpExt, HttpFactoryExt};
 
 let router = users::shared(implementation).http(DeclaredErrors)?;
 let routes = api::contract().http_with(session_factory, DeclaredErrors)?;
 ```
 
-It implements `ErrorPolicy<E>` for every `E: spline::http::Error`, so one policy
+It implements `ErrorPolicy<E>` for every `E: splinekit::http::Error`, so one policy
 works across resources with distinct error types. Lower-level router constructors
 and configured operation routers accept it too.
 
@@ -58,7 +58,7 @@ there is no separate table of executable status matches to maintain.
 Descriptions with policy metadata are explicit:
 
 ```rust
-use spline::http::DeclaredErrors;
+use splinekit::http::DeclaredErrors;
 
 let resource = users::http::describe_with(&DeclaredErrors)?;
 let application = api::http::describe_with(&DeclaredErrors)?;
@@ -73,7 +73,7 @@ Each plan contains `ErrorResponses`:
   `::http::describe()` and custom policies without a declaration.
 
 An `ErrorResponse` includes the complete JSON envelope schema, content type, and
-`x-spline-error: application` header. For a 404 above, its body describes:
+`x-splinekit-error: application` header. For a 404 above, its body describes:
 
 ```json
 {"kind":"application","value":{"kind":"not_found"}}
@@ -102,7 +102,7 @@ A struct, or an enum whose complete error shape uses one status, can declare a
 container status:
 
 ```rust
-#[derive(Debug, serde::Serialize, serde::Deserialize, spline::Schema, spline::http::Error)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, splinekit::Schema, splinekit::http::Error)]
 #[http(status = StatusCode::CONFLICT)]
 pub struct Conflict {
     pub message: String,
@@ -151,14 +151,14 @@ its schema graph remain available through `.contract()` or `.application()`.
 
 ## Verification
 
-The [derive/binding suite](../crates/spline/tests/http_errors.rs) compares actual HTTP
+The [derive/binding suite](../crates/splinekit/tests/http_errors.rs) compares actual HTTP
 responses against per-status metadata and native typed decoding. It covers payloads,
 renames, shared statuses, generic/recursive errors, aliases, custom policies, and
 transactional validation. Compiler fixtures verify status types, status ranges,
 missing/conflicting declarations, skipped variants, and unsupported overrides.
 
 ```sh
-cargo test --locked -p spline --features http --test http_errors --test ui
+cargo test --locked -p splinekit --features http --test http_errors --test ui
 npm run test:blog
 ```
 

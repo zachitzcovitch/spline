@@ -16,7 +16,7 @@ export async function run(baseUrl: string): Promise<void> {
   // -------- Create and read a draft --------
 
   const newPost = {
-    title: "Hello from Spline",
+    title: "Hello from Splinekit",
     body: "One Rust contract, two typed clients.",
   };
   const draft = valueOrThrow(await alice.posts.create(newPost), "Create draft");

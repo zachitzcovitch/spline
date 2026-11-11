@@ -4,20 +4,20 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use spline::Schema;
+use splinekit::Schema;
 
 pub mod v1 {
     use super::*;
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Profile")]
+    #[splinekit(name = "evolution.Profile")]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Profile {
         pub display_name: String,
     }
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.State")]
+    #[splinekit(name = "evolution.State")]
     #[serde(rename_all = "snake_case")]
     pub enum State {
         Active,
@@ -25,7 +25,7 @@ pub mod v1 {
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.User")]
+    #[splinekit(name = "evolution.User")]
     #[serde(deny_unknown_fields)]
     pub struct User {
         pub id: String,
@@ -38,7 +38,7 @@ pub mod v1 {
     }
 
     #[derive(Debug, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Create")]
+    #[splinekit(name = "evolution.Create")]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Create {
         pub display_name: String,
@@ -46,7 +46,7 @@ pub mod v1 {
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Error")]
+    #[splinekit(name = "evolution.Error")]
     #[serde(
         tag = "kind",
         content = "details",
@@ -59,14 +59,14 @@ pub mod v1 {
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Event")]
+    #[splinekit(name = "evolution.Event")]
     #[serde(rename_all = "snake_case", deny_unknown_fields)]
     pub enum Event {
         Item { id: String },
         Other { id: String },
     }
 
-    #[spline::contract(namespace = "evolution.users", module = "users")]
+    #[splinekit::contract(namespace = "evolution.users", module = "users")]
     pub trait Users {
         #[query]
         #[http(get = "/evolution/users/{id}")]
@@ -86,7 +86,7 @@ pub mod v2 {
     use super::*;
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Profile")]
+    #[splinekit(name = "evolution.Profile")]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Profile {
         pub display_name: String,
@@ -94,7 +94,7 @@ pub mod v2 {
     }
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.State")]
+    #[splinekit(name = "evolution.State")]
     #[serde(rename_all = "snake_case")]
     pub enum State {
         Active,
@@ -103,7 +103,7 @@ pub mod v2 {
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.User")]
+    #[splinekit(name = "evolution.User")]
     #[serde(deny_unknown_fields)]
     pub struct User {
         pub id: String,
@@ -117,7 +117,7 @@ pub mod v2 {
     }
 
     #[derive(Debug, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Create")]
+    #[splinekit(name = "evolution.Create")]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Create {
         pub display_name: String,
@@ -127,7 +127,7 @@ pub mod v2 {
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Error")]
+    #[splinekit(name = "evolution.Error")]
     #[serde(
         tag = "kind",
         content = "details",
@@ -141,7 +141,7 @@ pub mod v2 {
     }
 
     #[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.Event")]
+    #[splinekit(name = "evolution.Event")]
     #[serde(rename_all = "snake_case", deny_unknown_fields)]
     pub enum Event {
         Item { id: String, revision: u32 },
@@ -149,7 +149,7 @@ pub mod v2 {
         Removed { id: String },
     }
 
-    #[spline::contract(namespace = "evolution.users", module = "users")]
+    #[splinekit::contract(namespace = "evolution.users", module = "users")]
     pub trait Users {
         #[query]
         #[http(get = "/evolution/users/{id}")]
@@ -170,7 +170,7 @@ pub mod required_input {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize, Schema)]
-    #[spline(name = "evolution.RequiredCreate")]
+    #[splinekit(name = "evolution.RequiredCreate")]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Create {
         pub display_name: String,
@@ -178,7 +178,7 @@ pub mod required_input {
         pub approval: String,
     }
 
-    #[spline::contract(namespace = "evolution.users", module = "users")]
+    #[splinekit::contract(namespace = "evolution.users", module = "users")]
     pub trait Users {
         #[mutation]
         #[http(post = "/evolution/users", body = "input", status = 201)]
@@ -187,7 +187,7 @@ pub mod required_input {
 }
 
 pub fn typescript() -> Result<String, Box<dyn std::error::Error>> {
-    Ok(spline_typescript::Typescript::new()
+    Ok(splinekit_typescript::Typescript::new()
         .export_http_client(&v1::users::http::describe()?, "EvolutionV1")?
         .source)
 }

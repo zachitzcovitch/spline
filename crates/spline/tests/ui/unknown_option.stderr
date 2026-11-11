@@ -1,5 +1,0 @@
-error: unsupported spline option at this location
- --> tests/ui/unknown_option.rs:4:10
-  |
-4 | #[spline(nmae = "api.Typo")]
-  |          ^^^^^^^^^^^^^^^^^

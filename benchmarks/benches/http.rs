@@ -3,8 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use spline::http::{axum, reqwest, ErrorPolicy};
-use spline_example_blog_contracts::{api, NewPost, Post, PostError, Posts, User, UserError, Users};
+use splinekit::http::{axum, reqwest, ErrorPolicy};
+use splinekit_example_blog_contracts::{
+    api, NewPost, Post, PostError, Posts, User, UserError, Users,
+};
 
 struct Service(Arc<Post>);
 
@@ -106,7 +108,7 @@ fn http(c: &mut Criterion) {
             );
         });
 
-        group.bench_function(BenchmarkId::new("spline", body_bytes), |b| {
+        group.bench_function(BenchmarkId::new("splinekit", body_bytes), |b| {
             b.to_async(&runtime).iter(|| async {
                 black_box(
                     client

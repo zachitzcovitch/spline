@@ -1,13 +1,13 @@
-# Spline roadmap
+# Splinekit roadmap
 
-Spline is experimental and developed in this workspace. Public APIs and generated
+Splinekit is experimental and developed in this workspace. Public APIs and generated
 artifacts may change between commits; packages are not yet published. The
 [changelog](CHANGELOG.md) records implemented milestones. This roadmap describes
 priorities rather than release-date commitments.
 
 ## Working today
 
-- Rust-authored resource contracts, a Spline-owned directional schema graph, and
+- Rust-authored resource contracts, a Splinekit-owned directional schema graph, and
   Serde-backed derives.
 - Axum HTTP/JSON dispatch and executable, positional Rust and TypeScript clients.
 - GET/POST/PUT/PATCH/DELETE, explicit partial-update fields, and bodyless 204.

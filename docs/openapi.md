@@ -1,18 +1,18 @@
 # OpenAPI export
 
-`spline-openapi` generates deterministic **OpenAPI 3.1.2 JSON** from a selected
+`splinekit-openapi` generates deterministic **OpenAPI 3.1.2 JSON** from a selected
 HTTP description. It consumes the same routes, directional schemas, and declared
-error responses used by Spline's adapters.
+error responses used by Splinekit's adapters.
 
 ## Export an application
 
-Add `spline-openapi` as a development dependency of the contract crate and run the
+Add `splinekit-openapi` as a development dependency of the contract crate and run the
 exporter as a Cargo example, as in the [blog](../examples/blog/contracts/examples/export.rs):
 
 ```rust
-use spline::http::DeclaredErrors;
-use spline_example_blog_contracts::api;
-use spline_openapi::OpenApi;
+use splinekit::http::DeclaredErrors;
+use splinekit_example_blog_contracts::api;
+use splinekit_openapi::OpenApi;
 
 let binding = api::http::describe_with(&DeclaredErrors)?;
 let document = OpenApi::new("Blog API", "0.1.0")
@@ -95,7 +95,7 @@ independent of component presentation names. Collisions fail explicitly; use
 `.name(DefinitionId, "ComponentName")` for directional overrides:
 
 ```rust
-use spline::{DefinitionId, Direction};
+use splinekit::{DefinitionId, Direction};
 
 let exporter = OpenApi::new("API", "1").name(
     DefinitionId { name: "billing.User".into(), direction: Direction::Serialize },
@@ -148,8 +148,8 @@ Live conformance tests also check marker/envelope agreement on actual responses.
 From the repository root, regenerate both example documents:
 
 ```sh
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write
-cargo run --locked -p spline-example-contract --example contract-openapi -- --write
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --write
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --write
 ```
 
 The blog command writes both TypeScript and OpenAPI. The workbench keeps its
@@ -157,10 +157,10 @@ OpenAPI generator in a separate Cargo example so the exporter is development-onl
 Check freshness and validate with independent tools:
 
 ```sh
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
-cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --check
 npm run check:openapi
-cargo test --locked -p spline-openapi
+cargo test --locked -p splinekit-openapi
 npm run test:blog
 npm run check:neutral
 ```

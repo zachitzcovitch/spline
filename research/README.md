@@ -20,9 +20,9 @@ clients built on that foundation.
 
 | Former prototype | Current code and evidence |
 | --- | --- |
-| `schema-registry-probe` | [`crates/spline-schema`](../crates/spline-schema), including its 20 conformance tests. |
-| `schema-derive-probe` | [`crates/spline-macros`](../crates/spline-macros) and [`crates/spline`](../crates/spline), including derive behavior tests and diagnostic fixtures. |
-| `typescript-exporter-probe` | [`crates/spline-typescript`](../crates/spline-typescript), including the generator, Rust tests, TypeScript fixtures, and checked-in artifacts. |
+| `schema-registry-probe` | [`crates/splinekit-schema`](../crates/splinekit-schema), including its 20 conformance tests. |
+| `schema-derive-probe` | [`crates/splinekit-macros`](../crates/splinekit-macros) and [`crates/splinekit`](../crates/splinekit), including derive behavior tests and diagnostic fixtures. |
+| `typescript-exporter-probe` | [`crates/splinekit-typescript`](../crates/splinekit-typescript), including the generator, Rust tests, TypeScript fixtures, and checked-in artifacts. |
 
 The relocated prototypes' old manifests and lockfiles were replaced by root
 workspace manifests and lockfiles. Historical notes retain their original
@@ -34,13 +34,13 @@ root workspace and exercised by CI:
 
 | Former experiment | Maintained evidence |
 | --- | --- |
-| Serde attribute inspection | [`spline-schema/tests/support/parser`](../crates/spline-schema/tests/support/parser), a test-only adapter and owned inspection model. |
-| Parser vs. real Serde behavior | [`serde_inspection.rs`](../crates/spline-schema/tests/serde_inspection.rs), 19 comparison tests, and [`tests/ui`](../crates/spline-schema/tests/ui), three compiler-failure fixtures. |
-| Serde JSON wire behavior | [`serde_behavior.rs`](../crates/spline-schema/tests/serde_behavior.rs), 10 direct Serde checks using the current workspace versions. |
-| JavaScript integer precision | [`json-numbers.mjs`](../crates/spline-typescript/typescript/json-numbers.mjs), included in `npm run check`. |
+| Serde attribute inspection | [`splinekit-schema/tests/support/parser`](../crates/splinekit-schema/tests/support/parser), a test-only adapter and owned inspection model. |
+| Parser vs. real Serde behavior | [`serde_inspection.rs`](../crates/splinekit-schema/tests/serde_inspection.rs), 19 comparison tests, and [`tests/ui`](../crates/splinekit-schema/tests/ui), three compiler-failure fixtures. |
+| Serde JSON wire behavior | [`serde_behavior.rs`](../crates/splinekit-schema/tests/serde_behavior.rs), 10 direct Serde checks using the current workspace versions. |
+| JavaScript integer precision | [`json-numbers.mjs`](../crates/splinekit-typescript/typescript/json-numbers.mjs), included in `npm run check`. |
 
 ```sh
-cargo test --locked -p spline-schema
+cargo test --locked -p splinekit-schema
 npm run check
 ```
 
@@ -48,4 +48,4 @@ These notes remain as design history: their dates, proposed interfaces, benchmar
 limitations, and original tool versions describe the evaluated milestones. Use
 the linked current guides for supported APIs and the [roadmap](../ROADMAP.md) for
 future work. The production compiler adapter lives in
-[`spline-macros/src/adapter.rs`](../crates/spline-macros/src/adapter.rs).
+[`splinekit-macros/src/adapter.rs`](../crates/splinekit-macros/src/adapter.rs).

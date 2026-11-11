@@ -1,0 +1,5 @@
+error: unsupported splinekit option at this location
+ --> tests/ui/unknown_option.rs:4:13
+  |
+4 | #[splinekit(nmae = "api.Typo")]
+  |             ^^^^^^^^^^^^^^^^^

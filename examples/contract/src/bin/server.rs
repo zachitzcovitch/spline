@@ -1,5 +1,5 @@
-use spline::http::axum;
-use spline_example_contract::{error_status, users, DemoUsers};
+use splinekit::http::axum;
+use splinekit_example_contract::{error_status, users, DemoUsers};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

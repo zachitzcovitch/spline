@@ -1,6 +1,6 @@
-# Contributing to Spline
+# Contributing to Splinekit
 
-Spline is an experimental workspace. The implementation, conformance tests, and
+Splinekit is an experimental workspace. The implementation, conformance tests, and
 design notes evolve together; packages are currently unpublished.
 
 ## Ways to contribute
@@ -38,18 +38,18 @@ Cargo and npm lockfiles are checked in so local and CI dependencies agree.
 ```sh
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo check --locked -p spline --no-default-features
+cargo check --locked -p splinekit --no-default-features
 npm run check:neutral
-cargo run --locked -p spline --no-default-features --example neutral
+cargo run --locked -p splinekit --no-default-features --example neutral
 cargo test --locked --workspace
-cargo run --locked -p spline-typescript --example export -- --check
-cargo run --locked -p spline-example-contract -- --check
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --check
-cargo run --locked -p spline-example-contract --example contract-openapi -- --check
+cargo run --locked -p splinekit-typescript --example export -- --check
+cargo run --locked -p splinekit-example-contract -- --check
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --check
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --check
 npm run check
 npm run check:openapi
 npm run test:blog
-cargo bench --locked -p spline-benchmarks -- --test
+cargo bench --locked -p splinekit-benchmarks -- --test
 npm run bench:typescript -- --check
 ```
 
@@ -58,7 +58,7 @@ starts ephemeral loopback servers and launches the Rust and Node clients. Node
 and loopback networking must be available for that suite.
 
 For focused iteration, use `cargo test -p <crate>` or a specific integration test,
-such as `cargo test -p spline-example-contract --test http`.
+such as `cargo test -p splinekit-example-contract --test http`.
 
 For performance work, see [benchmarks/README.md](benchmarks/README.md). Keep fixture
 correctness checks separate from timing comparisons. Include the commit, toolchain,
@@ -71,10 +71,10 @@ Rust fixtures and contracts are the source of truth for checked-in TypeScript an
 After an intentional change to those inputs or the exporter, regenerate:
 
 ```sh
-cargo run --locked -p spline-typescript --example export -- --write
-cargo run --locked -p spline-example-contract -- --write
-cargo run --locked -p spline-example-blog-contracts --example blog-export -- --write
-cargo run --locked -p spline-example-contract --example contract-openapi -- --write
+cargo run --locked -p splinekit-typescript --example export -- --write
+cargo run --locked -p splinekit-example-contract -- --write
+cargo run --locked -p splinekit-example-blog-contracts --example blog-export -- --write
+cargo run --locked -p splinekit-example-contract --example contract-openapi -- --write
 ```
 
 Review the generated diff and rerun the relevant Rust and TypeScript checks.
@@ -82,8 +82,8 @@ Review the generated diff and rerun the relevant Rust and TypeScript checks.
 and wire samples are covered by tests, and the TypeScript suites include negative
 assertions that fail if an invalid call unexpectedly becomes accepted.
 
-Compiler-failure tests live under `crates/spline/tests/ui/`, its HTTP-specific
-`ui-http/` directory, and `crates/spline-schema/tests/ui/`. When a diagnostic
+Compiler-failure tests live under `crates/splinekit/tests/ui/`, its HTTP-specific
+`ui-http/` directory, and `crates/splinekit-schema/tests/ui/`. When a diagnostic
 intentionally changes, review the proposed `.stderr` output in `wip/` before
 updating the checked-in expectation. Generated diagnostic snapshots are part of
 the user-facing macro behavior.
@@ -110,11 +110,11 @@ Its TypeScript language-service check also verifies signature help, narrowed hov
 and DTO property completion. Preserve that editor-facing surface when changing
 names or generated signatures; see [docs/typescript.md](docs/typescript.md).
 
-Declared-error behavior is covered by `crates/spline/tests/http_errors.rs` and the
+Declared-error behavior is covered by `crates/splinekit/tests/http_errors.rs` and the
 HTTP compiler fixtures. Keep real statuses and serialized response metadata aligned;
 see [docs/http-errors.md](docs/http-errors.md) for derived defaults and custom policies.
 
-OpenAPI conformance lives in `crates/spline-openapi/tests/`. Its Rust tests run the
+OpenAPI conformance lives in `crates/splinekit-openapi/tests/`. Its Rust tests run the
 independent Node validators, so install root npm dependencies before running them.
 The blog exporter checks both its TypeScript and OpenAPI artifacts; the workbench's
 OpenAPI generator is a development-only Cargo example. `npm run check:openapi`
@@ -123,16 +123,16 @@ against the selected schemas. See [docs/openapi.md](docs/openapi.md).
 
 ## Where changes belong
 
-- `spline-schema`: directional shapes, registration, and field semantics.
-- `spline-contract`: neutral operation identities, argument order, and composition.
-- `spline-http-contract`: HTTP binding descriptions and planning/route validation.
-- `spline-runtime`: neutral definitions/bundles, typed Tower invocation, and in-process extensions.
-- `spline-macros`: schema/contract authoring and generated Rust; Serde's internal
+- `splinekit-schema`: directional shapes, registration, and field semantics.
+- `splinekit-contract`: neutral operation identities, argument order, and composition.
+- `splinekit-http-contract`: HTTP binding descriptions and planning/route validation.
+- `splinekit-runtime`: neutral definitions/bundles, typed Tower invocation, and in-process extensions.
+- `splinekit-macros`: schema/contract authoring and generated Rust; Serde's internal
   API stays behind the private adapter.
-- `spline`: application-facing re-exports and macro conformance tests.
-- `spline-http`: HTTP extensions, encoding, Axum/reqwest integration, and client errors.
-- `spline-typescript`: deterministic type/client export and TypeScript fixtures.
-- `spline-openapi`: deterministic document/schema lowering and OpenAPI conformance.
+- `splinekit`: application-facing re-exports and macro conformance tests.
+- `splinekit-http`: HTTP extensions, encoding, Axum/reqwest integration, and client errors.
+- `splinekit-typescript`: deterministic type/client export and TypeScript fixtures.
+- `splinekit-openapi`: deterministic document/schema lowering and OpenAPI conformance.
 - `examples/contract`: runnable server and clients, including end-to-end tests.
 - `examples/blog`: guided Users/Posts tutorial and its end-to-end smoke test.
 - `benchmarks`: Criterion metadata/export/HTTP benchmarks and a Node client harness.
@@ -150,5 +150,5 @@ both generated clients calling the same HTTP server.
 ## License
 
 Unless you explicitly state otherwise, contributions intentionally submitted for
-inclusion in Spline are licensed under both the [MIT license](LICENSE-MIT) and
+inclusion in Splinekit are licensed under both the [MIT license](LICENSE-MIT) and
 [Apache License 2.0](LICENSE-APACHE), without additional terms or conditions.

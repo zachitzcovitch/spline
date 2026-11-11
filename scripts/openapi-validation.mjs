@@ -87,7 +87,7 @@ export function responseAssertions(document) {
     const text = await response.clone().text();
     if (!expected.content) {
       assert.equal(text, "", "Bodyless response must be empty");
-      assert.equal(response.headers.get("x-spline-error"), null);
+      assert.equal(response.headers.get("x-splinekit-error"), null);
       return;
     }
     const media = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
@@ -95,7 +95,7 @@ export function responseAssertions(document) {
     const body = JSON.parse(text);
     const result = validate(`${pointer}/content/${escape(media)}/schema`, body);
     assert.ok(result.valid, `Response violates ${method} ${path} (${response.status}): ${JSON.stringify(result.errors)}`);
-    const kind = response.headers.get("x-spline-error");
+    const kind = response.headers.get("x-splinekit-error");
     if (kind !== null) assert.equal(body.kind, kind, "Error marker must match the envelope kind");
   };
 }

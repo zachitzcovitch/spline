@@ -44,7 +44,7 @@ for (const bodyBytes of [128, 16 * 1024]) {
   const strict = createBlogClient("http://benchmark.test", { fetch: fetcher, responsePolicy: "strict" });
   const calls = [
     ["response_json", async () => (await (await fetcher()).json()).body.length],
-    ...[["spline_compatible", compatible], ["spline_strict", strict]].map(([name, client]) => [
+    ...[["splinekit_compatible", compatible], ["splinekit_strict", strict]].map(([name, client]) => [
       name, async () => {
         const result = await client.posts.get("post_1");
         if (!result.ok) throw new Error(JSON.stringify(result.error));

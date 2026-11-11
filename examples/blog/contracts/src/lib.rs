@@ -7,7 +7,7 @@ pub mod users;
 pub use posts::{NewPost, Post, PostError, Posts};
 pub use users::{User, UserError, Users};
 
-spline::api! {
+splinekit::api! {
     /// One application with grouped clients and a shared server context.
     pub mod api {
         users: crate::users,

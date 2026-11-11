@@ -4,7 +4,7 @@ mod users;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use spline_example_blog_contracts::{Post, User};
+use splinekit_example_blog_contracts::{Post, User};
 use tokio::sync::RwLock;
 
 /// Shared for the lifetime of the server. Restarting the process resets the blog.

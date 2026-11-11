@@ -21,7 +21,7 @@ if (process.argv[2] === "--stdin") {
   for (const file of ["../examples/blog/openapi.json", "../examples/contract/openapi.json"]) {
     const document = JSON.parse(await readFile(new URL(file, import.meta.url), "utf8"));
     await validateDocument(document);
-    assert.ok(!JSON.stringify(document).toLowerCase().includes("spline"), `${file} must be customer-facing without implementation branding`);
+    assert.ok(!JSON.stringify(document).toLowerCase().includes("splinekit"), `${file} must be customer-facing without implementation branding`);
     console.log(`OpenAPI 3.1 document and local references validated: ${file}`);
   }
 }

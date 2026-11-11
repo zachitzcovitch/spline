@@ -1,0 +1,19 @@
+[package]
+name = "splinekit-typescript"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+description = "Deterministic TypeScript types and executable HTTP clients for Splinekit"
+
+[dependencies]
+splinekit-schema.workspace = true
+splinekit-contract.workspace = true
+splinekit-http-contract.workspace = true
+
+[dev-dependencies]
+splinekit.workspace = true
+serde.workspace = true
+serde_json.workspace = true

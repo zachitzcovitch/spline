@@ -23,7 +23,7 @@ tolerance does not rewrite schema definitions or widen generated static types.
 ## Choosing a policy
 
 ```rust
-use spline::http::ResponsePolicy;
+use splinekit::http::ResponsePolicy;
 
 let client = users::http::Client::new(base_url)?; // compatible
 let strict = users::http::Client::new(base_url)?
@@ -128,7 +128,7 @@ also confirm that request validation remains intact and a dictionary key named
 `__proto__` is preserved as an own data property. Runtime unit tests cover
 recursive projection, tuple arity, open objects, and traversal limits.
 
-These fixtures use **the old API contract with the current Spline runtime**.
+These fixtures use **the old API contract with the current Splinekit runtime**.
 Clients generated/compiled before this receiver policy retain their previous
 behavior until regenerated/rebuilt. The new v1 artifact establishes a baseline
 for future compatibility work, not a retroactive promise about historical clients.
@@ -144,11 +144,11 @@ workspace suite. The versioned evolution cases remain covered by Rust, live Node
 clients, strict TypeScript assertions, and generated-artifact checks.
 
 ```sh
-cargo test --locked -p spline-example-contract --test evolution
+cargo test --locked -p splinekit-example-contract --test evolution
 cargo test --locked --workspace
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo run --locked -p spline-example-contract -- --check
+cargo run --locked -p splinekit-example-contract -- --check
 npm run check
 ```
 

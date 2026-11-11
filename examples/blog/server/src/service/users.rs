@@ -1,4 +1,4 @@
-use spline_example_blog_contracts::{User, UserError, Users};
+use splinekit_example_blog_contracts::{User, UserError, Users};
 
 use super::Session;
 

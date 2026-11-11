@@ -2,35 +2,35 @@
 
 ## Decision
 
-Spline exports OpenAPI 3.1.2 from its sealed directional schema graph and HTTP
-descriptions. `spline-openapi` uses an inspectable `serde_json::Value` document,
+Splinekit exports OpenAPI 3.1.2 from its sealed directional schema graph and HTTP
+descriptions. `splinekit-openapi` uses an inspectable `serde_json::Value` document,
 builder-style deployment configuration, and deterministic rendering. Its maintained
-evidence lives in [the exporter tests](../crates/spline-openapi/tests) and
+evidence lives in [the exporter tests](../crates/splinekit-openapi/tests) and
 [independent validation helpers](../scripts/openapi-validation.mjs).
 
 ## Utoipa source review
 
 Utoipa 6.0.0's document builders, reusable components, explicit deployment
 modifiers, and separate UI integrations informed the design. Its schema/path derives
-solve an authoring problem that Spline already addresses with compiled metadata.
+solve an authoring problem that Splinekit already addresses with compiled metadata.
 
-Several source-level differences matter when exporting Spline's contract:
+Several source-level differences matter when exporting Splinekit's contract:
 
 - `ResponsesBuilder::response` inserts into a status-keyed map; repeated statuses
-  replace earlier responses. Spline explicitly groups application and framework
+  replace earlier responses. Splinekit explicitly groups application and framework
   alternatives before writing each status.
-- `OpenApi::merge` has shallow name/path-based conflict behavior. Spline validates
+- `OpenApi::merge` has shallow name/path-based conflict behavior. Splinekit validates
   composition and component-name collisions before document construction.
-- Utoipa's `IntoResponses` documents unit response variants as bodyless. Spline's
+- Utoipa's `IntoResponses` documents unit response variants as bodyless. Splinekit's
   unit application errors still have JSON envelopes; only a selected 204 success
   is bodyless.
-- Spline's recursive registry and Deserialize/Serialize shapes already establish
+- Splinekit's recursive registry and Deserialize/Serialize shapes already establish
   directional field presence and nullability. Those shapes remain authoritative.
 
 ## Executable compatibility probe
 
 The evaluated candidate was `utoipa = { version = "=6.0.0", default-features = false }`
-with Serde JSON 1.0.154 and Spline's pinned `nightly-2026-02-25` toolchain. The temporary
+with Serde JSON 1.0.154 and Splinekit's pinned `nightly-2026-02-25` toolchain. The temporary
 probe prepared recursive objects, tuple prefix items, literal constraints, u32 bounds,
 overlapping null unions, and reference-local descriptions for a JSON round trip.
 
@@ -41,7 +41,7 @@ candidate failed the selected dependency profile before serialization could be
 evaluated. This is evidence about that exact version/configuration, not a claim
 about all Utoipa versions or its default macro-enabled build.
 
-Spline adopted the document-builder patterns and a JSON-backed output, with
+Splinekit adopted the document-builder patterns and a JSON-backed output, with
 independent standard validation. The temporary probe and its isolated manifest/
 lockfile are outside the repository; no second schema derive or Utoipa dependency
 is required by the exporter. A future object-model dependency can be reevaluated

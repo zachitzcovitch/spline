@@ -1,11 +1,11 @@
-use spline_example_contract::{error_status, users};
-use spline_openapi::OpenApi;
+use splinekit_example_contract::{error_status, users};
+use splinekit_openapi::OpenApi;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let mode = match args.as_slice() {
         [mode] if mode == "--write" || mode == "--check" => mode,
-        _ => return Err("usage: cargo run -p spline-example-contract --example contract-openapi -- --write|--check".into()),
+        _ => return Err("usage: cargo run -p splinekit-example-contract --example contract-openapi -- --write|--check".into()),
     };
     // The workbench keeps its executable policy, demonstrating opaque status metadata.
     let binding = users::http::describe_with(&error_status)?;
