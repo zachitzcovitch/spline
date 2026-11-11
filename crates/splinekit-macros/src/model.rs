@@ -54,6 +54,8 @@ pub struct Field {
     pub defaulted: bool,
     pub omission: Option<syn::ExprPath>,
     pub custom_codec: bool,
+    /// The Serde codec function for this direction, when the field has one.
+    pub codec: Option<syn::ExprPath>,
     pub transparent_member: bool,
 }
 

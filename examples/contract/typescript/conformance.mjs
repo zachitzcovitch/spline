@@ -49,11 +49,12 @@ assert.equal((await echo.inspect("plain", 2147483648, false, null)).error.kind, 
 const formats = {
   id: "0191f1b2-7c4e-7a3b-9f1e-2a3b4c5d6e7f", at: "2026-11-11T05:06:53.123Z", day: "2026-11-11",
   link: "https://example.test/a?b=c", amount: "-12.50", big: "18446744073709551615",
-  safe: -9007199254740991, ratio: 0.25,
+  safe: -9007199254740991, ratio: 0.25, total: "18446744073709551615", limit: null,
 };
 assert.deepEqual(await echo.formats(formats), { ok: true, value: formats });
 for (const [field, value] of [
   ["at", "2026-11-11T05:06:53.123456789Z"], ["at", "2016-12-31T23:59:60+05:30"], ["day", "2024-02-29"],
+  ["total", "0"], ["limit", 9007199254740991],
 ]) {
   assert.equal((await echo.formats({ ...formats, [field]: value })).ok, true, `${field}=${value}`);
 }
@@ -63,6 +64,7 @@ for (const [field, value] of [
   ["link", "relative"],
   ["amount", "1e5"], ["amount", "01.5"], ["big", "18446744073709551616"], ["big", "-1"],
   ["safe", 9007199254740992], ["ratio", Infinity],
+  ["total", "007"], ["total", "+7"], ["total", 7], ["total", "18446744073709551616"], ["limit", 9007199254740992],
 ]) {
   assert.equal((await echo.formats({ ...formats, [field]: value })).error.kind, "encode", `${field}=${value}`);
 }
@@ -71,7 +73,9 @@ const answering = (patch) => createEchoClient(base, {
     status: 200, headers: { "content-type": "application/json" },
   }),
 });
-for (const patch of [{ id: "x" }, { big: "99999999999999999999" }, { safe: 2 ** 53 }, { ratio: "0.25" }]) {
+for (const patch of [
+  { id: "x" }, { big: "99999999999999999999" }, { safe: 2 ** 53 }, { ratio: "0.25" }, { total: "-1" }, { limit: "7" },
+]) {
   assert.equal((await answering(patch).formats(formats)).error.kind, "protocol", JSON.stringify(patch));
 }
 

@@ -1,4 +1,4 @@
-error: custom Serde deserialize codec needs #[splinekit(schema = "WireType")] or a directional override
+error: custom Serde deserialize codec needs #[splinekit(schema = "WireType")] or a directional override; for 64/128-bit integers, use #[serde(with = "splinekit::codec::decimal_string")] or splinekit::codec::safe_number
  --> tests/ui/missing_codec.rs:6:12
   |
 6 |     value: u64,

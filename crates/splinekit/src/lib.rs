@@ -2,6 +2,7 @@
 
 extern crate self as splinekit;
 
+pub mod codec;
 mod patch;
 
 pub use patch::Patch;

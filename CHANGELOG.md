@@ -57,6 +57,13 @@ release yet; the workspace version is a development version.
   serialization. Generated TypeScript checks dates by calendar (leap years, leap
   seconds, offsets) rather than `Date.parse`, which differs between engines and
   accepts impossible dates.
+- `splinekit::codec::decimal_string` and `splinekit::codec::safe_number` (each
+  with an `option` form) for `u64`/`i64`/`u128`/`i128`/`usize`/`isize`. The
+  derive recognizes them in `#[serde(with = ...)]` and describes the field as
+  integer digits or a JavaScript-safe integer, so one attribute is enough.
+  Decimal strings accept only canonical digits; safe numbers refuse values
+  JavaScript would round, in both directions. Bare wide integers and other
+  codecs without a schema now point to these codecs in their errors.
 
 ### Maintenance
 

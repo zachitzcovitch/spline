@@ -197,6 +197,20 @@ struct Emitter {
 }
 
 impl Emitter {
+    /// A field's explicit wire override, or the description of a built-in
+    /// Splinekit codec named by `#[serde(with = "...")]`.
+    fn wire(&self, field: &Field, options: &attrs::Options) -> Option<syn::Type> {
+        if let Some(wire) = options.wire(self.mode) {
+            return Some(wire.clone());
+        }
+        let module = builtin_codec(field.codec.as_ref()?, &self.runtime)?;
+        let runtime = &self.runtime;
+        let ty = &field.ty;
+        Some(syn::parse_quote_spanned!(ty.span()=>
+            <#ty as #runtime::codec::#module::Field>::Schema
+        ))
+    }
+
     fn reference(&mut self, ty: &syn::Type) -> TokenStream {
         self.used_types.push(ty.clone());
         quote_spanned!(ty.span()=> __splinekit_cx.schema::<#ty>()?)
@@ -268,11 +282,11 @@ impl Emitter {
     fn field(&mut self, field: &Field, container_default: bool) -> syn::Result<TokenStream> {
         check_field_attributes(field, self.mode)?;
         let options = attrs::parse(&field.attrs, false)?;
-        let wire = options.wire(self.mode);
+        let wire = self.wire(field, &options);
         if field.custom_codec && wire.is_none() {
             return Err(codec_error(field, self.mode));
         }
-        let ty = wire.unwrap_or(&field.ty);
+        let ty = wire.as_ref().unwrap_or(&field.ty);
         self.used_types.push(ty.clone());
         let runtime = &self.runtime;
         let name = &field.name;
@@ -318,11 +332,11 @@ impl Emitter {
             ));
         }
         let options = attrs::parse(&field.attrs, false)?;
-        let wire = options.wire(self.mode);
+        let wire = self.wire(field, &options);
         if field.custom_codec && wire.is_none() {
             return Err(codec_error(field, self.mode));
         }
-        Ok(self.reference(wire.unwrap_or(&field.ty)))
+        Ok(self.reference(wire.as_ref().unwrap_or(&field.ty)))
     }
 
     fn enumeration(
@@ -469,10 +483,44 @@ fn codec_error(field: &Field, mode: Mode) -> syn::Error {
     syn::Error::new_spanned(
         &field.ty,
         format!(
-        "custom Serde {} codec needs #[splinekit(schema = \"WireType\")] or a directional override",
+        "custom Serde {} codec needs #[splinekit(schema = \"WireType\")] or a directional override; \
+         for 64/128-bit integers, use #[serde(with = \"splinekit::codec::decimal_string\")] or \
+         splinekit::codec::safe_number",
         mode.label(),
     ),
     )
+}
+
+/// The codec module named by a Serde codec path such as
+/// `splinekit::codec::decimal_string::serialize` (or its `option` form), when
+/// it is one of Splinekit's own, under `splinekit` or the configured runtime path.
+fn builtin_codec(path: &syn::ExprPath, runtime: &syn::Path) -> Option<syn::Ident> {
+    let names: Vec<String> = path
+        .path
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect();
+    let configured: Vec<String> = runtime
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect();
+    let rest = names
+        .strip_prefix(&["splinekit".to_owned()][..])
+        .or_else(|| names.strip_prefix(&configured[..]))?;
+    let [codec, module, tail @ ..] = rest else {
+        return None;
+    };
+    let function = |name: &String| name == "serialize" || name == "deserialize";
+    let known = codec == "codec"
+        && matches!(module.as_str(), "decimal_string" | "safe_number")
+        && match tail {
+            [name] => function(name),
+            [option, name] => option == "option" && function(name),
+            _ => false,
+        };
+    known.then(|| syn::Ident::new(module, path.span()))
 }
 
 fn check_container_attributes(attributes: &[syn::Attribute], mode: Mode) -> syn::Result<()> {

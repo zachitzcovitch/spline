@@ -79,7 +79,9 @@ macro_rules! unsupported {
 
             fn describe(_: &mut Context<'_>) -> Result<Shape> {
                 Err(Error::Unsupported(concat!(
-                    stringify!($ty), " requires an explicit numeric/codec policy"
+                    stringify!($ty),
+                    " needs an explicit wire form: #[serde(with = \"splinekit::codec::decimal_string\")] ",
+                    "(digits in a string) or splinekit::codec::safe_number (a JSON number up to 2^53 - 1)"
                 ).into()))
             }
         }

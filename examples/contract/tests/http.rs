@@ -59,6 +59,10 @@ pub struct Formats {
     #[splinekit(schema = "splinekit::wire::SafeInteger<i64>")]
     pub safe: i64,
     pub ratio: f64,
+    #[serde(with = "splinekit::codec::decimal_string")]
+    pub total: u64,
+    #[serde(with = "splinekit::codec::safe_number::option")]
+    pub limit: Option<i64>,
 }
 
 #[splinekit::contract(namespace = "echo", module = "echo")]
@@ -176,11 +180,14 @@ async fn rust_and_generated_typescript_clients_call_the_same_server() {
         big: u64::MAX.to_string(),
         safe: -9_007_199_254_740_991,
         ratio: 0.25,
+        total: u64::MAX,
+        limit: None,
     };
     let echo_client = echo::http::Client::new(&server.base).unwrap();
     let echoed = echo_client.formats(formats).await.unwrap();
     assert_eq!(echoed.big, "18446744073709551615");
     assert_eq!(echoed.safe, -9_007_199_254_740_991);
+    assert_eq!((echoed.total, echoed.limit), (u64::MAX, None));
 
     let native = tokio::time::timeout(
         Duration::from_secs(20),

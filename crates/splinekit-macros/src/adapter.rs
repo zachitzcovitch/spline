@@ -80,6 +80,10 @@ fn field(field: &ast::Field<'_>, mode: Mode) -> Field {
             Mode::Serialize => field.attrs.serialize_with().is_some(),
             Mode::Deserialize => field.attrs.deserialize_with().is_some(),
         },
+        codec: match mode {
+            Mode::Serialize => field.attrs.serialize_with().cloned(),
+            Mode::Deserialize => field.attrs.deserialize_with().cloned(),
+        },
         transparent_member: field.attrs.transparent(),
     }
 }

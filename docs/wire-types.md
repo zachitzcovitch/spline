@@ -18,7 +18,37 @@ which no float field accepts back, and both clients refuse them.
 
 `u64`, `i64`, `u128`, `i128`, `usize` and `isize` have no default form.
 JavaScript numbers hold integers exactly only up to 2^53 − 1, so a bare field of
-these types is a registration error. Give it an explicit form (below).
+these types is a registration error. Give it a codec (below).
+
+## Codecs for 64/128-bit integers
+
+Pick one with `#[serde(with = "...")]`; the derive recognizes both and describes
+the field, with no `#[splinekit(schema = ...)]` needed:
+
+```rust
+#[derive(serde::Serialize, serde::Deserialize, splinekit::Schema)]
+pub struct Balance {
+    #[serde(with = "splinekit::codec::decimal_string")]
+    pub credits: u64,
+    #[serde(with = "splinekit::codec::safe_number::option")]
+    pub limit: Option<i64>,
+}
+```
+
+| Codec | JSON | TypeScript | Use when |
+| --- | --- | --- | --- |
+| `splinekit::codec::decimal_string` | digits in a string, `"18446744073709551615"` | `string` | Values can use the type's full range. The recommended default. |
+| `splinekit::codec::safe_number` | JSON number within ±(2^53 − 1) | `number` | Values are known to stay small and clients want a number. |
+
+- `decimal_string` accepts only canonical digits on input: no `+`, no leading
+  zeros, no `-0`, and no sign on unsigned types. The generated TypeScript client
+  accepts exactly the same strings.
+- `safe_number` refuses to serialize a value outside the safe range, rather than
+  sending a number JavaScript would round, and refuses one when decoding.
+- Each has an `option` module for `Option<T>` fields (`None` is `null`).
+- The derive recognizes these paths under `splinekit` (or the `crate = "..."`
+  path you configured). A codec of your own still needs
+  `#[splinekit(schema = ...)]`.
 
 ## Formatted strings and safe integers
 
