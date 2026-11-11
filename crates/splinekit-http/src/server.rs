@@ -242,24 +242,17 @@ fn parse_scalar(value: &str, scalar: Scalar) -> Result<Value, Fault> {
             "false" => Ok(Value::Bool(false)),
             _ => Err(Fault::invalid("expected true or false")),
         },
-        Scalar::Integer { signed: true, bits } => {
-            let number: i64 = value
-                .parse()
-                .map_err(|_| Fault::invalid("expected an integer"))?;
-            let limit = 1_i64 << (bits - 1);
-            if !(-limit..limit).contains(&number) {
-                return Err(Fault::invalid("integer outside its declared range"));
-            }
-            Ok(number.into())
-        }
-        Scalar::Integer {
-            signed: false,
-            bits,
-        } => {
-            let number: u64 = value
-                .parse()
-                .map_err(|_| Fault::invalid("expected an unsigned integer"))?;
-            if number >= 1_u64 << bits {
+        Scalar::Integer { signed, bits } => {
+            let number: i64 = value.parse().map_err(|_| {
+                Fault::invalid(if signed {
+                    "expected an integer"
+                } else {
+                    "expected an unsigned integer"
+                })
+            })?;
+            let (min, max) = splinekit_schema::integer_bounds(signed, bits)
+                .ok_or_else(|| Fault::invalid("unsupported integer width"))?;
+            if !(min..=max).contains(&number) {
                 return Err(Fault::invalid("integer outside its declared range"));
             }
             Ok(number.into())

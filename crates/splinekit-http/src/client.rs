@@ -284,19 +284,12 @@ fn scalar_text(value: &Value, scalar: Scalar) -> Result<String, String> {
     match scalar {
         Scalar::String => value.as_str().map(str::to_owned),
         Scalar::Boolean => value.as_bool().map(|v| v.to_string()),
-        Scalar::Integer { signed: true, bits } => value
+        Scalar::Integer { signed, bits } => value
             .as_i64()
             .filter(|v| {
-                let bound = 1_i64 << (bits - 1);
-                (-bound..bound).contains(v)
+                splinekit_schema::integer_bounds(signed, bits)
+                    .is_some_and(|(min, max)| (min..=max).contains(v))
             })
-            .map(|v| v.to_string()),
-        Scalar::Integer {
-            signed: false,
-            bits,
-        } => value
-            .as_u64()
-            .filter(|v| *v < 1_u64 << bits)
             .map(|v| v.to_string()),
     }
     .ok_or_else(|| "URL argument does not match its declared scalar type".into())

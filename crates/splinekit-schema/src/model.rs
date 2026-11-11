@@ -98,8 +98,21 @@ pub struct Definition {
 pub enum Shape {
     Null,
     Boolean,
+    /// Any JSON string.
     String,
-    Integer { signed: bool, bits: u8 },
+    /// A JSON string with a known lexical format. Exporters describe and, where
+    /// they validate, check the format; Rust clients rely on Serde decoding.
+    Formatted(StringFormat),
+    /// A JSON integer of `bits` 8, 16, 32 or [`SAFE_INTEGER_BITS`].
+    Integer {
+        signed: bool,
+        bits: u8,
+    },
+    /// A finite JSON number held in a 32- or 64-bit float. Non-finite values
+    /// have no JSON form.
+    Number {
+        bits: u8,
+    },
     Literal(String),
     Array(Box<Shape>),
     Tuple(Vec<Shape>),
@@ -107,6 +120,45 @@ pub enum Shape {
     Object(Object),
     Union(Vec<Shape>),
     Ref(DefinitionId),
+}
+
+/// Lexical formats of [`Shape::Formatted`] strings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StringFormat {
+    /// An RFC 9562 UUID in hyphenated form.
+    Uuid,
+    /// An RFC 3339 date-time with an offset or `Z`.
+    DateTime,
+    /// An RFC 3339 full date (`YYYY-MM-DD`).
+    Date,
+    /// An absolute URI.
+    Uri,
+    /// An exact base-10 decimal: optional `-`, digits, optional fraction.
+    Decimal,
+    /// A base-10 integer of the given width written as a string, for widths
+    /// JavaScript numbers can't hold exactly (64 or 128 bits).
+    Integer { signed: bool, bits: u8 },
+}
+
+/// The [`Shape::Integer`] width for JavaScript's safe-integer range:
+/// ±(2^53 − 1), or 0 to 2^53 − 1 when unsigned. Every value in it survives
+/// `JSON.parse` exactly.
+pub const SAFE_INTEGER_BITS: u8 = 53;
+
+/// Inclusive bounds of a [`Shape::Integer`], or `None` for an unsupported width.
+pub fn integer_bounds(signed: bool, bits: u8) -> Option<(i64, i64)> {
+    match bits {
+        8 | 16 | 32 if signed => {
+            let limit = 1_i64 << (bits - 1);
+            Some((-limit, limit - 1))
+        }
+        8 | 16 | 32 => Some((0, (1_i64 << bits) - 1)),
+        SAFE_INTEGER_BITS => {
+            let limit = (1_i64 << 53) - 1;
+            Some((if signed { -limit } else { 0 }, limit))
+        }
+        _ => None,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

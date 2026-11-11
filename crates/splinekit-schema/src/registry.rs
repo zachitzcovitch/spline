@@ -236,8 +236,16 @@ fn validate_shape(
                 validate_shape(&field.shape, direction, definitions)?;
             }
         }
-        Shape::Integer { bits, .. } if !matches!(bits, 8 | 16 | 32) => {
+        Shape::Integer { signed, bits } if crate::integer_bounds(*signed, *bits).is_none() => {
             return Err(Error::Unsupported(format!("{bits}-bit JSON integer")));
+        }
+        Shape::Number { bits } if !matches!(bits, 32 | 64) => {
+            return Err(Error::Unsupported(format!("{bits}-bit JSON number")));
+        }
+        Shape::Formatted(crate::StringFormat::Integer { bits, .. })
+            if !matches!(bits, 64 | 128) =>
+        {
+            return Err(Error::Unsupported(format!("{bits}-bit integer string")));
         }
         _ => {}
     }

@@ -46,6 +46,28 @@ assert.equal((await echo.inspect("plain", 0, false, null)).value.note, null);
 assert.equal((await echo.inspect("..", 0, false, null)).error.kind, "encode");
 assert.equal((await echo.inspect("plain", 2147483648, false, null)).error.kind, "encode");
 
+const formats = {
+  id: "0191f1b2-7c4e-7a3b-9f1e-2a3b4c5d6e7f", at: "2026-11-11T05:06:53.123Z", day: "2026-11-11",
+  link: "https://example.test/a?b=c", amount: "-12.50", big: "18446744073709551615",
+  safe: -9007199254740991, ratio: 0.25,
+};
+assert.deepEqual(await echo.formats(formats), { ok: true, value: formats });
+for (const [field, value] of [
+  ["id", "0191f1b2"], ["at", "2026-11-11 05:06"], ["day", "2026-02-30"], ["link", "relative"],
+  ["amount", "1e5"], ["amount", "01.5"], ["big", "18446744073709551616"], ["big", "-1"],
+  ["safe", 9007199254740992], ["ratio", Infinity],
+]) {
+  assert.equal((await echo.formats({ ...formats, [field]: value })).error.kind, "encode", `${field}=${value}`);
+}
+const answering = (patch) => createEchoClient(base, {
+  fetch: async () => new Response(JSON.stringify({ ...formats, ...patch }), {
+    status: 200, headers: { "content-type": "application/json" },
+  }),
+});
+for (const patch of [{ id: "x" }, { big: "99999999999999999999" }, { safe: 2 ** 53 }, { ratio: "0.25" }]) {
+  assert.equal((await answering(patch).formats(formats)).error.kind, "protocol", JSON.stringify(patch));
+}
+
 let requests = 0;
 const checked = createUsersClient(base, { fetch: async (...args) => { requests++; return fetch(...args); } });
 assert.equal((await checked.get({ id: "wrong wrapper" })).error.kind, "encode");

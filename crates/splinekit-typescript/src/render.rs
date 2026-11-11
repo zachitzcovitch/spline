@@ -13,8 +13,8 @@ pub fn shape(
     Ok(match value {
         Shape::Null => "null".into(),
         Shape::Boolean => "boolean".into(),
-        Shape::String => "string".into(),
-        Shape::Integer { .. } => "number".into(),
+        Shape::String | Shape::Formatted(_) => "string".into(),
+        Shape::Integer { .. } | Shape::Number { .. } => "number".into(),
         Shape::Literal(value) => string(value),
         Shape::Ref(id) => symbols
             .get(id)

@@ -10,6 +10,7 @@ mod compare;
 mod field;
 mod model;
 mod registry;
+pub mod wire;
 
 pub use field::{FieldRules, Omission};
 pub use model::*;

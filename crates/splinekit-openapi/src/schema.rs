@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{json, Map, Value};
 use splinekit_contract::Operation;
 use splinekit_http_contract::{ErrorResponses, HttpPlan};
-use splinekit_schema::{DefinitionId, Direction, Graph, Name, Presence, Shape, UnknownFields};
+use splinekit_schema::{
+    DefinitionId, Direction, Graph, Name, Presence, Shape, StringFormat, UnknownFields,
+};
 
 use crate::{operation::FRAMEWORK_SCHEMA, Error, Result};
 
@@ -107,21 +109,19 @@ impl<'a> Schemas<'a> {
             Shape::Null => json!({"type":"null"}),
             Shape::Boolean => json!({"type":"boolean"}),
             Shape::String => json!({"type":"string"}),
+            Shape::Formatted(format) => formatted(*format),
             Shape::Literal(value) => json!({"type":"string","const":value}),
             Shape::Integer { signed, bits } => {
-                if !matches!(bits, 8 | 16 | 32) {
+                let Some((min, max)) = splinekit_schema::integer_bounds(*signed, *bits) else {
                     return Err(splinekit_schema::Error::Unsupported(format!(
                         "{bits}-bit JSON integer"
                     ))
                     .into());
-                }
-                let (min, max) = if *signed {
-                    let limit = 1_i64 << (bits - 1);
-                    (-limit, limit - 1)
-                } else {
-                    (0, (1_i64 << bits) - 1)
                 };
                 json!({"type":"integer","minimum":min,"maximum":max})
+            }
+            Shape::Number { bits } => {
+                json!({"type":"number","format":if *bits == 32 { "float" } else { "double" }})
             }
             Shape::Array(element) => json!({"type":"array","items":self.render(element)?}),
             Shape::Tuple(elements) => {
@@ -307,4 +307,22 @@ fn cycles(graph: &Graph, selected: &BTreeSet<DefinitionId>) -> Result<()> {
         visit(id, graph, &mut done, &mut Vec::new())?;
     }
     Ok(())
+}
+
+/// Standard OpenAPI formats where one exists; a pattern for decimal and
+/// integer strings, which have none.
+fn formatted(format: StringFormat) -> Value {
+    match format {
+        StringFormat::Uuid => json!({"type":"string","format":"uuid"}),
+        StringFormat::DateTime => json!({"type":"string","format":"date-time"}),
+        StringFormat::Date => json!({"type":"string","format":"date"}),
+        StringFormat::Uri => json!({"type":"string","format":"uri"}),
+        StringFormat::Decimal => {
+            json!({"type":"string","pattern":"^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"})
+        }
+        StringFormat::Integer { signed, .. } => json!({
+            "type":"string",
+            "pattern": if signed { "^(0|-?[1-9][0-9]*)$" } else { "^(0|[1-9][0-9]*)$" },
+        }),
+    }
 }

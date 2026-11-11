@@ -396,9 +396,13 @@ codecs. Those declarations are not proofs of arbitrary codec behavior.
 The derive supports owned named structs, unit/newtype/transparent wrappers,
 supported externally/internally/adjacently tagged enums, directional renaming,
 defaults, and field omission. The built-in profile includes Option, Vec, Box,
-string-keyed maps, and signed/unsigned 8/16/32-bit integers. Flattening, untagged
-enums, tuple structs, and broader numeric representations need explicit schema
-descriptions or overrides; unsupported derive cases receive diagnostics.
+string-keyed maps, signed/unsigned 8/16/32-bit integers, and finite 32/64-bit
+floats. Formatted strings (UUID, date-time, date, URI, decimal, 64/128-bit integer
+digits) and JavaScript-safe integers are first-class shapes that types declare
+through `splinekit::wire` descriptions; see [wire types](docs/wire-types.md).
+Flattening, untagged enums, tuple structs, and bare 64/128-bit integers need
+explicit schema descriptions or overrides; unsupported derive cases receive
+diagnostics.
 
 Schemas distinguish Deserialize/input from Serialize/output. Request types match
 what the server accepts; response types describe what it emits. Presence,

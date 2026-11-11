@@ -35,16 +35,14 @@ pub fn matches(graph: &Graph, shape: &Shape, value: &Value) -> bool {
         match shape {
             Shape::Null => value.is_null(),
             Shape::Boolean => value.is_boolean(),
-            Shape::String => value.is_string(),
+            // Lexical formats are checked by the schema crate's oracle.
+            Shape::String | Shape::Formatted(_) => value.is_string(),
+            Shape::Number { bits } => value
+                .as_f64()
+                .is_some_and(|n| n.is_finite() && (*bits == 64 || n.abs() <= f64::from(f32::MAX))),
             Shape::Literal(literal) => value.as_str() == Some(literal),
-            Shape::Integer { signed: true, bits } => value.as_i64().is_some_and(|n| {
-                let limit = 1_i64 << (bits - 1);
-                (-limit..limit).contains(&n)
-            }),
-            Shape::Integer {
-                signed: false,
-                bits,
-            } => value.as_u64().is_some_and(|n| n < (1_u64 << bits)),
+            Shape::Integer { signed, bits } => integer_bounds(*signed, *bits)
+                .is_some_and(|(min, max)| value.as_i64().is_some_and(|n| (min..=max).contains(&n))),
             Shape::Array(element) => value
                 .as_array()
                 .is_some_and(|a| a.iter().all(|v| child(element, v))),

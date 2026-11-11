@@ -3,7 +3,7 @@ use std::fmt::Write;
 
 use splinekit_contract::ResourceDescription;
 use splinekit_http_contract::{ApplicationDescription, ContractDescription, HttpMethod, HttpPlan};
-use splinekit_schema::{Graph, Presence, Shape, UnknownFields};
+use splinekit_schema::{Graph, Presence, Shape, StringFormat, UnknownFields};
 use std::collections::BTreeMap;
 
 use crate::{contract, render, Artifact, Error, Typescript};
@@ -145,6 +145,17 @@ fn wire(shape: &Shape) -> String {
     match shape {
         Shape::Null => "[\"null\"]".into(),
         Shape::String => "[\"string\"]".into(),
+        Shape::Formatted(format) => match format {
+            StringFormat::Uuid => "[\"string\", \"uuid\"]".into(),
+            StringFormat::DateTime => "[\"string\", \"date-time\"]".into(),
+            StringFormat::Date => "[\"string\", \"date\"]".into(),
+            StringFormat::Uri => "[\"string\", \"uri\"]".into(),
+            StringFormat::Decimal => "[\"string\", \"decimal\"]".into(),
+            StringFormat::Integer { signed, bits } => {
+                format!("[\"string\", \"integer\", {signed}, {bits}]")
+            }
+        },
+        Shape::Number { bits } => format!("[\"number\", {bits}]"),
         Shape::Boolean => "[\"boolean\"]".into(),
         Shape::Integer { signed, bits } => format!("[\"integer\", {signed}, {bits}]"),
         Shape::Literal(value) => format!("[\"literal\", {}]", render::string(value)),

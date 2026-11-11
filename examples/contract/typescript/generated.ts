@@ -144,7 +144,10 @@ export function createUsersClient(
 
   type __SplinekitWire =
     | ["null" | "string" | "boolean"]
+    | ["string", "uuid" | "date-time" | "date" | "uri" | "decimal"]
+    | ["string", "integer", boolean, number]
     | ["integer", boolean, number]
+    | ["number", number]
     | ["literal" | "ref", string]
     | ["array" | "map", __SplinekitWire]
     | ["tuple" | "union", __SplinekitWire[]]
@@ -166,14 +169,51 @@ export function createUsersClient(
   const object = (value: unknown): value is { [name: string]: unknown } =>
     value !== null && typeof value === "object" && !globalThis.Array.isArray(value);
   const owns = (value: object, name: string): boolean => globalThis.Object.prototype.hasOwnProperty.call(value, name);
+  // Integer strings compare digits against the type's limit, so no BigInt is needed.
+  const limits: { [key: string]: string } = {
+    u64: "18446744073709551615", i64: "9223372036854775807", n64: "9223372036854775808",
+    u128: "340282366920938463463374607431768211455",
+    i128: "170141183460469231731687303715884105727",
+    n128: "170141183460469231731687303715884105728",
+  };
+  const formatted = (
+    value: string,
+    schema: ["string", "uuid" | "date-time" | "date" | "uri" | "decimal"] | ["string", "integer", boolean, number],
+  ): boolean => {
+    switch (schema[1]) {
+      case "uuid": return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
+      case "date-time": return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value)
+        && globalThis.Number.isFinite(globalThis.Date.parse(value));
+      case "date": {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+        const time = globalThis.Date.parse(`${value}T00:00:00Z`);
+        return globalThis.Number.isFinite(time) && new globalThis.Date(time).toISOString().startsWith(value);
+      }
+      case "uri": try { new globalThis.URL(value); return true; } catch { return false; }
+      case "decimal": return /^-?(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value);
+      case "integer": {
+        if (!(schema[2] ? /^(0|-?[1-9][0-9]*)$/ : /^(0|[1-9][0-9]*)$/).test(value)) return false;
+        const negative = value.startsWith("-");
+        const digits = negative ? value.slice(1) : value;
+        const limit = limits[`${schema[2] ? (negative ? "n" : "i") : "u"}${schema[3]}`];
+        return limit !== undefined
+          && (digits.length < limit.length || (digits.length === limit.length && digits <= limit));
+      }
+    }
+  };
   const valid = (value: unknown, schema: __SplinekitWire, depth = 0): boolean => {
     if (depth > 256) return false;
     const child = (value: unknown, schema: __SplinekitWire): boolean => valid(value, schema, depth + 1);
     switch (schema[0]) {
       case "null": return value === null;
-      case "string": return typeof value === "string";
+      case "string": return typeof value === "string" && (schema.length === 1 || formatted(value, schema));
       case "boolean": return typeof value === "boolean";
+      case "number": return typeof value === "number" && globalThis.Number.isFinite(value)
+        && (schema[1] === 64 || globalThis.Math.abs(value) <= 3.4028234663852886e38);
       case "integer": {
+        if (schema[2] === 53) {
+          return typeof value === "number" && globalThis.Number.isSafeInteger(value) && (schema[1] || value >= 0);
+        }
         const bound = 2 ** (schema[2] - (schema[1] ? 1 : 0));
         return typeof value === "number" && globalThis.Number.isInteger(value)
           && value >= (schema[1] ? -bound : 0) && value < bound;

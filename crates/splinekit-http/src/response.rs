@@ -46,19 +46,15 @@ fn project_at(
         }
         Shape::Null if value.is_null() => Ok(Value::Null),
         Shape::Boolean if value.is_boolean() => Ok(value.clone()),
-        Shape::String if value.is_string() => Ok(value.clone()),
+        // Formats are checked by Serde when the Rust DTO decodes.
+        Shape::String | Shape::Formatted(_) if value.is_string() => Ok(value.clone()),
+        Shape::Number { .. } if value.is_number() => Ok(value.clone()),
         Shape::Literal(literal) if value.as_str() == Some(literal.as_str()) => Ok(value.clone()),
         Shape::Integer { signed, bits } => {
-            if !matches!(bits, 8 | 16 | 32) {
+            let Some((min, max)) = splinekit_schema::integer_bounds(*signed, *bits) else {
                 return mismatch();
-            }
-            let valid = if *signed {
-                let bound = 1_i64 << (bits - 1);
-                value.as_i64().is_some_and(|n| (-bound..bound).contains(&n))
-            } else {
-                value.as_u64().is_some_and(|n| n < 1_u64 << bits)
             };
-            if valid {
+            if value.as_i64().is_some_and(|n| (min..=max).contains(&n)) {
                 Ok(value.clone())
             } else {
                 mismatch()

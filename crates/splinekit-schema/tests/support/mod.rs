@@ -345,15 +345,13 @@ pub fn matches(graph: &Graph, shape: &Shape, value: &Value) -> bool {
             Shape::Null => value.is_null(),
             Shape::Boolean => value.is_boolean(),
             Shape::String => value.is_string(),
+            Shape::Formatted(format) => value.as_str().is_some_and(|text| lexical(*format, text)),
+            Shape::Number { bits } => value
+                .as_f64()
+                .is_some_and(|n| n.is_finite() && (*bits == 64 || n.abs() <= f64::from(f32::MAX))),
             Shape::Literal(expected) => value.as_str() == Some(expected),
-            Shape::Integer { signed: true, bits } => value.as_i64().is_some_and(|n| {
-                let limit = 1_i64 << (bits - 1);
-                (-limit..limit).contains(&n)
-            }),
-            Shape::Integer {
-                signed: false,
-                bits,
-            } => value.as_u64().is_some_and(|n| n < (1_u64 << bits)),
+            Shape::Integer { signed, bits } => integer_bounds(*signed, *bits)
+                .is_some_and(|(min, max)| value.as_i64().is_some_and(|n| (min..=max).contains(&n))),
             Shape::Array(element) => value
                 .as_array()
                 .is_some_and(|values| values.iter().all(|v| child(element, v))),
@@ -385,4 +383,61 @@ pub fn matches(graph: &Graph, shape: &Shape, value: &Value) -> bool {
         }
     }
     visit(graph, shape, value, 256)
+}
+
+/// Structural lexical checks for the oracle; parsers prove the details.
+fn lexical(format: StringFormat, text: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let canonical = |s: &str| digits(s) && (s == "0" || !s.starts_with('0'));
+    match format {
+        StringFormat::Uuid => {
+            text.len() == 36
+                && text.char_indices().all(|(i, c)| {
+                    if matches!(i, 8 | 13 | 18 | 23) {
+                        c == '-'
+                    } else {
+                        c.is_ascii_hexdigit()
+                    }
+                })
+        }
+        StringFormat::Date => {
+            text.len() == 10
+                && text.char_indices().all(|(i, c)| {
+                    if matches!(i, 4 | 7) {
+                        c == '-'
+                    } else {
+                        c.is_ascii_digit()
+                    }
+                })
+        }
+        StringFormat::DateTime => {
+            text.len() >= 20
+                && lexical(StringFormat::Date, &text[..10])
+                && text.as_bytes()[10] == b'T'
+                && (text.ends_with('Z') || text[text.len() - 6..].starts_with(['+', '-']))
+        }
+        StringFormat::Uri => text.contains(':'),
+        StringFormat::Decimal => {
+            let unsigned = text.strip_prefix('-').unwrap_or(text);
+            match unsigned.split_once('.') {
+                Some((whole, fraction)) => canonical(whole) && digits(fraction),
+                None => canonical(unsigned),
+            }
+        }
+        StringFormat::Integer { signed, bits } => {
+            let unsigned = if signed {
+                text.strip_prefix('-').unwrap_or(text)
+            } else {
+                text
+            };
+            canonical(unsigned)
+                && match (signed, bits) {
+                    (true, 64) => text.parse::<i64>().is_ok(),
+                    (false, 64) => text.parse::<u64>().is_ok(),
+                    (true, 128) => text.parse::<i128>().is_ok(),
+                    (false, 128) => text.parse::<u128>().is_ok(),
+                    _ => false,
+                }
+        }
+    }
 }

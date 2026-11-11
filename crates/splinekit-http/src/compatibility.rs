@@ -79,7 +79,7 @@ fn compatible(
         (Shape::Tuple(a), Shape::Tuple(b)) => {
             a.len() == b.len() && a.iter().zip(b).all(|(a, b)| check(a, b))
         }
-        (Shape::Literal(_), Shape::String) => true,
+        (Shape::Literal(_) | Shape::Formatted(_), Shape::String) => true,
         _ => source == target,
     }
 }

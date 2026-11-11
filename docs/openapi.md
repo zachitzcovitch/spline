@@ -114,6 +114,13 @@ concrete JSON default. Schema validation describes structural JSON values; arbit
 custom codecs, lexical restrictions, and application business rules still need their
 own conformance evidence. Native shared-DTO client compatibility is a separate check.
 
+[Formatted strings](wire-types.md) use the standard `format` keyword where OpenAPI
+defines one (`uuid`, `date-time`, `date`, `uri`) and a `pattern` for decimal and
+integer strings. A pattern can't express an integer string's numeric range, so the
+document admits any digits; the generated TypeScript client checks the range.
+Floats are `number` with format `float` or `double`; JavaScript-safe integers carry
+`minimum`/`maximum` of ±(2^53 − 1).
+
 ## Customer-facing error responses
 
 Use `::http::describe_with(&DeclaredErrors)` or another declared policy to export

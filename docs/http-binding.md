@@ -296,7 +296,9 @@ The emitted structural validator checks JSON-encoded arguments against the autho
 input schema. Response decoding separately defaults to compatible projection of
 known fields; set `responsePolicy: "strict"` in client options to enforce the
 recorded unknown-field policy. Both response modes validate references, unions,
-recursive containers, required fields, nullability, and supported integer ranges.
+recursive containers, required fields, nullability, supported integer ranges,
+finite floats, and [formatted strings](wire-types.md) (UUID, date-time, date, URI,
+decimal and range-checked integer digits).
 Response projection has a traversal-depth limit of 256. Schema-declared custom
 predicates remain outside that structural check. See [contract evolution](contract-evolution.md)
 for the cross-version policy and tests.

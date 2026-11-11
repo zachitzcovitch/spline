@@ -39,6 +39,28 @@ pub struct EchoValue {
     pub note: Option<String>,
 }
 
+/// Every formatted wire value, round-tripped through both generated clients.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Schema)]
+#[splinekit(name = "conformance.Formats")]
+#[serde(deny_unknown_fields)]
+pub struct Formats {
+    #[splinekit(schema = "splinekit::wire::Uuid")]
+    pub id: String,
+    #[splinekit(schema = "splinekit::wire::DateTime")]
+    pub at: String,
+    #[splinekit(schema = "splinekit::wire::Date")]
+    pub day: String,
+    #[splinekit(schema = "splinekit::wire::Uri")]
+    pub link: String,
+    #[splinekit(schema = "splinekit::wire::Decimal")]
+    pub amount: String,
+    #[splinekit(schema = "splinekit::wire::IntegerString<u64>")]
+    pub big: String,
+    #[splinekit(schema = "splinekit::wire::SafeInteger<i64>")]
+    pub safe: i64,
+    pub ratio: f64,
+}
+
 #[splinekit::contract(namespace = "echo", module = "echo")]
 pub trait Echo {
     #[query]
@@ -62,6 +84,10 @@ pub trait Echo {
         flag: bool,
         note: Option<String>,
     ) -> Result<EchoValue, ()>;
+
+    #[mutation]
+    #[http(post = "/formats", body = "input")]
+    async fn formats(&self, input: Formats) -> Result<Formats, ()>;
 }
 pub type Empty = ();
 struct EchoService;
@@ -95,6 +121,10 @@ impl Echo for EchoService {
             flag,
             note,
         })
+    }
+
+    async fn formats(&self, input: Formats) -> Result<Formats, ()> {
+        Ok(input)
     }
 }
 
@@ -136,6 +166,21 @@ async fn rust_and_generated_typescript_clients_call_the_same_server() {
             .await,
         Err(CallError::Application(ApiError::InvalidName { .. }))
     ));
+
+    let formats = Formats {
+        id: "0191f1b2-7c4e-7a3b-9f1e-2a3b4c5d6e7f".into(),
+        at: "2026-11-11T05:06:53.123Z".into(),
+        day: "2026-11-11".into(),
+        link: "https://example.test/a?b=c".into(),
+        amount: "-12.50".into(),
+        big: u64::MAX.to_string(),
+        safe: -9_007_199_254_740_991,
+        ratio: 0.25,
+    };
+    let echo_client = echo::http::Client::new(&server.base).unwrap();
+    let echoed = echo_client.formats(formats).await.unwrap();
+    assert_eq!(echoed.big, "18446744073709551615");
+    assert_eq!(echoed.safe, -9_007_199_254_740_991);
 
     let native = tokio::time::timeout(
         Duration::from_secs(20),

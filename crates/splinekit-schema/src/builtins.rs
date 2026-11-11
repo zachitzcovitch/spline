@@ -19,6 +19,8 @@ macro_rules! scalar {
 scalar!((), "core.Unit", Shape::Null);
 scalar!(bool, "core.Bool", Shape::Boolean);
 scalar!(String, "core.String", Shape::String);
+scalar!(f32, "core.F32", Shape::Number { bits: 32 });
+scalar!(f64, "core.F64", Shape::Number { bits: 64 });
 scalar!(
     u8,
     "core.U8",
@@ -84,7 +86,7 @@ macro_rules! unsupported {
     )*};
 }
 
-unsupported!(u64, i64, u128, i128, usize, isize, f32, f64);
+unsupported!(u64, i64, u128, i128, usize, isize);
 
 impl<T: Schema> Schema for Option<T> {
     fn info() -> TypeInfo {

@@ -45,6 +45,12 @@ release yet; the workspace version is a development version.
   name overrides, and JSON inspection/editing/rendering helpers.
 - Checked-in blog and CRUD OpenAPI documents, freshness commands, independent
   Swagger Parser/Ajv validation, and live response conformance in CI.
+- `f32`/`f64` as finite JSON numbers, formatted strings (`Shape::Formatted`: UUID,
+  date-time, date, URI, decimal, 64/128-bit integer digits) and JavaScript-safe
+  integers (`SAFE_INTEGER_BITS`). OpenAPI describes them with `format`/`pattern`
+  and bounds; the generated TypeScript client checks them in arguments and
+  responses. `splinekit::wire` descriptions let a type declare these forms through
+  `#[splinekit(schema = ...)]`. See the new [wire types](docs/wire-types.md) guide.
 
 ### Maintenance
 

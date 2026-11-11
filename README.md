@@ -98,15 +98,16 @@ error policies, and supported DTO compatibility.
 | Area | Current support |
 | --- | --- |
 | Authoring | Owned DTOs, Serde derives, safe non-generic resource traits, queries and mutations. |
-| Schemas | Directional names/presence, tagged enums, generic and recursive types, explicit custom-codec descriptions. |
+| Schemas | Directional names/presence, tagged enums, generic and recursive types, floats, formatted strings (UUID, date-time, decimal, 64/128-bit integer digits), explicit custom-codec descriptions. |
 | HTTP | GET/POST/PUT/PATCH/DELETE, scalar path/query arguments, selected JSON bodies, 200/201/204 successes. |
 | Clients | Positional calls, typed errors, shared configuration, compatible or strict response decoding. |
 | Execution | Typed Tower operation services and positional in-process Rust clients. |
 | Composition | Neutral resource/schema composition; grouped HTTP clients and one router with shared request-scoped services. |
 | OpenAPI | Deterministic OpenAPI 3.1.2 documents with directional components, error responses, and explicit server/authentication metadata. |
 
-The evaluated numeric JSON profile uses 8/16/32-bit integers. Larger integers and
-floats need an explicit wire representation. Error types can opt into
+Integers up to 32 bits and floats map to JSON numbers; 64/128-bit integers need an
+explicit wire form, such as digits in a string. [Wire types](docs/wire-types.md)
+lists the forms both clients and OpenAPI share. Error types can opt into
 [`splinekit::http::Error`](docs/http-errors.md) to declare default HTTP statuses and
 documented response shapes. [OpenAPI export](docs/openapi.md) consumes those same
 bound descriptions. Streaming is [follow-up work](ROADMAP.md).
@@ -275,6 +276,8 @@ same machine and toolchain.
 
 - [Workspace and contract milestone](docs/workspace-contracts.md): implemented API,
   crate boundaries, verification, and current scope.
+- [Wire types](docs/wire-types.md): each Rust type's JSON form, formatted strings,
+  safe integers, and declaring a type's own wire form.
 - [First HTTP binding](docs/http-binding.md): authoring, server/client examples,
   wire behavior, request context, and conformance checks.
 - [Declared HTTP errors](docs/http-errors.md): derived default statuses, policy-aware

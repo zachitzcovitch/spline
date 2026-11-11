@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use splinekit_schema::{DefinitionId, Direction, Graph, Shape};
+use splinekit_schema::{DefinitionId, Direction, Graph, Shape, StringFormat};
 
 use crate::Error;
 
@@ -131,9 +131,21 @@ pub fn shape(value: &Shape, direction: Direction, graph: &Graph) -> Result<(), E
                 shape(&field.shape, direction, graph)?;
             }
         }
-        Shape::Integer { bits, .. } if !matches!(bits, 8 | 16 | 32) => {
+        Shape::Integer { signed, bits }
+            if splinekit_schema::integer_bounds(*signed, *bits).is_none() =>
+        {
             return Err(Error::InvalidShape(format!(
                 "integer width {bits} is outside the evaluated JSON profile"
+            )));
+        }
+        Shape::Number { bits } if !matches!(bits, 32 | 64) => {
+            return Err(Error::InvalidShape(format!(
+                "number width {bits} is outside the evaluated JSON profile"
+            )));
+        }
+        Shape::Formatted(StringFormat::Integer { bits, .. }) if !matches!(bits, 64 | 128) => {
+            return Err(Error::InvalidShape(format!(
+                "integer string width {bits} is outside the evaluated JSON profile"
             )));
         }
         _ => {}

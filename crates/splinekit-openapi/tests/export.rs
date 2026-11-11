@@ -364,3 +364,63 @@ fn malformed_deployment_configuration_is_rejected_before_export() {
         .export_contract(&binding)
         .unwrap();
 }
+
+#[test]
+fn formatted_strings_floats_and_safe_integers_keep_their_constraints() {
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(name = "test.Formats")]
+    #[allow(dead_code)]
+    struct Formats {
+        #[splinekit(schema = "splinekit::wire::Uuid")]
+        id: String,
+        #[splinekit(schema = "splinekit::wire::DateTime")]
+        at: String,
+        #[splinekit(schema = "splinekit::wire::Decimal")]
+        amount: String,
+        #[splinekit(schema = "splinekit::wire::IntegerString<i64>")]
+        big: String,
+        #[splinekit(schema = "splinekit::wire::SafeInteger<u64>")]
+        safe: u64,
+        ratio: f32,
+    }
+    let doc = OpenApi::new("Formats", "1")
+        .export_contract(&binding::<Formats>())
+        .unwrap();
+    let properties = &doc.as_json()["components"]["schemas"]["Formats"]["properties"];
+    assert_eq!(properties["id"], json!({"type":"string","format":"uuid"}));
+    assert_eq!(
+        properties["at"],
+        json!({"type":"string","format":"date-time"})
+    );
+    assert_eq!(
+        properties["ratio"],
+        json!({"type":"number","format":"float"})
+    );
+    let valid = json!({
+        "id": "0191f1b2-7c4e-7a3b-9f1e-2a3b4c5d6e7f",
+        "at": "2026-11-11T05:06:53Z",
+        "amount": "-12.50",
+        "big": "-9223372036854775808",
+        "safe": 9_007_199_254_740_991_u64,
+        "ratio": 0.5,
+    });
+    let with = |name: &str, value: serde_json::Value| {
+        let mut changed = valid.clone();
+        changed[name] = value;
+        json!({"pointer":"#/components/schemas/Formats","value":changed,"valid":false})
+    };
+    independent(
+        &doc,
+        json!([
+            {"pointer":"#/components/schemas/Formats","value":valid,"valid":true},
+            with("amount", json!("1e5")),
+            with("amount", json!("01.5")),
+            with("big", json!("1.5")),
+            with("big", json!(7)),
+            with("safe", json!(9_007_199_254_740_992_u64)),
+            with("safe", json!(-1)),
+            with("ratio", json!("0.5")),
+            with("id", json!(7)),
+        ]),
+    );
+}

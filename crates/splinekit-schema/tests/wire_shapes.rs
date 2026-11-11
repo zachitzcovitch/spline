@@ -271,12 +271,9 @@ fn small_integer_ranges_maps_and_unit_follow_the_initial_json_profile() {
         .unwrap();
     let signed = registry.register::<i8>(Direction::Deserialize).unwrap();
     let unit = registry.register::<()>(Direction::Serialize).unwrap();
+    // A bare 64-bit integer still needs an explicit wire choice.
     assert!(matches!(
         registry.register::<u64>(Direction::Serialize),
-        Err(Error::Unsupported(_))
-    ));
-    assert!(matches!(
-        registry.register::<f64>(Direction::Serialize),
         Err(Error::Unsupported(_))
     ));
     let graph = registry.finish().unwrap();
@@ -290,4 +287,174 @@ fn small_integer_ranges_maps_and_unit_follow_the_initial_json_profile() {
     assert!(!matches(&graph, &signed, &json!(-129)));
     assert!(!matches(&graph, &signed, &json!(1.5)));
     assert!(matches(&graph, &unit, &to_value(()).unwrap()));
+}
+
+#[test]
+fn floats_are_finite_json_numbers_and_non_finite_values_have_no_wire_form() {
+    let mut registry = Registry::new();
+    let double = registry.register::<f64>(Direction::Serialize).unwrap();
+    let single = registry.register::<f32>(Direction::Deserialize).unwrap();
+    let graph = registry.finish().unwrap();
+    assert_eq!(double, Shape::Number { bits: 64 });
+    for value in [0.0, -1.5, 1e300, f64::MIN_POSITIVE] {
+        let wire = to_value(value).unwrap();
+        assert!(matches(&graph, &double, &wire));
+        assert_eq!(from_value::<f64>(wire).unwrap(), value);
+    }
+    // Serde writes non-finite floats as null, which no float accepts back.
+    let nan = to_value(f64::NAN).unwrap();
+    assert!(!matches(&graph, &double, &nan));
+    assert!(from_value::<f64>(nan).is_err());
+    assert!(matches(&graph, &single, &to_value(f32::MAX).unwrap()));
+    assert!(!matches(&graph, &single, &json!(1e300)));
+    assert!(!matches(&graph, &single, &json!("1.5")));
+}
+
+#[test]
+fn safe_integers_cover_exactly_the_javascript_safe_range() {
+    let limit = (1_i64 << 53) - 1;
+    assert_eq!(
+        integer_bounds(true, SAFE_INTEGER_BITS),
+        Some((-limit, limit))
+    );
+    assert_eq!(integer_bounds(false, SAFE_INTEGER_BITS), Some((0, limit)));
+    assert_eq!(integer_bounds(true, 8), Some((-128, 127)));
+    assert_eq!(integer_bounds(false, 32), Some((0, i64::from(u32::MAX))));
+    assert_eq!(integer_bounds(true, 64), None);
+
+    let mut registry = Registry::new();
+    let signed = registry
+        .register::<wire::SafeInteger<i64>>(Direction::Serialize)
+        .unwrap();
+    let unsigned = registry
+        .register::<wire::SafeInteger<u64>>(Direction::Serialize)
+        .unwrap();
+    let graph = registry.finish().unwrap();
+    assert!(matches(&graph, &signed, &json!(-limit)));
+    assert!(!matches(&graph, &signed, &json!(-limit - 1)));
+    assert!(matches(&graph, &unsigned, &json!(limit)));
+    assert!(!matches(&graph, &unsigned, &json!(limit + 1)));
+    assert!(!matches(&graph, &unsigned, &json!(-1)));
+}
+
+#[test]
+fn wire_markers_describe_formatted_strings_that_real_serde_values_satisfy() {
+    #[derive(Serialize)]
+    struct Values {
+        id: String,
+        at: String,
+        day: String,
+        link: String,
+        amount: String,
+        big: String,
+        small: String,
+    }
+    let mut registry = Registry::new();
+    let mut shape = |format| {
+        let shape = Shape::Formatted(format);
+        assert_eq!(
+            match format {
+                StringFormat::Uuid => registry.register::<wire::Uuid>(Direction::Serialize),
+                StringFormat::DateTime => registry.register::<wire::DateTime>(Direction::Serialize),
+                StringFormat::Date => registry.register::<wire::Date>(Direction::Serialize),
+                StringFormat::Uri => registry.register::<wire::Uri>(Direction::Serialize),
+                StringFormat::Decimal => registry.register::<wire::Decimal>(Direction::Serialize),
+                StringFormat::Integer {
+                    signed: false,
+                    bits: 64,
+                } => registry.register::<wire::IntegerString<u64>>(Direction::Serialize),
+                StringFormat::Integer {
+                    signed: true,
+                    bits: 128,
+                } => registry.register::<wire::IntegerString<i128>>(Direction::Serialize),
+                other => panic!("no marker for {other:?}"),
+            }
+            .unwrap(),
+            shape
+        );
+        shape
+    };
+    let uuid = shape(StringFormat::Uuid);
+    let at = shape(StringFormat::DateTime);
+    let day = shape(StringFormat::Date);
+    let link = shape(StringFormat::Uri);
+    let amount = shape(StringFormat::Decimal);
+    let big = shape(StringFormat::Integer {
+        signed: false,
+        bits: 64,
+    });
+    let small = shape(StringFormat::Integer {
+        signed: true,
+        bits: 128,
+    });
+    let graph = registry.finish().unwrap();
+    let values = to_value(Values {
+        id: "0191f1b2-7c4e-7a3b-9f1e-2a3b4c5d6e7f".into(),
+        at: "2026-11-11T05:06:53.123Z".into(),
+        day: "2026-11-11".into(),
+        link: "https://example.test/a?b=c".into(),
+        amount: "-12.50".into(),
+        big: u64::MAX.to_string(),
+        small: i128::MIN.to_string(),
+    })
+    .unwrap();
+    for (name, shape) in [
+        ("id", &uuid),
+        ("at", &at),
+        ("day", &day),
+        ("link", &link),
+        ("amount", &amount),
+        ("big", &big),
+        ("small", &small),
+    ] {
+        assert!(matches(&graph, shape, &values[name]), "{name}");
+    }
+    for (shape, invalid) in [
+        (&uuid, json!("0191f1b2-7c4e-7a3b-9f1e")),
+        (&at, json!("2026-11-11 05:06")),
+        (&day, json!("11/11/2026")),
+        (&link, json!("relative")),
+        (&amount, json!("1e5")),
+        (&amount, json!("01.5")),
+        (&big, json!("18446744073709551616")),
+        (&big, json!("-1")),
+        (&big, json!(1)),
+        (&small, json!("-170141183460469231731687303715884105729")),
+    ] {
+        assert!(!matches(&graph, shape, &invalid), "{invalid}");
+    }
+}
+
+#[test]
+fn unsupported_widths_cannot_enter_a_graph() {
+    struct Wide;
+    impl Schema for Wide {
+        fn info() -> TypeInfo {
+            TypeInfo::named("demo.Wide")
+        }
+        fn describe(_: &mut Context<'_>) -> Result<Shape> {
+            Ok(Shape::Formatted(StringFormat::Integer {
+                signed: false,
+                bits: 32,
+            }))
+        }
+    }
+    struct Half;
+    impl Schema for Half {
+        fn info() -> TypeInfo {
+            TypeInfo::named("demo.Half")
+        }
+        fn describe(_: &mut Context<'_>) -> Result<Shape> {
+            Ok(Shape::Number { bits: 16 })
+        }
+    }
+    let mut registry = Registry::new();
+    assert!(matches!(
+        registry.register::<Wide>(Direction::Serialize),
+        Err(Error::Unsupported(_))
+    ));
+    assert!(matches!(
+        registry.register::<Half>(Direction::Serialize),
+        Err(Error::Unsupported(_))
+    ));
 }
