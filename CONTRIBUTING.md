@@ -33,6 +33,13 @@ npm ci --ignore-scripts --no-audit --no-fund
 Other Node version managers work too; use the version recorded in `.nvmrc`.
 Cargo and npm lockfiles are checked in so local and CI dependencies agree.
 
+Library manifests use compatible version ranges whose minimum is the evaluated
+release (`serde = "1.0.229"`), so applications aren't forced onto exact versions;
+the lockfile records exactly what was tested. The one exception is
+`serde_derive_internals`, pinned exactly behind the macro adapter because it
+exposes Serde's internal syntax tree; upgrade it deliberately (see
+[the reuse evaluation](research/serde-internals-reuse.md)).
+
 ## Verify a change
 
 ```sh

@@ -60,6 +60,10 @@ release yet; the workspace version is a development version.
   taken on crates.io. Code imports `splinekit::`; the HTTP error marker header is
   `x-splinekit-error`, the OpenAPI extension `x-splinekit-error-policy`, and the
   partial-update schema `splinekit.Patch`. Regenerate clients and artifacts.
+- Library dependencies use compatible version ranges from the evaluated release
+  instead of exact pins (Axum, reqwest, Tower, Serde, serde_json, Syn), so
+  applications can share newer compatible releases. `serde_derive_internals`
+  stays exactly pinned behind the macro adapter.
 - TypeScript exports use short public DTO names and authored parameter names.
   Equivalent directions share one declaration; differing nested wire shapes keep
   `Input`/`Output` distinctions. Collisions require explicit exporter overrides.

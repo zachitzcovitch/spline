@@ -374,5 +374,6 @@ npm run test:blog
 ```
 
 The HTTP integration tests need loopback networking and a Node runtime with
-TypeScript stripping. TypeScript 5.9.3, Axum 0.8.9, and reqwest 0.12.28 are pinned;
-the lockfiles record the remaining evaluated dependencies.
+TypeScript stripping. The lockfiles record the evaluated versions, including
+TypeScript 5.9.3, Axum 0.8.9, and reqwest 0.12.28; the crate manifests accept
+compatible later releases.
