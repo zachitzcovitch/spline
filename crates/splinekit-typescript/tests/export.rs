@@ -357,7 +357,7 @@ fn open_enums_keep_their_known_values_as_suggestions() {
 }
 
 #[test]
-fn string_enums_get_constants_keyed_by_their_rust_variants() {
+fn string_enums_get_constants_keyed_by_their_values_in_capitals() {
     #[allow(dead_code)]
     #[derive(serde::Serialize, splinekit::Schema)]
     #[splinekit(only = "serialize", name = "api.Availability")]
@@ -387,9 +387,49 @@ fn string_enums_get_constants_keyed_by_their_rust_variants() {
         .source;
     assert!(source
         .contains("export type Availability = \"ready\" | \"allowance_exhausted\" | \"pending\";"));
+    // Keys follow the wire value, not the Rust variant (`UsagePending` is sent
+    // as "pending").
     assert!(source.contains(
-        "export const Availability = {\n  \"Ready\": \"ready\",\n  \"AllowanceExhausted\": \"allowance_exhausted\",\n  \"UsagePending\": \"pending\",\n} as const;"
+        "export const Availability = {\n  READY: \"ready\",\n  ALLOWANCE_EXHAUSTED: \"allowance_exhausted\",\n  PENDING: \"pending\",\n} as const;"
     ));
     // Only string enums: a union of objects has no constants.
     assert!(!source.contains("export const Problem"));
+}
+
+#[test]
+fn string_values_that_cannot_make_distinct_keys_get_no_constants() {
+    struct Clashing;
+    impl Schema for Clashing {
+        fn info() -> TypeInfo {
+            TypeInfo::named("api.Clashing")
+        }
+        fn describe(_: &mut Context<'_>) -> splinekit_schema::Result<Shape> {
+            Ok(Shape::Union(vec![
+                Shape::Literal("a-b".into()),
+                Shape::Literal("a_b".into()),
+            ]))
+        }
+    }
+    struct Numeric;
+    impl Schema for Numeric {
+        fn info() -> TypeInfo {
+            TypeInfo::named("api.Numeric")
+        }
+        fn describe(_: &mut Context<'_>) -> splinekit_schema::Result<Shape> {
+            Ok(Shape::Union(vec![
+                Shape::Literal("3ds".into()),
+                Shape::Literal("card".into()),
+            ]))
+        }
+    }
+    let mut registry = Registry::new();
+    registry.register::<Clashing>(Direction::Serialize).unwrap();
+    registry.register::<Numeric>(Direction::Serialize).unwrap();
+    let source = Typescript::new()
+        .export(&registry.finish().unwrap(), &[])
+        .unwrap()
+        .source;
+    assert!(source.contains("export type Clashing = \"a-b\" | \"a_b\";"));
+    assert!(!source.contains("export const Clashing"));
+    assert!(!source.contains("export const Numeric"));
 }

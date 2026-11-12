@@ -10,10 +10,10 @@ const invalid: EvolutionV1HttpOptions = { responsePolicy: "unchecked" };
 compatible.get("user_1");
 strict.create({ displayName: "v1", state: "active" });
 // A string enum's values come as constants: no literal to mistype.
-strict.create({ displayName: "v1", state: State.Active });
-const active: "active" = State.Active;
+strict.create({ displayName: "v1", state: State.ACTIVE });
+const active: "active" = State.ACTIVE;
 // @ts-expect-error constants name only the known values
-State.Suspended;
+State.SUSPENDED;
 // @ts-expect-error the old contract's positional signature has no newly added query argument
 compatible.get("user_1", "new audit value");
 // @ts-expect-error accepting additive response fields does not relax authored inputs

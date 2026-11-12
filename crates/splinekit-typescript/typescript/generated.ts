@@ -101,7 +101,7 @@ export type Unusual = {
 export type UnusualLiteral = "literal\"\\\n\u2029";
 
 export const UnusualLiteral = {
-  "Value": "literal\"\\\n\u2029",
+  LITERAL: "literal\"\\\n\u2029",
 } as const;
 
 /**

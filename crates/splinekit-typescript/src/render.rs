@@ -142,14 +142,11 @@ pub fn string(value: &str) -> String {
 }
 
 /// For a string union (a string enum), its values as constants beside the
-/// type, so code compares against `Status.Active` rather than a literal it
-/// could mistype. Keys are the Rust variant names when the schema records
-/// them, otherwise PascalCase of each value; values are the wire strings.
-pub(crate) fn string_constants(
-    symbol: &str,
-    shape: &Shape,
-    variants: Option<&[String]>,
-) -> Option<String> {
+/// type, so code compares against `Status.ACTIVE` rather than a literal it
+/// could mistype. Each key is its value in capitals (`"allowance_exhausted"`
+/// is `ALLOWANCE_EXHAUSTED`), so key and value read as the same word. A value
+/// that can't make a key, or two that make the same one, means no constants.
+pub(crate) fn string_constants(symbol: &str, shape: &Shape) -> Option<String> {
     let Shape::Union(alternatives) = shape else {
         return None;
     };
@@ -160,35 +157,31 @@ pub(crate) fn string_constants(
             _ => None,
         })
         .collect::<Option<_>>()?;
-    let keys: Vec<String> = match variants {
-        Some(names) if names.len() == values.len() => names.to_vec(),
-        _ => values.iter().map(|value| pascal(value)).collect(),
-    };
-    let mut seen = std::collections::BTreeSet::new();
-    if keys
+    let keys: Vec<String> = values
         .iter()
-        .any(|key| key.is_empty() || !seen.insert(key.as_str()))
-    {
+        .map(|value| constant_key(value))
+        .collect::<Option<_>>()?;
+    let mut seen = std::collections::BTreeSet::new();
+    if !keys.iter().all(|key| seen.insert(key.as_str())) {
         return None;
     }
     let mut source = format!("export const {symbol} = {{\n");
     for (key, value) in keys.iter().zip(&values) {
-        source.push_str(&format!("  {}: {},\n", string(key), string(value)));
+        source.push_str(&format!("  {key}: {},\n", string(value)));
     }
     source.push_str("} as const;\n\n");
     Some(source)
 }
 
-fn pascal(value: &str) -> String {
-    value
+/// A value in capitals with `_` between words; `None` when that isn't a
+/// plain identifier (empty, or starting with a digit).
+fn constant_key(value: &str) -> Option<String> {
+    let key = value
         .split(|c: char| !c.is_ascii_alphanumeric())
         .filter(|part| !part.is_empty())
-        .map(|part| {
-            let mut chars = part.chars();
-            chars
-                .next()
-                .map(|first| first.to_ascii_uppercase().to_string() + chars.as_str())
-                .unwrap_or_default()
-        })
-        .collect()
+        .collect::<Vec<_>>()
+        .join("_")
+        .to_ascii_uppercase();
+    key.starts_with(|c: char| c.is_ascii_alphabetic())
+        .then_some(key)
 }

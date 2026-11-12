@@ -94,17 +94,19 @@ compares against a named value instead of a literal it could mistype:
 ```typescript
 export type Availability = "ready" | "allowance_exhausted";
 export const Availability = {
-  "Ready": "ready",
-  "AllowanceExhausted": "allowance_exhausted",
+  READY: "ready",
+  ALLOWANCE_EXHAUSTED: "allowance_exhausted",
 } as const;
 
-if (balance.availability === Availability.Ready) { /* … */ }
+if (balance.availability === Availability.READY) { /* … */ }
 ```
 
-Keys are the Rust variant names (PascalCase of each value for handwritten
-schemas); values are the wire strings, so they follow `rename`/`rename_all`.
-Types and values live in separate TypeScript namespaces, so the shared name
-doesn't clash, and an unused constant is removed by tree-shaking. A union of
+Each key is its wire value in capitals, so key and value read as the same word
+whatever the Rust variant is called. A value that can't make a key (one that
+starts with a digit), or two values that make the same key, means that type
+gets no constants. Types and values live in separate TypeScript namespaces, so
+the shared name doesn't clash (one import brings both, like a TypeScript
+`enum`), and an unused constant is removed by tree-shaking. A union of
 objects (a tagged enum) gets no constants; its variants are told apart by
 their tag.
 
