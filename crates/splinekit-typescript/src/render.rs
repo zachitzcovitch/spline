@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
-use splinekit_schema::{DefinitionId, Presence, Shape, UnknownFields};
+use splinekit_schema::{DefinitionId, Graph, Object, Presence, Shape, UnknownFields};
 
 use crate::names::Properties;
 use crate::Error;
@@ -157,6 +157,97 @@ pub(crate) fn string_constants(symbol: &str, shape: &Shape) -> Option<String> {
             _ => None,
         })
         .collect::<Option<_>>()?;
+    constants_object(symbol, &values)
+}
+
+/// For a tagged union (objects told apart by one literal field, such as an
+/// error's `code` or a flow's `phase`), its tag values as constants named
+/// after the type and the tag: `AcceptErrorCode.QUOTE_EXPIRED`,
+/// `FlowPhase.NEEDS_CUSTOMER`. None when no single field tells every
+/// alternative apart, or the name is already a type's.
+pub(crate) fn tag_constants(
+    symbol: &str,
+    shape: &Shape,
+    graph: &Graph,
+    taken: &BTreeSet<String>,
+) -> Option<String> {
+    let alternatives: Vec<&Object> = match resolve(shape, graph)? {
+        Shape::Union(alternatives) => alternatives
+            .iter()
+            .map(|alternative| match resolve(alternative, graph)? {
+                Shape::Object(object) => Some(object),
+                _ => None,
+            })
+            .collect::<Option<_>>()?,
+        Shape::Object(object) => vec![object],
+        _ => return None,
+    };
+    let tags: Vec<(&str, Vec<&str>)> = alternatives
+        .first()?
+        .fields
+        .iter()
+        .filter_map(|field| {
+            let values: Vec<&str> = alternatives
+                .iter()
+                .map(|object| tag_value(object, &field.name, graph))
+                .collect::<Option<_>>()?;
+            let distinct: BTreeSet<_> = values.iter().collect();
+            (distinct.len() == values.len()).then_some((field.name.as_str(), values))
+        })
+        .collect();
+    let [(tag, values)] = tags.as_slice() else {
+        return None;
+    };
+    let name = format!("{symbol}{}", pascal(tag)?);
+    if taken.contains(&name) {
+        return None;
+    }
+    constants_object(&name, values)
+}
+
+/// A required field's literal value, following aliases.
+fn tag_value<'a>(object: &'a Object, name: &str, graph: &'a Graph) -> Option<&'a str> {
+    let field = object
+        .fields
+        .iter()
+        .find(|field| field.name == name && field.presence == Presence::Required)?;
+    match resolve(&field.shape, graph)? {
+        Shape::Literal(value) => Some(value.as_str()),
+        _ => None,
+    }
+}
+
+fn resolve<'a>(mut shape: &'a Shape, graph: &'a Graph) -> Option<&'a Shape> {
+    for _ in 0..32 {
+        match shape {
+            Shape::Ref(id) => shape = &graph.definitions().get(id)?.shape,
+            other => return Some(other),
+        }
+    }
+    None
+}
+
+/// `code` → `Code`, `next_action` → `NextAction`.
+fn pascal(name: &str) -> Option<String> {
+    let key = constant_key(name)?;
+    Some(
+        key.split('_')
+            .map(|word| {
+                let lower = word.to_ascii_lowercase();
+                let mut chars = lower.chars();
+                chars
+                    .next()
+                    .map(|c| c.to_ascii_uppercase().to_string() + chars.as_str())
+                    .unwrap_or_default()
+            })
+            .collect(),
+    )
+}
+
+/// `export const {name} = { KEY: "value", … } as const;` with each key its
+/// value in capitals. None when a value can't make a key, or two make the
+/// same one.
+fn constants_object(name: &str, values: &[&str]) -> Option<String> {
     let keys: Vec<String> = values
         .iter()
         .map(|value| constant_key(value))
@@ -165,8 +256,8 @@ pub(crate) fn string_constants(symbol: &str, shape: &Shape) -> Option<String> {
     if !keys.iter().all(|key| seen.insert(key.as_str())) {
         return None;
     }
-    let mut source = format!("export const {symbol} = {{\n");
-    for (key, value) in keys.iter().zip(&values) {
+    let mut source = format!("export const {name} = {{\n");
+    for (key, value) in keys.iter().zip(values) {
         source.push_str(&format!("  {key}: {},\n", string(value)));
     }
     source.push_str("} as const;\n\n");

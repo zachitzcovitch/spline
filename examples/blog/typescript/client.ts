@@ -1,4 +1,4 @@
-import { createBlogClient } from "./generated.ts";
+import { createBlogClient, PostErrorCode } from "./generated.ts";
 
 // -------- Blog workflow --------
 
@@ -31,7 +31,7 @@ export async function run(baseUrl: string): Promise<void> {
   if (
     !denied.ok &&
     denied.error.kind === "application" &&
-    denied.error.value.code === "forbidden"
+    denied.error.value.code === PostErrorCode.FORBIDDEN
   ) {
     console.log("Bob cannot publish Alice's post (typed Forbidden)");
   } else {

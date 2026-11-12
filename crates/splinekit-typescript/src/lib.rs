@@ -161,6 +161,7 @@ impl Typescript {
         if declarations.is_empty() {
             source.push_str("export {};\n");
         }
+        let taken: std::collections::BTreeSet<String> = declarations.keys().cloned().collect();
         for (symbol, (shape, docs)) in declarations {
             source.push_str(&render::docs(docs, 0));
             source.push_str("export type ");
@@ -169,6 +170,9 @@ impl Typescript {
             source.push_str(&render::shape_with(shape, &symbols, 0, properties)?);
             source.push_str(";\n\n");
             if let Some(constants) = render::string_constants(&symbol, shape) {
+                source.push_str(&constants);
+            }
+            if let Some(constants) = render::tag_constants(&symbol, shape, graph, &taken) {
                 source.push_str(&constants);
             }
         }

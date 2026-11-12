@@ -20,6 +20,12 @@ export type PostError = {
   "code": "invalid_title";
 };
 
+export const PostErrorCode = {
+  NOT_FOUND: "not_found",
+  FORBIDDEN: "forbidden",
+  INVALID_TITLE: "invalid_title",
+} as const;
+
 export type User = {
   "id": string;
   "displayName": string;
@@ -28,6 +34,10 @@ export type User = {
 export type UserError = {
   "code": "not_found";
 };
+
+export const UserErrorCode = {
+  NOT_FOUND: "not_found",
+} as const;
 
 /**
  * Users and posts, composed with shared configuration.

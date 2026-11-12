@@ -15,6 +15,11 @@ export type Error = {
   "code": "rejected";
 };
 
+export const ErrorCode = {
+  MISSING: "missing",
+  REJECTED: "rejected",
+} as const;
+
 export type Event = {
   "item": {
     "id": string;

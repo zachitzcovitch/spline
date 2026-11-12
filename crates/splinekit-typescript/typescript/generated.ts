@@ -11,6 +11,11 @@ export type ApiErrorInput = {
   };
 };
 
+export const ApiErrorInputKind = {
+  NOT_FOUND: "not_found",
+  VALIDATION: "validation",
+} as const;
+
 export type ApiErrorOutput = {
   "kind": "not_found";
 } | {
@@ -19,6 +24,11 @@ export type ApiErrorOutput = {
     "field": string;
   };
 };
+
+export const ApiErrorOutputKind = {
+  NOT_FOUND: "not_found",
+  VALIDATION: "validation",
+} as const;
 
 export type Array = string;
 

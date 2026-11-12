@@ -10,6 +10,11 @@ export type ApiError = {
   };
 };
 
+export const ApiErrorCode = {
+  NOT_FOUND: "not_found",
+  INVALID_NAME: "invalid_name",
+} as const;
+
 /**
  * Information supplied when creating a user.
  */

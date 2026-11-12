@@ -392,8 +392,11 @@ fn string_enums_get_constants_keyed_by_their_values_in_capitals() {
     assert!(source.contains(
         "export const Availability = {\n  READY: \"ready\",\n  ALLOWANCE_EXHAUSTED: \"allowance_exhausted\",\n  PENDING: \"pending\",\n} as const;"
     ));
-    // Only string enums: a union of objects has no constants.
-    assert!(!source.contains("export const Problem"));
+    // A tagged union gets its tag values, named after the type and the tag.
+    assert!(source.contains(
+        "export const ProblemCode = {\n  GONE: \"gone\",\n  BUSY: \"busy\",\n} as const;"
+    ));
+    assert!(!source.contains("export const Problem = "));
 }
 
 #[test]
@@ -432,4 +435,58 @@ fn string_values_that_cannot_make_distinct_keys_get_no_constants() {
     assert!(source.contains("export type Clashing = \"a-b\" | \"a_b\";"));
     assert!(!source.contains("export const Clashing"));
     assert!(!source.contains("export const Numeric"));
+}
+
+#[test]
+fn tagged_unions_without_one_telling_field_or_with_a_taken_name_get_no_constants() {
+    #[allow(dead_code)]
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(only = "serialize", name = "api.Event")]
+    #[serde(tag = "kind", rename_all = "snake_case")]
+    enum Event {
+        Opened { at: u32 },
+        Closed { at: u32 },
+    }
+    // A type already named like Event's constant: the constant is skipped.
+    #[allow(dead_code)]
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(only = "serialize", name = "api.EventKind")]
+    struct EventKind {
+        label: String,
+    }
+    struct Ambiguous;
+    impl Schema for Ambiguous {
+        fn info() -> TypeInfo {
+            TypeInfo::named("api.Ambiguous")
+        }
+        fn describe(_: &mut Context<'_>) -> splinekit_schema::Result<Shape> {
+            let variant = |a: &str, b: &str| {
+                Shape::Object(Object {
+                    fields: vec![
+                        Field::required("a", Shape::Literal(a.into())),
+                        Field::required("b", Shape::Literal(b.into())),
+                    ],
+                    unknown_fields: UnknownFields::Reject,
+                })
+            };
+            Ok(Shape::Union(vec![variant("x", "1"), variant("y", "2")]))
+        }
+    }
+    let mut registry = Registry::new();
+    registry.register::<Event>(Direction::Serialize).unwrap();
+    registry
+        .register::<EventKind>(Direction::Serialize)
+        .unwrap();
+    registry
+        .register::<Ambiguous>(Direction::Serialize)
+        .unwrap();
+    let source = Typescript::new()
+        .export(&registry.finish().unwrap(), &[])
+        .unwrap()
+        .source;
+    assert!(!source.contains("export const EventKind"), "{source}");
+    assert!(
+        !source.contains("export const Ambiguous"),
+        "two telling fields: {source}"
+    );
 }

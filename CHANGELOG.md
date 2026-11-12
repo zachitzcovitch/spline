@@ -8,7 +8,9 @@ release yet; the workspace version is a development version.
 ### Changed
 
 - TypeScript: a string enum's type comes with a constant object of the same
-  name, keyed by each value in capitals (`Availability.READY === "ready"`).
+  name, keyed by each value in capitals (`Availability.READY === "ready"`). A
+  tagged union's tag values do too, named after the type and the tag
+  (`PostErrorCode.FORBIDDEN`).
 - Errors are RFC 9457 problem details (`application/problem+json`): a numeric
   `status` and a string `code`, plus the application error's fields or a
   framework fault's optional developer `detail`. HTTP application errors must be

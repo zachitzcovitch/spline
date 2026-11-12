@@ -86,7 +86,7 @@ direction with a differing shape can change `User` to `UserInput`/`UserOutput`;
 that is an intentional distinction. Adding a type with the same short name produces
 a collision error rather than assigning visit-order-dependent suffixes.
 
-## String enums come with constants
+## Enum values come with constants
 
 A string enum's type also gets a constant object of the same name, so code
 compares against a named value instead of a literal it could mistype:
@@ -106,9 +106,24 @@ whatever the Rust variant is called. A value that can't make a key (one that
 starts with a digit), or two values that make the same key, means that type
 gets no constants. Types and values live in separate TypeScript namespaces, so
 the shared name doesn't clash (one import brings both, like a TypeScript
-`enum`), and an unused constant is removed by tree-shaking. A union of
-objects (a tagged enum) gets no constants; its variants are told apart by
-their tag.
+`enum`), and an unused constant is removed by tree-shaking.
+
+A tagged union (objects told apart by one literal field, such as an error's
+`code`) gets a constant for that field's values, named after the type and the
+field:
+
+```typescript
+export const PostErrorCode = {
+  NOT_FOUND: "not_found",
+  FORBIDDEN: "forbidden",
+} as const;
+
+if (!result.ok && result.error.kind === "application"
+    && result.error.value.code === PostErrorCode.FORBIDDEN) { /* … */ }
+```
+
+There are none when no single field tells every alternative apart, or when the
+name is already a type's.
 
 ## Collisions and explicit names
 
