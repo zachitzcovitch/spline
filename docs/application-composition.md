@@ -160,9 +160,10 @@ if (post.ok) {
 One factory initializes the URL, headers, fetch implementation, response policy,
 and runtime schema table for all groups. The artifact emits shared DTO definitions
 once, a flat `ApiOperations` map keyed by stable operation IDs, and grouped
-`ApiCalls<Failure>` signatures. `ApiClient` and `ApiResult` provide clean client and
-result types; `ApiHttpOptions` and `ApiHttpFailure` describe the
-common HTTP configuration and failures. `export_application` emits only wire types,
+`ApiCalls<Failure, ErrorContext>` signatures. `ApiClient` and `ApiResult` provide clean
+client and result types; `ApiHttpOptions`, `ApiHttpFailure` and `ApiHttpErrorContext`
+describe the common HTTP configuration, failures, and the `status` beside an
+application error. `export_application` emits only wire types,
 the operation map, and grouped signatures, without execution code.
 
 DTOs use short public names and signatures reference them directly. Matching

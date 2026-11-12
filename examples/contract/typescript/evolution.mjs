@@ -28,7 +28,7 @@ assert.equal(created.value.counters.tags, 0);
 assert.equal(created.value.state, "inactive");
 
 assert.deepEqual(await client.get("existing-error"), {
-  ok: false, error: { kind: "application", value: { code: "missing", details: { message: "missing" } } },
+  ok: false, error: { kind: "application", status: 404, value: { code: "missing", details: { message: "missing" } } },
 });
 assert.equal((await strict.get("existing-error")).error.kind, "protocol");
 assert.deepEqual(await client.event("known"), { ok: true, value: { item: { id: "known" } } });

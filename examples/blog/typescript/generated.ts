@@ -74,12 +74,13 @@ export type BlogOperations = {
   }; output: User; error: UserError };
 };
 
-export type BlogResult<Value, ApplicationError, Failure = never> =
+export type BlogResult<Value, ApplicationError, Failure = never, ErrorContext = unknown> =
   | { ok: true; value: Value }
-  | { ok: false; error: { kind: "application"; value: ApplicationError } | Failure };
+  | { ok: false; error: ({ kind: "application"; value: ApplicationError } & ErrorContext) | Failure };
 
-/** Typed call signatures; a binding supplies execution and any extra Failure union. */
-export type BlogCalls<Failure = never> = {
+/** Typed call signatures; a binding supplies execution, any extra Failure union,
+ *  and what it adds to an application error (ErrorContext). */
+export type BlogCalls<Failure = never, ErrorContext = unknown> = {
   /**
    * Drafts and publishing operations.
    */
@@ -87,15 +88,15 @@ export type BlogCalls<Failure = never> = {
     /**
      * Create a draft owned by the authenticated user. The title must not be blank.
      */
-    create(input: NewPost): Promise<BlogResult<Post, PostError, Failure>>;
+    create(input: NewPost): Promise<BlogResult<Post, PostError, Failure, ErrorContext>>;
     /**
      * Read a post. Authenticated readers can view drafts as well as published posts.
      */
-    get(id: string): Promise<BlogResult<Post, PostError, Failure>>;
+    get(id: string): Promise<BlogResult<Post, PostError, Failure, ErrorContext>>;
     /**
      * Publish a draft. Only its author may publish it; repeating the call is allowed.
      */
-    publish(id: string): Promise<BlogResult<Post, PostError, Failure>>;
+    publish(id: string): Promise<BlogResult<Post, PostError, Failure, ErrorContext>>;
   };
   /**
    * Profiles shared by blog authors and readers.
@@ -104,7 +105,7 @@ export type BlogCalls<Failure = never> = {
     /**
      * Look up a profile by its ID.
      */
-    get(id: string): Promise<BlogResult<User, UserError, Failure>>;
+    get(id: string): Promise<BlogResult<User, UserError, Failure, ErrorContext>>;
   };
 };
 
@@ -121,7 +122,10 @@ export type BlogHttpOptions = {
   responsePolicy?: "compatible" | "strict";
 };
 
-export type BlogClient = BlogCalls<BlogHttpFailure>;
+/** What an application error carries besides its value: the HTTP status it was answered with. */
+export type BlogHttpErrorContext = { status: number };
+
+export type BlogClient = BlogCalls<BlogHttpFailure, BlogHttpErrorContext>;
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
 export function createBlogClient(
@@ -327,7 +331,7 @@ export function createBlogClient(
     const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
     return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
   };
-  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<BlogResult<O, E, BlogHttpFailure>> => {
+  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<BlogResult<O, E, BlogHttpFailure, BlogHttpErrorContext>> => {
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
@@ -418,7 +422,7 @@ export function createBlogClient(
         .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
       const decoded = project(fields, declared[2]);
       return decoded !== undefined
-        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        ? { ok: false, error: { kind: "application", status: response.status, value: decoded as E } }
         : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
     return {

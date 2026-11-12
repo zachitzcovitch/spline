@@ -63,27 +63,28 @@ export type ApiOperations = {
   }; output: User; error: UserError };
 };
 
-export type ApiResult<Value, ApplicationError, Failure = never> =
+export type ApiResult<Value, ApplicationError, Failure = never, ErrorContext = unknown> =
   | { ok: true; value: Value }
-  | { ok: false; error: { kind: "application"; value: ApplicationError } | Failure };
+  | { ok: false; error: ({ kind: "application"; value: ApplicationError } & ErrorContext) | Failure };
 
-/** Typed call signatures; a binding supplies execution and any extra Failure union. */
-export type ApiCalls<Failure = never> = {
+/** Typed call signatures; a binding supplies execution, any extra Failure union,
+ *  and what it adds to an application error (ErrorContext). */
+export type ApiCalls<Failure = never, ErrorContext = unknown> = {
   /**
    * Post operations use the same authenticated session and user store.
    */
   "posts": {
-    create(input: NewPost): Promise<ApiResult<Post, PostError, Failure>>;
-    delete(id: string): Promise<ApiResult<void, PostError, Failure>>;
-    get(id: string): Promise<ApiResult<Post, PostError, Failure>>;
-    publish(id: string): Promise<ApiResult<Post, PostError, Failure>>;
+    create(input: NewPost): Promise<ApiResult<Post, PostError, Failure, ErrorContext>>;
+    delete(id: string): Promise<ApiResult<void, PostError, Failure, ErrorContext>>;
+    get(id: string): Promise<ApiResult<Post, PostError, Failure, ErrorContext>>;
+    publish(id: string): Promise<ApiResult<Post, PostError, Failure, ErrorContext>>;
   };
   /**
    * User operations in the shared application.
    */
   "users": {
-    get(id: string): Promise<ApiResult<User, UserError, Failure>>;
-    rename(name: string): Promise<ApiResult<User, UserError, Failure>>;
+    get(id: string): Promise<ApiResult<User, UserError, Failure, ErrorContext>>;
+    rename(name: string): Promise<ApiResult<User, UserError, Failure, ErrorContext>>;
   };
 };
 
@@ -100,7 +101,10 @@ export type ApiHttpOptions = {
   responsePolicy?: "compatible" | "strict";
 };
 
-export type ApiClient = ApiCalls<ApiHttpFailure>;
+/** What an application error carries besides its value: the HTTP status it was answered with. */
+export type ApiHttpErrorContext = { status: number };
+
+export type ApiClient = ApiCalls<ApiHttpFailure, ApiHttpErrorContext>;
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
 export function createApiClient(
@@ -308,7 +312,7 @@ export function createApiClient(
     const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
     return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
   };
-  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<ApiResult<O, E, ApiHttpFailure>> => {
+  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<ApiResult<O, E, ApiHttpFailure, ApiHttpErrorContext>> => {
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
@@ -399,7 +403,7 @@ export function createApiClient(
         .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
       const decoded = project(fields, declared[2]);
       return decoded !== undefined
-        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        ? { ok: false, error: { kind: "application", status: response.status, value: decoded as E } }
         : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
     return {

@@ -63,15 +63,16 @@ export type EvolutionV1Operations = {
   }; output: User; error: Error };
 };
 
-export type EvolutionV1Result<Value, ApplicationError, Failure = never> =
+export type EvolutionV1Result<Value, ApplicationError, Failure = never, ErrorContext = unknown> =
   | { ok: true; value: Value }
-  | { ok: false; error: { kind: "application"; value: ApplicationError } | Failure };
+  | { ok: false; error: ({ kind: "application"; value: ApplicationError } & ErrorContext) | Failure };
 
-/** Typed call signatures; a binding supplies execution and any extra Failure union. */
-export type EvolutionV1Calls<Failure = never> = {
-  create(input: Create): Promise<EvolutionV1Result<User, Error, Failure>>;
-  event(id: string): Promise<EvolutionV1Result<Event, Error, Failure>>;
-  get(id: string): Promise<EvolutionV1Result<User, Error, Failure>>;
+/** Typed call signatures; a binding supplies execution, any extra Failure union,
+ *  and what it adds to an application error (ErrorContext). */
+export type EvolutionV1Calls<Failure = never, ErrorContext = unknown> = {
+  create(input: Create): Promise<EvolutionV1Result<User, Error, Failure, ErrorContext>>;
+  event(id: string): Promise<EvolutionV1Result<Event, Error, Failure, ErrorContext>>;
+  get(id: string): Promise<EvolutionV1Result<User, Error, Failure, ErrorContext>>;
 };
 
 export type EvolutionV1HttpFailure =
@@ -87,7 +88,10 @@ export type EvolutionV1HttpOptions = {
   responsePolicy?: "compatible" | "strict";
 };
 
-export type EvolutionV1Client = EvolutionV1Calls<EvolutionV1HttpFailure>;
+/** What an application error carries besides its value: the HTTP status it was answered with. */
+export type EvolutionV1HttpErrorContext = { status: number };
+
+export type EvolutionV1Client = EvolutionV1Calls<EvolutionV1HttpFailure, EvolutionV1HttpErrorContext>;
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
 export function createEvolutionV1Client(
@@ -294,7 +298,7 @@ export function createEvolutionV1Client(
     const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
     return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
   };
-  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<EvolutionV1Result<O, E, EvolutionV1HttpFailure>> => {
+  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<EvolutionV1Result<O, E, EvolutionV1HttpFailure, EvolutionV1HttpErrorContext>> => {
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
@@ -385,7 +389,7 @@ export function createEvolutionV1Client(
         .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
       const decoded = project(fields, declared[2]);
       return decoded !== undefined
-        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        ? { ok: false, error: { kind: "application", status: response.status, value: decoded as E } }
         : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
     return {

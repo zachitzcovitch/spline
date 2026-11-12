@@ -21,6 +21,10 @@ release yet; the workspace version is a development version.
   exposed header. Clients recognize a declared `code` at its status; an
   undeclared code is a framework fault. `Fault::message` is now
   `Fault::detail: Option<String>`.
+- TypeScript: an HTTP application error carries the status it was answered with
+  (`{ kind: "application", status, value }`). Results and call signatures take
+  a fourth `ErrorContext` parameter for what a binding adds to an application
+  error; the HTTP client's is `<Name>HttpErrorContext`.
 
 ### Added
 

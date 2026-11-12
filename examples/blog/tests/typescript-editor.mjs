@@ -51,8 +51,8 @@ test("generated blog types provide readable hovers, signatures, and completions"
       ts.displayPartsToString(item.suffixDisplayParts);
   };
   try {
-    assert.equal(signature("create-signature"), "create(input: NewPost): Promise<BlogResult<Post, PostError, BlogHttpFailure>>");
-    assert.equal(signature("get-signature"), "get(id: string): Promise<BlogResult<User, UserError, BlogHttpFailure>>");
+    assert.equal(signature("create-signature"), "create(input: NewPost): Promise<BlogResult<Post, PostError, BlogHttpFailure, BlogHttpErrorContext>>");
+    assert.equal(signature("get-signature"), "get(id: string): Promise<BlogResult<User, UserError, BlogHttpFailure, BlogHttpErrorContext>>");
     for (const [marker, expected] of [["user-hover", "const user: User"], ["error-hover", "const error: UserError"]]) {
       const info = service.getQuickInfoAtPosition(file, position(marker));
       assert.ok(info, marker);

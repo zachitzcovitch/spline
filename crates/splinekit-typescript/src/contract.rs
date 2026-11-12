@@ -10,8 +10,10 @@ use crate::{render, validate, Artifact, Error, Typescript};
 
 impl Typescript {
     /// Emit a contract's wire types, operation map, and callable type surface.
-    /// `Failure` is an explicit extension point for a future binding's errors;
-    /// this emits signatures only and does not supply a transport implementation.
+    /// `Failure` is an explicit extension point for a binding's own errors, and
+    /// `ErrorContext` for what it adds to an application error (HTTP adds the
+    /// status); this emits signatures only and does not supply a transport
+    /// implementation.
     pub fn export_contract(
         &self,
         contract: &ContractDescription,
@@ -63,9 +65,17 @@ impl Typescript {
         let mut artifact =
             self.export_selected(schemas, &[], &selected, crate::names::Properties::Idiomatic)?;
         let occupied: BTreeSet<_> = artifact.symbols.values().map(String::as_str).collect();
-        // Promise is a global type dependency and Failure a local type parameter.
-        // Reject shadowing instead of generating changed or invalid signatures.
-        for symbol in [&calls, &operations, &result, "Promise", "Failure"] {
+        // Promise is a global type dependency; Failure and ErrorContext are local
+        // type parameters. Reject shadowing instead of generating changed or
+        // invalid signatures.
+        for symbol in [
+            &calls,
+            &operations,
+            &result,
+            "Promise",
+            "Failure",
+            "ErrorContext",
+        ] {
             if occupied.contains(symbol) {
                 return Err(Error::SymbolCollision(symbol.into()));
             }
@@ -93,9 +103,13 @@ impl Typescript {
             .unwrap();
         }
         artifact.source.push_str("};\n\n");
-        writeln!(artifact.source, "export type {result}<Value, ApplicationError, Failure = never> =\n  | {{ ok: true; value: Value }}\n  | {{ ok: false; error: {{ kind: \"application\"; value: ApplicationError }} | Failure }};\n").unwrap();
-        artifact.source.push_str("/** Typed call signatures; a binding supplies execution and any extra Failure union. */\n");
-        writeln!(artifact.source, "export type {calls}<Failure = never> = {{").unwrap();
+        writeln!(artifact.source, "export type {result}<Value, ApplicationError, Failure = never, ErrorContext = unknown> =\n  | {{ ok: true; value: Value }}\n  | {{ ok: false; error: ({{ kind: \"application\"; value: ApplicationError }} & ErrorContext) | Failure }};\n").unwrap();
+        artifact.source.push_str("/** Typed call signatures; a binding supplies execution, any extra Failure union,\n *  and what it adds to an application error (ErrorContext). */\n");
+        writeln!(
+            artifact.source,
+            "export type {calls}<Failure = never, ErrorContext = unknown> = {{"
+        )
+        .unwrap();
         member_names(resources)?;
         for (group, resource) in resources {
             let depth = if let Some(group) = group {
@@ -120,7 +134,7 @@ impl Typescript {
                 let parameters = parameters(operation, &artifact.symbols)?;
                 writeln!(
                     artifact.source,
-                    "{indent}{}({parameters}): Promise<{result}<{}, {}, Failure>>;",
+                    "{indent}{}({parameters}): Promise<{result}<{}, {}, Failure, ErrorContext>>;",
                     render::property(&crate::names::camel(&operation.name)),
                     output(operation, &artifact.symbols, void_outputs)?,
                     render::shape(&operation.error, &artifact.symbols, depth)?

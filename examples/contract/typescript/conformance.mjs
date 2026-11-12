@@ -28,7 +28,7 @@ assert.deepEqual(await client.delete(id), { ok: true, value: undefined });
 assert.equal((await client.get(id)).error.kind, "application");
 assert.equal((await client.delete(id)).error.kind, "application");
 assert.deepEqual(await client.get("missing"), {
-  ok: false, error: { kind: "application", value: { code: "not_found" } },
+  ok: false, error: { kind: "application", status: 404, value: { code: "not_found" } },
 });
 const invalid = await client.create({ displayName: " " });
 assert.equal(invalid.error.kind, "application");
@@ -38,7 +38,7 @@ const echo = createEchoClient(base);
 assert.deepEqual(await echo.health(), { ok: true, value: null });
 assert.deepEqual(await echo.noContent(), { ok: true, value: undefined });
 assert.deepEqual(await echo.command(false), { ok: true, value: undefined });
-assert.deepEqual(await echo.command(true), { ok: false, error: { kind: "application", value: { code: "rejected" } } });
+assert.deepEqual(await echo.command(true), { ok: false, error: { kind: "application", status: 400, value: { code: "rejected" } } });
 const value = "slash/space ?#%ü";
 const note = "query &+?/ü";
 assert.deepEqual(await echo.inspect(value, -7, true, note), { ok: true, value: { value, count: -7, flag: true, note } });

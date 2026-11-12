@@ -88,32 +88,33 @@ export type UsersOperations = {
   }; output: User; error: ApiError };
 };
 
-export type UsersResult<Value, ApplicationError, Failure = never> =
+export type UsersResult<Value, ApplicationError, Failure = never, ErrorContext = unknown> =
   | { ok: true; value: Value }
-  | { ok: false; error: { kind: "application"; value: ApplicationError } | Failure };
+  | { ok: false; error: ({ kind: "application"; value: ApplicationError } & ErrorContext) | Failure };
 
-/** Typed call signatures; a binding supplies execution and any extra Failure union. */
-export type UsersCalls<Failure = never> = {
+/** Typed call signatures; a binding supplies execution, any extra Failure union,
+ *  and what it adds to an application error (ErrorContext). */
+export type UsersCalls<Failure = never, ErrorContext = unknown> = {
   /**
    * Create a user from the supplied profile.
    */
-  create(input: NewUser): Promise<UsersResult<User, ApiError, Failure>>;
+  create(input: NewUser): Promise<UsersResult<User, ApiError, Failure, ErrorContext>>;
   /**
    * Delete an existing user with an empty success response.
    */
-  delete(id: UserId): Promise<UsersResult<void, ApiError, Failure>>;
+  delete(id: UserId): Promise<UsersResult<void, ApiError, Failure, ErrorContext>>;
   /**
    * Fetch an existing user.
    */
-  get(id: UserId): Promise<UsersResult<User, ApiError, Failure>>;
+  get(id: UserId): Promise<UsersResult<User, ApiError, Failure, ErrorContext>>;
   /**
    * Replace an existing user's writable profile.
    */
-  replace(id: UserId, input: ReplaceUser): Promise<UsersResult<User, ApiError, Failure>>;
+  replace(id: UserId, input: ReplaceUser): Promise<UsersResult<User, ApiError, Failure, ErrorContext>>;
   /**
    * Apply the supplied fields without changing omitted fields.
    */
-  update(id: UserId, input: UserPatch): Promise<UsersResult<User, ApiError, Failure>>;
+  update(id: UserId, input: UserPatch): Promise<UsersResult<User, ApiError, Failure, ErrorContext>>;
 };
 
 export type UsersHttpFailure =
@@ -129,7 +130,10 @@ export type UsersHttpOptions = {
   responsePolicy?: "compatible" | "strict";
 };
 
-export type UsersClient = UsersCalls<UsersHttpFailure>;
+/** What an application error carries besides its value: the HTTP status it was answered with. */
+export type UsersHttpErrorContext = { status: number };
+
+export type UsersClient = UsersCalls<UsersHttpFailure, UsersHttpErrorContext>;
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
 export function createUsersClient(
@@ -338,7 +342,7 @@ export function createUsersClient(
     const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
     return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
   };
-  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<UsersResult<O, E, UsersHttpFailure>> => {
+  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<UsersResult<O, E, UsersHttpFailure, UsersHttpErrorContext>> => {
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
@@ -429,7 +433,7 @@ export function createUsersClient(
         .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
       const decoded = project(fields, declared[2]);
       return decoded !== undefined
-        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        ? { ok: false, error: { kind: "application", status: response.status, value: decoded as E } }
         : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
     return {

@@ -184,10 +184,10 @@ fn operation_exports_are_deterministic_and_preserve_kind_and_types() {
         .contains("input: Value; output: Value; error: Value"));
     assert!(first
         .source
-        .contains("get(input: Value): Promise<UsersResult<Value, Value, Failure>>"));
+        .contains("get(input: Value): Promise<UsersResult<Value, Value, Failure, ErrorContext>>"));
     assert!(first
         .source
-        .contains("export type UsersCalls<Failure = never>"));
+        .contains("export type UsersCalls<Failure = never, ErrorContext = unknown>"));
 }
 
 #[test]
@@ -200,6 +200,7 @@ fn schema_overrides_cannot_shadow_call_surface_or_type_parameters() {
     for name in [
         "Promise",
         "Failure",
+        "ErrorContext",
         "UsersCalls",
         "UsersOperations",
         "UsersResult",
@@ -244,7 +245,8 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         .export_contract(&neutral, "Empty")
         .unwrap()
         .source;
-    assert!(neutral_source.contains("delete(): Promise<EmptyResult<null, AppError, Failure>>"));
+    assert!(neutral_source
+        .contains("delete(): Promise<EmptyResult<null, AppError, Failure, ErrorContext>>"));
     let mut builder = HttpBuilder::new(neutral);
     builder
         .bind(
@@ -273,8 +275,10 @@ fn no_content_signatures_are_void_without_changing_the_json_unit_shape() {
         .export_http_client(&description, "Empty")
         .unwrap()
         .source;
-    assert!(source.contains("delete(): Promise<EmptyResult<void, AppError, Failure>>"));
-    assert!(source.contains("json(): Promise<EmptyResult<null, AppError, Failure>>"));
+    assert!(
+        source.contains("delete(): Promise<EmptyResult<void, AppError, Failure, ErrorContext>>")
+    );
+    assert!(source.contains("json(): Promise<EmptyResult<null, AppError, Failure, ErrorContext>>"));
     // Generated result utility names participate in the same checks as DTOs.
     let key = DefinitionId {
         name: Name::new("test.AppError"),

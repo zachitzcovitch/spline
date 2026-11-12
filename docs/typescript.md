@@ -20,13 +20,14 @@ if (result.ok) {
 Signature help shows the authored argument name and public DTOs:
 
 ```typescript
-create(input: NewPost): Promise<BlogResult<Post, PostError, BlogHttpFailure>>
-get(id: string): Promise<BlogResult<User, UserError, BlogHttpFailure>>
+create(input: NewPost): Promise<BlogResult<Post, PostError, BlogHttpFailure, BlogHttpErrorContext>>
+get(id: string): Promise<BlogResult<User, UserError, BlogHttpFailure, BlogHttpErrorContext>>
 ```
 
 After narrowing `result.ok`, a successful user result is `User`; after narrowing
-the application failure category, its declared error is `UserError`. Property
-completion follows those concrete types.
+the application failure category, its declared error is `UserError`, with the HTTP
+`status` it was answered with beside it. Property completion follows those
+concrete types.
 
 ## Default names
 
@@ -160,10 +161,13 @@ Exporting an HTTP application named `Blog` supplies:
 
 - Public DTOs such as `User`, `Post`, `NewPost`, `UserError`, and `PostError`.
 - `BlogClient`, returned by `createBlogClient`.
-- `BlogCalls<Failure = never>`, the callable surface with an optional extra failure
-  type for bindings.
-- `BlogResult<Value, ApplicationError, Failure = never>`, the discriminated result.
-- `BlogHttpOptions` and `BlogHttpFailure`, the common HTTP configuration/failures.
+- `BlogCalls<Failure = never, ErrorContext = unknown>`, the callable surface with
+  an optional extra failure type for bindings and what a binding adds to an
+  application error.
+- `BlogResult<Value, ApplicationError, Failure = never, ErrorContext = unknown>`,
+  the discriminated result.
+- `BlogHttpOptions` and `BlogHttpFailure`, the common HTTP configuration/failures,
+  and `BlogHttpErrorContext`, the `status` an application error was answered with.
 - `BlogOperations`, keyed by stable logical operation IDs, with input/output/error
   types available to tooling.
 

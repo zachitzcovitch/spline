@@ -60,6 +60,7 @@ impl Typescript {
         let occupied: BTreeSet<_> = artifact.symbols.values().cloned().collect();
         for symbol in [
             format!("{name}HttpFailure"),
+            format!("{name}HttpErrorContext"),
             format!("{name}HttpOptions"),
             format!("create{name}Client"),
             format!("{name}Client"),

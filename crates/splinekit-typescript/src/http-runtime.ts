@@ -11,7 +11,10 @@ export type __PREFIX__HttpOptions = {
   responsePolicy?: "compatible" | "strict";
 };
 
-export type __PREFIX__Client = __PREFIX__Calls<__PREFIX__HttpFailure>;
+/** What an application error carries besides its value: the HTTP status it was answered with. */
+export type __PREFIX__HttpErrorContext = { status: number };
+
+export type __PREFIX__Client = __PREFIX__Calls<__PREFIX__HttpFailure, __PREFIX__HttpErrorContext>;
 
 /** Positional calls; JSON codecs and HTTP routing come from the contract binding. */
 export function create__PREFIX__Client(
@@ -207,7 +210,7 @@ export function create__PREFIX__Client(
     const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
     return type === "application/json" || (type?.startsWith("application/") === true && type.endsWith("+json"));
   };
-  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<__PREFIX__Result<O, E, __PREFIX__HttpFailure>> => {
+  const call = async <O, E>(plan: __SplinekitPlan, argumentsObject: unknown): Promise<__PREFIX__Result<O, E, __PREFIX__HttpFailure, __PREFIX__HttpErrorContext>> => {
     let url: globalThis.URL;
     let init: globalThis.RequestInit;
     try {
@@ -298,7 +301,7 @@ export function create__PREFIX__Client(
         .filter(([name]) => !["type", "title", "status", "detail", "instance"].includes(name)));
       const decoded = project(fields, declared[2]);
       return decoded !== undefined
-        ? { ok: false, error: { kind: "application", value: decoded as E } }
+        ? { ok: false, error: { kind: "application", status: response.status, value: decoded as E } }
         : { ok: false, error: { kind: "protocol", message: "application error does not match its declared schema" } };
     }
     return {
