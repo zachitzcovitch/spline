@@ -355,3 +355,41 @@ fn open_enums_keep_their_known_values_as_suggestions() {
         assert!(source.contains(expected), "missing {expected}:\n{source}");
     }
 }
+
+#[test]
+fn string_enums_get_constants_keyed_by_their_rust_variants() {
+    #[allow(dead_code)]
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(only = "serialize", name = "api.Availability")]
+    #[serde(rename_all = "snake_case")]
+    enum Availability {
+        Ready,
+        AllowanceExhausted,
+        #[serde(rename = "pending")]
+        UsagePending,
+    }
+    #[allow(dead_code)]
+    #[derive(serde::Serialize, splinekit::Schema)]
+    #[splinekit(only = "serialize", name = "api.Problem")]
+    #[serde(tag = "code", rename_all = "snake_case")]
+    enum Problem {
+        Gone,
+        Busy { retry: u32 },
+    }
+    let mut registry = Registry::new();
+    registry
+        .register::<Availability>(Direction::Serialize)
+        .unwrap();
+    registry.register::<Problem>(Direction::Serialize).unwrap();
+    let source = Typescript::new()
+        .export(&registry.finish().unwrap(), &[])
+        .unwrap()
+        .source;
+    assert!(source
+        .contains("export type Availability = \"ready\" | \"allowance_exhausted\" | \"pending\";"));
+    assert!(source.contains(
+        "export const Availability = {\n  \"Ready\": \"ready\",\n  \"AllowanceExhausted\": \"allowance_exhausted\",\n  \"UsagePending\": \"pending\",\n} as const;"
+    ));
+    // Only string enums: a union of objects has no constants.
+    assert!(!source.contains("export const Problem"));
+}

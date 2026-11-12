@@ -31,6 +31,11 @@ export type Profile = {
 
 export type State = "active" | "inactive";
 
+export const State = {
+  "Active": "active",
+  "Inactive": "inactive",
+} as const;
+
 export type User = {
   "id": string;
   "profile": Profile;

@@ -86,6 +86,28 @@ direction with a differing shape can change `User` to `UserInput`/`UserOutput`;
 that is an intentional distinction. Adding a type with the same short name produces
 a collision error rather than assigning visit-order-dependent suffixes.
 
+## String enums come with constants
+
+A string enum's type also gets a constant object of the same name, so code
+compares against a named value instead of a literal it could mistype:
+
+```typescript
+export type Availability = "ready" | "allowance_exhausted";
+export const Availability = {
+  "Ready": "ready",
+  "AllowanceExhausted": "allowance_exhausted",
+} as const;
+
+if (balance.availability === Availability.Ready) { /* … */ }
+```
+
+Keys are the Rust variant names (PascalCase of each value for handwritten
+schemas); values are the wire strings, so they follow `rename`/`rename_all`.
+Types and values live in separate TypeScript namespaces, so the shared name
+doesn't clash, and an unused constant is removed by tree-shaking. A union of
+objects (a tagged enum) gets no constants; its variants are told apart by
+their tag.
+
 ## Collisions and explicit names
 
 If `billing.User` and `accounts.User` are exported together, both would default to

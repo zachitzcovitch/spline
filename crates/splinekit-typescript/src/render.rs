@@ -140,3 +140,55 @@ pub fn string(value: &str) -> String {
     output.push('"');
     output
 }
+
+/// For a string union (a string enum), its values as constants beside the
+/// type, so code compares against `Status.Active` rather than a literal it
+/// could mistype. Keys are the Rust variant names when the schema records
+/// them, otherwise PascalCase of each value; values are the wire strings.
+pub(crate) fn string_constants(
+    symbol: &str,
+    shape: &Shape,
+    variants: Option<&[String]>,
+) -> Option<String> {
+    let Shape::Union(alternatives) = shape else {
+        return None;
+    };
+    let values: Vec<&str> = alternatives
+        .iter()
+        .map(|alternative| match alternative {
+            Shape::Literal(value) => Some(value.as_str()),
+            _ => None,
+        })
+        .collect::<Option<_>>()?;
+    let keys: Vec<String> = match variants {
+        Some(names) if names.len() == values.len() => names.to_vec(),
+        _ => values.iter().map(|value| pascal(value)).collect(),
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    if keys
+        .iter()
+        .any(|key| key.is_empty() || !seen.insert(key.as_str()))
+    {
+        return None;
+    }
+    let mut source = format!("export const {symbol} = {{\n");
+    for (key, value) in keys.iter().zip(&values) {
+        source.push_str(&format!("  {}: {},\n", string(key), string(value)));
+    }
+    source.push_str("} as const;\n\n");
+    Some(source)
+}
+
+fn pascal(value: &str) -> String {
+    value
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            chars
+                .next()
+                .map(|first| first.to_ascii_uppercase().to_string() + chars.as_str())
+                .unwrap_or_default()
+        })
+        .collect()
+}

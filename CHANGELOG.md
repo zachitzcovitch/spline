@@ -7,6 +7,8 @@ release yet; the workspace version is a development version.
 
 ### Changed
 
+- TypeScript: a string enum's type comes with a constant object of the same
+  name (`Availability.Ready === "ready"`), keyed by the Rust variant names.
 - Errors are RFC 9457 problem details (`application/problem+json`): a numeric
   `status` and a string `code`, plus the application error's fields or a
   framework fault's optional developer `detail`. HTTP application errors must be

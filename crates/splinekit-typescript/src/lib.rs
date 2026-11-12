@@ -135,7 +135,11 @@ impl Typescript {
             // Prefer the serialization description for its declaration/docs.
             declarations.insert(
                 symbol.clone(),
-                (&definition.shape, definition.documentation.as_str()),
+                (
+                    &definition.shape,
+                    definition.documentation.as_str(),
+                    definition.variants.as_deref(),
+                ),
             );
         }
         for root in roots {
@@ -143,7 +147,7 @@ impl Typescript {
             if declarations
                 .insert(
                     root.symbol.clone(),
-                    (&root.shape, root.documentation.as_str()),
+                    (&root.shape, root.documentation.as_str(), None),
                 )
                 .is_some()
             {
@@ -161,13 +165,16 @@ impl Typescript {
         if declarations.is_empty() {
             source.push_str("export {};\n");
         }
-        for (symbol, (shape, docs)) in declarations {
+        for (symbol, (shape, docs, variants)) in declarations {
             source.push_str(&render::docs(docs, 0));
             source.push_str("export type ");
             source.push_str(&symbol);
             source.push_str(" = ");
             source.push_str(&render::shape_with(shape, &symbols, 0, properties)?);
             source.push_str(";\n\n");
+            if let Some(constants) = render::string_constants(&symbol, shape, variants) {
+                source.push_str(&constants);
+            }
         }
         if source.ends_with("\n\n") {
             source.pop();
