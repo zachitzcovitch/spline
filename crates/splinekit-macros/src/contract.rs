@@ -54,6 +54,7 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
             "this contract slice requires a safe, non-generic trait without supertraits",
         ));
     }
+    let problem_types = crate::http::take_contract(&mut item.attrs)?;
     check_docs_only(&item.attrs)?;
     let source_runtime = runtime.unwrap_or_else(|| syn::parse_quote!(::splinekit));
     let trait_name = &item.ident;
@@ -354,7 +355,13 @@ pub fn expand(attributes: TokenStream, input: TokenStream) -> syn::Result<TokenS
     item.supertraits
         .push(syn::parse_quote!(::core::marker::Sync));
     item.colon_token = Some(Default::default());
-    let http_code = crate::http::generate(&http_methods, &runtime, trait_name, namespace.as_ref())?;
+    let http_code = crate::http::generate(
+        &http_methods,
+        &runtime,
+        trait_name,
+        namespace.as_ref(),
+        problem_types.as_ref(),
+    )?;
     let execution_code = crate::execution::resource(&execution_methods, &runtime, trait_name);
     let support = quote! {
         use super::#runtime_alias as __splinekit_runtime;

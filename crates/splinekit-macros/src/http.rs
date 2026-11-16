@@ -35,6 +35,46 @@ pub struct Binding {
     pub status: u16,
 }
 
+/// The contract-level HTTP option: `#[http(problem_types = "https://…/errors")]`
+/// on the trait, where the contract's RFC 9457 problem types live.
+pub fn take_contract(attributes: &mut Vec<syn::Attribute>) -> syn::Result<Option<syn::LitStr>> {
+    let mut problem_types = None;
+    let mut retained = Vec::new();
+    for attribute in attributes.drain(..) {
+        if !attribute.path().is_ident("http") {
+            retained.push(attribute);
+            continue;
+        }
+        attribute.parse_nested_meta(|meta| {
+            if !meta.path.is_ident("problem_types") {
+                return Err(meta.error("the supported contract HTTP option is problem_types"));
+            }
+            let base: syn::LitStr = meta.value()?.parse()?;
+            let value = base.value();
+            let scheme = value.split_once(':').map(|(scheme, _)| scheme);
+            if !scheme.is_some_and(|scheme| {
+                scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+                    && scheme
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+            }) || value.ends_with('/')
+                || value.contains(|c: char| c.is_whitespace() || matches!(c, '?' | '#'))
+            {
+                return Err(syn::Error::new_spanned(
+                    &base,
+                    "problem_types must be an absolute URI without a query, fragment or trailing slash",
+                ));
+            }
+            if problem_types.replace(base).is_some() {
+                return Err(meta.error("duplicate problem_types"));
+            }
+            Ok(())
+        })?;
+    }
+    *attributes = retained;
+    Ok(problem_types)
+}
+
 pub fn take(attributes: &mut Vec<syn::Attribute>) -> syn::Result<Option<Binding>> {
     let mut binding = None;
     let mut retained = Vec::new();
@@ -199,7 +239,12 @@ pub fn generate(
     runtime: &syn::Path,
     trait_name: &syn::Ident,
     namespace: Option<&syn::LitStr>,
+    problem_types: Option<&syn::LitStr>,
 ) -> syn::Result<TokenStream> {
+    let problem_types = match problem_types {
+        Some(base) => quote!(::core::option::Option::Some(#base)),
+        None => quote!(::core::option::Option::None),
+    };
     let mut client_methods = Vec::new();
     let mut verify = Vec::new();
     let mut routes = Vec::new();
@@ -286,14 +331,14 @@ pub fn generate(
                         let context = #runtime::http::RequestContext::from_request(&__splinekit_request);
                         let service = match factory(context).await {
                             Ok(service) => service,
-                            Err(error) => return #runtime::http::axum::response::IntoResponse::into_response(error),
+                            Err(error) => return #runtime::http::server::fault_response(error, __PROBLEM_TYPES),
                         };
                         let __splinekit_input = match #runtime::http::server::decode::<super::#name::Input>(__splinekit_request, &plan).await {
                             Ok(input) => input,
-                            Err(error) => return #runtime::http::axum::response::IntoResponse::into_response(error),
+                            Err(error) => return #runtime::http::server::fault_response(error, __PROBLEM_TYPES),
                         };
                         let result = #runtime::runtime::invoke(super::#name::Service::new(service), __splinekit_input).await;
-                        #runtime::http::server::respond_call(result, plan.binding.success_status, &*errors)
+                        #runtime::http::server::respond_call(result, plan.binding.success_status, &*errors, __PROBLEM_TYPES)
                     }
                 }
             ));
@@ -326,10 +371,10 @@ pub fn generate(
                             async move {
                                 let input = match #runtime::http::server::decode::<super::super::#name::Input>(request, &plan).await {
                                     Ok(input) => input,
-                                    Err(error) => return #runtime::http::axum::response::IntoResponse::into_response(error),
+                                    Err(error) => return #runtime::http::server::fault_response(error, super::__PROBLEM_TYPES),
                                 };
                                 let result = #runtime::runtime::invoke(service, input).await;
-                                #runtime::http::server::respond_call(result, plan.binding.success_status, &*errors)
+                                #runtime::http::server::respond_call(result, plan.binding.success_status, &*errors, super::__PROBLEM_TYPES)
                             }
                         }
                     )))
@@ -365,11 +410,16 @@ pub fn generate(
         }
         }
 
+        /// Where this contract's RFC 9457 problem types live, when it declares them.
+        #[doc(hidden)]
+        pub const __PROBLEM_TYPES: ::core::option::Option<&str> = #problem_types;
+
         /// Select and validate this contract's HTTP binding.
         pub fn describe() -> ::core::result::Result<#runtime::http::contract::ContractDescription, #runtime::http::BuildError> {
             #(#no_content)*
             let mut builder = #runtime::http::contract::ContractBuilder::new(super::describe()?);
             for (id, binding) in __bindings() { builder.bind(&id, binding)?; }
+            if let ::core::option::Option::Some(base) = __PROBLEM_TYPES { builder.problem_types(base)?; }
             Ok(builder.finish()?)
         }
         /// Describe the binding with the selected policy's application-error responses.

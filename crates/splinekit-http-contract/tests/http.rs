@@ -231,3 +231,31 @@ fn missing_and_unknown_bindings_are_rejected_when_selecting_http() {
         .to_string()
         .contains("test.first has no HTTP binding"));
 }
+
+#[test]
+fn problem_types_append_the_code_with_hyphens_under_an_absolute_base() {
+    use splinekit_http_contract::{check_problem_types, problem_type};
+    assert_eq!(
+        problem_type("https://example.test/errors", "invalid_request"),
+        "https://example.test/errors/invalid-request"
+    );
+    for valid in [
+        "https://example.test/errors",
+        "urn:example:errors",
+        "tag:example.test,2026:errors",
+    ] {
+        assert!(check_problem_types(valid).is_ok(), "{valid}");
+    }
+    for invalid in [
+        "",
+        "/errors",
+        "example.test/errors",
+        "https://example.test/errors/",
+        "https://example.test/errors?v=1",
+        "https://example.test/errors#top",
+        "https://example.test/my errors",
+        "1http://example.test",
+    ] {
+        assert!(check_problem_types(invalid).is_err(), "{invalid:?}");
+    }
+}

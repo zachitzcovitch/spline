@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 use splinekit_http_contract::{HttpPlan, Scalar};
 
 use crate::{json_content_type, ErrorPolicy, Fault, MAX_BODY_BYTES, PROBLEM_CONTENT_TYPE};
-use splinekit_http_contract::PROBLEM_MEMBERS;
+use splinekit_http_contract::{problem_type, PROBLEM_MEMBERS};
 
 /// Request-owned context, suitable for an asynchronous per-request service factory.
 #[derive(Clone, Debug)]
@@ -32,28 +32,41 @@ impl RequestContext {
 }
 
 impl IntoResponse for Fault {
+    /// Problem details without a `type`. Routes generated for a contract that
+    /// declares problem types render faults with [`fault_response`] instead.
     fn into_response(self) -> Response {
-        let status = StatusCode::from_u16(self.status)
-            .ok()
-            .filter(|status| status.is_client_error() || status.is_server_error());
-        let Some(status) = status else {
-            return Fault::internal().into_response();
-        };
-        let mut body = Map::new();
-        body.insert("status".into(), status.as_u16().into());
-        body.insert("code".into(), self.code.into());
-        if let Some(detail) = self.detail {
-            body.insert("detail".into(), detail.into());
-        }
-        problem_response(status, serde_json::to_vec(&body).unwrap())
+        fault_response(self, None)
     }
+}
+
+/// A fault as problem details, with RFC 9457's `type` under `problem_types`
+/// when the contract declares them.
+pub fn fault_response(fault: Fault, problem_types: Option<&str>) -> Response {
+    let status = StatusCode::from_u16(fault.status)
+        .ok()
+        .filter(|status| status.is_client_error() || status.is_server_error());
+    let Some(status) = status else {
+        return fault_response(Fault::internal(), problem_types);
+    };
+    let mut body = Map::new();
+    if let Some(base) = problem_types {
+        body.insert("type".into(), problem_type(base, &fault.code).into());
+    }
+    body.insert("status".into(), status.as_u16().into());
+    body.insert("code".into(), fault.code.into());
+    if let Some(detail) = fault.detail {
+        body.insert("detail".into(), detail.into());
+    }
+    problem_response(status, serde_json::to_vec(&body).unwrap())
 }
 
 pub fn respond<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
     result: Result<T, E>,
     success: u16,
     policy: &P,
+    problem_types: Option<&str>,
 ) -> Response {
+    let internal = || fault_response(Fault::internal(), problem_types);
     match result {
         Ok(value) if success == 204 => match serde_json::to_value(value) {
             Ok(Value::Null) => {
@@ -61,36 +74,42 @@ pub fn respond<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
                 *response.status_mut() = StatusCode::NO_CONTENT;
                 response
             }
-            _ => Fault::internal().into_response(),
+            _ => internal(),
         },
         Ok(value) if matches!(success, 200 | 201) => match serde_json::to_vec(&value) {
             Ok(body) => json_response(StatusCode::from_u16(success).unwrap(), body),
-            Err(_) => Fault::internal().into_response(),
+            Err(_) => internal(),
         },
-        Ok(_) => Fault::internal().into_response(),
+        Ok(_) => internal(),
         Err(error) => {
             let status = policy.status(&error);
             if !status.is_client_error() && !status.is_server_error() {
-                return Fault::internal().into_response();
+                return internal();
             }
             // The binding checked the error type: an object tagged by `code`
-            // with no problem-detail members of its own. Add the status.
+            // with no problem-detail members of its own. Add the status, and
+            // the type when the contract declares its problem types.
             let Ok(Value::Object(fields)) = serde_json::to_value(error) else {
-                return Fault::internal().into_response();
+                return internal();
             };
-            if !fields.get("code").is_some_and(Value::is_string)
-                || PROBLEM_MEMBERS
-                    .iter()
-                    .any(|member| fields.contains_key(*member))
+            let Some(code) = fields.get("code").and_then(Value::as_str) else {
+                return internal();
+            };
+            if PROBLEM_MEMBERS
+                .iter()
+                .any(|member| fields.contains_key(*member))
             {
-                return Fault::internal().into_response();
+                return internal();
             }
             let mut body = Map::new();
+            if let Some(base) = problem_types {
+                body.insert("type".into(), problem_type(base, code).into());
+            }
             body.insert("status".into(), status.as_u16().into());
             body.extend(fields);
             match serde_json::to_vec(&body) {
                 Ok(body) => problem_response(status, body),
-                Err(_) => Fault::internal().into_response(),
+                Err(_) => internal(),
             }
         }
     }
@@ -101,15 +120,17 @@ pub fn respond_call<T: Serialize, E: Serialize, P: ErrorPolicy<E>>(
     result: Result<T, splinekit_runtime::CallError<E>>,
     success: u16,
     policy: &P,
+    problem_types: Option<&str>,
 ) -> Response {
     match result {
-        Ok(value) => respond(Ok::<_, E>(value), success, policy),
+        Ok(value) => respond(Ok::<_, E>(value), success, policy, problem_types),
         Err(splinekit_runtime::CallError::Application(error)) => {
-            respond(Err::<T, _>(error), success, policy)
+            respond(Err::<T, _>(error), success, policy, problem_types)
         }
-        Err(splinekit_runtime::CallError::Service(_)) => {
-            Fault::new(500, "service_failure", "operation service failed").into_response()
-        }
+        Err(splinekit_runtime::CallError::Service(_)) => fault_response(
+            Fault::new(500, "service_failure", "operation service failed"),
+            problem_types,
+        ),
     }
 }
 

@@ -13,6 +13,13 @@
 //! decoding it as one of the operation's declared errors at that status;
 //! application errors may not declare the binding's own fault codes or use
 //! RFC 9457's member names as fields, so the two can't be confused.
+//!
+//! A contract can declare where its problem types live
+//! (`#[http(problem_types = "https://example.com/errors")]` on the trait).
+//! Then every error also carries RFC 9457's `type`: the base, a slash, and
+//! the code with underscores as hyphens ([`problem_type`]). Clients accept
+//! only problem details whose `type` matches their `code`, so a proxy's or
+//! gateway's JSON can't pass as the service's own answer.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -21,6 +28,33 @@ use splinekit_schema::{Field, Graph, Object, Presence, Shape, UnknownFields};
 use crate::{Error, Result};
 
 pub const PROBLEM_CONTENT_TYPE: &str = "application/problem+json";
+
+/// A problem's RFC 9457 `type` under `base`: `{base}/{code}`, with the code's
+/// underscores as hyphens (`invalid_request` is `{base}/invalid-request`).
+pub fn problem_type(base: &str, code: &str) -> String {
+    format!("{base}/{}", code.replace('_', "-"))
+}
+
+/// A problem-type base must be an absolute URI a code can be appended to: a
+/// scheme, no whitespace, query, fragment or trailing slash.
+pub fn check_problem_types(base: &str) -> Result<()> {
+    let scheme = base.split_once(':').map(|(scheme, _)| scheme);
+    let valid_scheme = scheme.is_some_and(|scheme| {
+        scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+            && scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+    });
+    if !valid_scheme
+        || base.ends_with('/')
+        || base.contains(|c: char| c.is_whitespace() || matches!(c, '?' | '#'))
+    {
+        return Err(Error::Binding(format!(
+            "problem types {base:?} must be an absolute URI without a query, fragment or trailing slash"
+        )));
+    }
+    Ok(())
+}
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 
 /// RFC 9457's members. Application error fields can't use these names.
@@ -46,11 +80,20 @@ fn status_field() -> Field {
     )
 }
 
+/// RFC 9457's `type`, sent when the contract declares its problem types.
+fn type_field() -> Field {
+    Field {
+        presence: Presence::Optional,
+        ..Field::required("type", Shape::String)
+    }
+}
+
 /// A framework fault's body. Other members are ignored, so intermediaries and
 /// later versions can add RFC 9457 members.
 pub fn framework_error_schema() -> Shape {
     Shape::Object(Object {
         fields: vec![
+            type_field(),
             status_field(),
             Field::required("code", Shape::String),
             Field {
@@ -73,7 +116,7 @@ pub fn application_error_schema(error: &Shape, graph: &Graph) -> Result<Shape> {
                 .collect::<Result<_>>()?,
         ),
         Shape::Object(object) => {
-            let mut fields = vec![status_field()];
+            let mut fields = vec![type_field(), status_field()];
             fields.extend(object.fields.iter().cloned());
             Shape::Object(Object {
                 fields,

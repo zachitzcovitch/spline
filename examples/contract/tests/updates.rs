@@ -261,19 +261,19 @@ async fn response_helper_never_serializes_a_json_null_body_for_204() {
     use axum::body::to_bytes;
     use axum::http::StatusCode;
     let policy = |_: &()| StatusCode::BAD_REQUEST;
-    let response = http::server::respond::<(), (), _>(Ok(()), 204, &policy);
+    let response = http::server::respond::<(), (), _>(Ok(()), 204, &policy, None);
     assert_eq!(response.status(), 204);
     assert!(!response.headers().contains_key("content-type"));
     assert!(to_bytes(response.into_body(), 100)
         .await
         .unwrap()
         .is_empty());
-    let response = http::server::respond::<(), (), _>(Ok(()), 200, &policy);
+    let response = http::server::respond::<(), (), _>(Ok(()), 200, &policy, None);
     assert_eq!(
         to_bytes(response.into_body(), 100).await.unwrap().as_ref(),
         b"null"
     );
     // Direct helper misuse must not silently discard a non-null success payload.
-    let response = http::server::respond::<_, (), _>(Ok("payload"), 204, &policy);
+    let response = http::server::respond::<_, (), _>(Ok("payload"), 204, &policy, None);
     assert_eq!(response.status(), 500);
 }

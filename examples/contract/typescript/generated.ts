@@ -145,6 +145,10 @@ export function createUsersClient(
       || base.username || base.password) {
     throw new globalThis.TypeError("base URL must be HTTP(S), without credentials, query, or fragment");
   }
+  // Where the service's RFC 9457 problem types live, when its contract
+  // declares them: problem details count only when their `type` is this base,
+  // a slash, and the code with underscores as hyphens.
+  const problemTypes: string | null = null;
   const fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
   const defaultHeaders = new globalThis.Headers(options.headers);
   const responsePolicy = options.responsePolicy ?? "compatible";
@@ -418,9 +422,11 @@ export function createUsersClient(
         ? { ok: true, value: decoded as O }
         : { ok: false, error: { kind: "protocol", message: "response does not match the output schema" } };
     }
-    // Problem details carrying this status and a code; anything else (a
-    // proxy's page, a gateway error) is an unrecognized HTTP failure.
-    if (!object(value) || value.status !== response.status || typeof value.code !== "string") {
+    // Problem details carrying this status and a code (and the service's own
+    // `type` for that code, when it declares problem types); anything else (a
+    // proxy's page, a gateway's JSON) is an unrecognized HTTP failure.
+    if (!object(value) || value.status !== response.status || typeof value.code !== "string"
+        || (problemTypes !== null && value.type !== `${problemTypes}/${value.code.replace(/_/g, "-")}`)) {
       return { ok: false, error: { kind: "http", status: response.status } };
     }
     const code = value.code;

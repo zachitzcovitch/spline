@@ -165,8 +165,38 @@ No header marks either kind, and nothing on the wire names Splinekit. A client
 recognizes an application error by its body: a `code` the operation declares at
 that status, which must then decode as that error. Any other problem body is a
 framework fault with its `code`; anything that isn't problem details from the
-service (a proxy's page, a gateway's JSON) is an unrecognized HTTP failure. To keep
-the two apart, binding checks each operation's error type:
+service (a proxy's page, a gateway's JSON) is an unrecognized HTTP failure.
+
+A gateway's JSON can look like problem details, so a contract should say where
+its problem types live, on the trait:
+
+```rust
+#[splinekit::contract]
+#[http(problem_types = "https://example.com/errors")]
+pub trait Users { /* ... */ }
+```
+
+Then every error also carries RFC 9457's `type`: the base, a slash, and the code
+with underscores as hyphens.
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/problem+json
+
+{"type":"https://example.com/errors/invalid-request","status":400,"code":"invalid_request","detail":"..."}
+```
+
+Clients generated from the contract, in Rust and TypeScript, accept problem
+details only when `type` is the service's own for that `code`; anything else is an
+unrecognized HTTP failure. Without `problem_types`, a body with a matching
+`status` and a string `code` counts as the service's. The base must be an absolute
+URI without a query, fragment or trailing slash, and every contract in one
+`api!` application must declare the same base, since one client serves them all.
+Routes render a request factory's `Fault` with the type too; a `Fault` turned into
+a response anywhere else (`IntoResponse`) has none.
+
+To keep application errors and faults apart, binding checks each operation's error
+type:
 
 - it serializes as objects (or a union of objects) with a required literal `code`;
 - no `code` is one the binding's own faults use: `invalid_request`,

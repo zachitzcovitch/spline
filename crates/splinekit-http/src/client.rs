@@ -8,8 +8,8 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use splinekit_contract::Operation;
 use splinekit_http_contract::{
-    application_error_codes, ApplicationDescription, ContractDescription, ErrorResponses,
-    HttpMethod, HttpPlan, Scalar, PROBLEM_MEMBERS,
+    application_error_codes, problem_type, ApplicationDescription, ContractDescription,
+    ErrorResponses, HttpMethod, HttpPlan, Scalar, PROBLEM_MEMBERS,
 };
 use splinekit_schema::{Graph, Shape};
 
@@ -29,6 +29,9 @@ pub struct Client {
     plans: Arc<BTreeMap<String, CallPlan>>,
     schemas: Arc<Graph>,
     response_policy: ResponsePolicy,
+    /// Where the service's problem types live, when its contract declares
+    /// them: problem details count only when their `type` matches.
+    problem_types: Option<Arc<str>>,
 }
 
 impl fmt::Debug for Client {
@@ -74,6 +77,7 @@ impl Client {
             contract.contract().schemas(),
             contract.contract().operations().values(),
             contract.plans(),
+            contract.problem_types(),
             erase(transport),
         )
     }
@@ -103,6 +107,7 @@ impl Client {
             application.application().schemas(),
             application.application().operations(),
             application.plans(),
+            application.problem_types(),
             erase(transport),
         )
     }
@@ -112,6 +117,7 @@ impl Client {
         schemas: &Graph,
         operations: impl Iterator<Item = &'a Operation>,
         bindings: &BTreeMap<String, HttpPlan>,
+        problem_types: Option<&str>,
         transport: Arc<dyn Erased>,
     ) -> Result<Self, BuildError> {
         let base =
@@ -152,6 +158,7 @@ impl Client {
             plans: Arc::new(plans),
             schemas: Arc::new(schemas.clone()),
             response_policy: ResponsePolicy::default(),
+            problem_types: problem_types.map(Arc::from),
         })
     }
 
@@ -277,8 +284,10 @@ impl Client {
                 "unexpected success/redirect status {status}"
             )));
         }
-        // Problem details carrying this status and a code; anything else
-        // (a proxy's page, a gateway error) is an unrecognized HTTP failure.
+        // Problem details carrying this status and a code (and the service's
+        // own `type` for that code, when its contract declares problem types);
+        // anything else (a proxy's page, a gateway's JSON) is an unrecognized
+        // HTTP failure.
         let problem = json
             .then(|| serde_json::from_slice::<Value>(response.body()).ok())
             .flatten()
@@ -287,8 +296,14 @@ impl Client {
                 _ => None,
             })
             .filter(|fields| {
+                let Some(code) = fields.get("code").and_then(Value::as_str) else {
+                    return false;
+                };
                 fields.get("status").and_then(Value::as_u64) == Some(u64::from(status))
-                    && fields.get("code").is_some_and(Value::is_string)
+                    && self.problem_types.as_deref().is_none_or(|base| {
+                        fields.get("type").and_then(Value::as_str)
+                            == Some(problem_type(base, code).as_str())
+                    })
             });
         let Some(mut problem) = problem else {
             return Err(CallError::Http { status });

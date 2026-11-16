@@ -5,7 +5,22 @@ release yet; the workspace version is a development version.
 
 ## Unreleased
 
+### Added
+
+- HTTP: a contract can declare where its RFC 9457 problem types live,
+  `#[http(problem_types = "https://example.com/errors")]` on the trait. Its routes
+  then send `type` (the base, a slash, the code with hyphens) on every error, and
+  the generated Rust and TypeScript clients accept only problem details whose
+  `type` matches their `code`, so a gateway's JSON can't pass as the service's
+  answer. Descriptions expose it as `problem_types()`; the contracts in one
+  application must agree.
+
 ### Changed
+
+- HTTP: `server::respond` and `server::respond_call` take the contract's problem
+  types (`Option<&str>`), and `server::fault_response(fault, problem_types)`
+  renders a fault with them. Problem-details schemas (and OpenAPI) allow an
+  optional `type`.
 
 - TypeScript: a string enum's type comes with a constant object of the same
   name, keyed by each value in capitals (`Availability.READY === "ready"`). A

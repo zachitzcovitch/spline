@@ -114,6 +114,9 @@
             "maximum": 65535,
             "minimum": 0,
             "type": "integer"
+          },
+          "type": {
+            "type": "string"
           }
         },
         "required": [
@@ -216,6 +219,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -249,6 +255,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -288,6 +297,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -367,6 +379,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -400,6 +415,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -436,6 +454,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -515,6 +536,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -548,6 +572,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -584,6 +611,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -663,6 +693,9 @@
                           "maximum": 65535,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "type": {
+                          "type": "string"
                         }
                       },
                       "required": [

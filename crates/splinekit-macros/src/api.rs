@@ -208,6 +208,7 @@ pub fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             pub fn describe() -> ::core::result::Result<__runtime::http::contract::ApplicationDescription, __runtime::http::BuildError> {
                 let mut builder = __runtime::http::contract::ApplicationBuilder::new(super::describe()?);
                 #(for (id, binding) in #local::http::__bindings() { builder.bind(&id, binding)?; })*
+                #(builder.contract_problem_types(#local::http::__PROBLEM_TYPES)?;)*
                 Ok(builder.finish()?)
             }
 

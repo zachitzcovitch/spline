@@ -23,6 +23,7 @@ impl Typescript {
             contract.contract().documentation(),
             name,
             contract.plans(),
+            contract.problem_types(),
         )
     }
 
@@ -39,6 +40,7 @@ impl Typescript {
             application.application().documentation(),
             name,
             application.plans(),
+            application.problem_types(),
         )
     }
 
@@ -49,6 +51,7 @@ impl Typescript {
         documentation: &str,
         name: &str,
         plans: &BTreeMap<String, HttpPlan>,
+        problem_types: Option<&str>,
     ) -> Result<Artifact, Error> {
         let void_outputs = plans
             .iter()
@@ -169,7 +172,10 @@ impl Typescript {
                 methods.push_str("    },\n");
             }
         }
-        let template = include_str!("http-runtime.ts").replace("__PREFIX__", name);
+        let problem_types = problem_types.map_or_else(|| "null".to_owned(), render::string);
+        let template = include_str!("http-runtime.ts")
+            .replace("__PREFIX__", name)
+            .replace("__PROBLEM_TYPES__", &problem_types);
         let (prefix, rest) = template.split_once("/*__DEFINITIONS__*/").unwrap();
         let (middle, suffix) = rest.split_once("/*__METHODS__*/").unwrap();
         let runtime = format!("{prefix}{definitions}{middle}{methods}{suffix}");
