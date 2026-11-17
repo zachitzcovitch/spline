@@ -156,7 +156,7 @@ async fn the_server_stamps_the_problem_type_on_every_error() {
     client.get(1).await.unwrap();
 }
 
-/// A stand-in for whatever answers at the service's address: Inlay's own
+/// A stand-in for whatever answers at the service's address: its own
 /// problem details, or a proxy's.
 fn answering(body: Value, status: u16) -> axum::Router {
     axum::Router::new().route(
