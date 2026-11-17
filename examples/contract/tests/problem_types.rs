@@ -9,7 +9,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use splinekit::http::{
-    axum, reqwest, CallError, DeclaredErrors, Fault, RequestContext, StatusCode,
+    axum, reqwest, CallError, DeclaredErrors, Fault, HttpExt, RequestContext, StatusCode,
 };
 use splinekit::Schema;
 
@@ -45,10 +45,29 @@ pub mod plain {
     }
 }
 
+pub mod refunds {
+    use super::OrderError;
+
+    #[splinekit::contract]
+    #[http(problem_types = "https://example.test/errors")]
+    pub trait Refunds {
+        #[query]
+        #[http(get = "/refunds/{id}")]
+        async fn get(&self, id: u8) -> Result<(), OrderError>;
+    }
+}
+
 splinekit::api! {
     pub mod mixed {
         orders: crate::orders,
         plain: crate::plain,
+    }
+}
+
+splinekit::api! {
+    pub mod agreeing {
+        orders: crate::orders,
+        refunds: crate::refunds,
     }
 }
 
@@ -60,6 +79,11 @@ impl orders::Orders for Backend {
         } else {
             Ok(())
         }
+    }
+}
+impl refunds::Refunds for Backend {
+    async fn get(&self, _id: u8) -> Result<(), OrderError> {
+        Err(OrderError::OrderMissing)
     }
 }
 impl plain::Plain for Backend {
@@ -147,6 +171,19 @@ async fn the_server_stamps_the_problem_type_on_every_error() {
         (404, json!({ "status": 404, "code": "order_missing" }))
     );
 
+    // A single operation's router stamps it too.
+    let operation = serve(
+        orders::http::get::router(orders::get::Service::new(Arc::new(Backend)), DeclaredErrors)
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        get(&http, format!("{}/orders/0", operation.base), false)
+            .await
+            .1["type"],
+        format!("{BASE}/order-missing")
+    );
+
     // The generated clients read the service's own answers as before.
     let client = orders::http::Client::new(base).unwrap();
     assert!(matches!(
@@ -210,6 +247,34 @@ async fn the_rust_client_accepts_only_the_services_problem_types() {
             "{body} passed as the service's answer"
         );
     }
+}
+
+#[tokio::test]
+async fn an_application_whose_contracts_agree_checks_the_base_in_one_client() {
+    assert_eq!(
+        agreeing::http::describe().unwrap().problem_types(),
+        Some(BASE)
+    );
+    let server = serve(agreeing::shared(Backend).http(DeclaredErrors).unwrap()).await;
+    let client = agreeing::http::Client::new(&server.base).unwrap();
+    assert!(matches!(
+        client.refunds().get(1).await,
+        Err(CallError::Application(OrderError::OrderMissing))
+    ));
+
+    let proxy = json!({ "status": 502, "code": "bad_gateway" });
+    let server = serve(answering(proxy, 502)).await;
+    let client = agreeing::http::Client::new(&server.base).unwrap();
+    assert!(matches!(
+        client.orders().get(1).await,
+        Err(CallError::Http { status: 502 })
+    ));
+
+    let typescript = splinekit_typescript::Typescript::new()
+        .export_http_application(&agreeing::http::describe().unwrap(), "Agreeing")
+        .unwrap()
+        .source;
+    assert!(typescript.contains(&format!("const problemTypes: string | null = \"{BASE}\";")));
 }
 
 #[test]

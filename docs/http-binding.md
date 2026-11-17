@@ -190,10 +190,17 @@ Clients generated from the contract, in Rust and TypeScript, accept problem
 details only when `type` is the service's own for that `code`; anything else is an
 unrecognized HTTP failure. Without `problem_types`, a body with a matching
 `status` and a string `code` counts as the service's. The base must be an absolute
-URI without a query, fragment or trailing slash, and every contract in one
-`api!` application must declare the same base, since one client serves them all.
-Routes render a request factory's `Fault` with the type too; a `Fault` turned into
-a response anywhere else (`IntoResponse`) has none.
+URI without a query, fragment or trailing slash; the macro checks it where it's
+written. Every contract in one `api!` application must declare the same base,
+since one client serves them all; otherwise building the application's router or
+client fails. Routes render a request factory's `Fault` with the type too; a
+`Fault` turned into a response anywhere else (`IntoResponse`) has none, so clients
+read it as an unrecognized HTTP failure. Use `server::fault_response(fault,
+Some(base))` in your own layers.
+
+Adding `problem_types` to a contract that's already deployed changes what its
+clients accept: deploy the server first, because new clients treat the old
+server's errors, which have no `type`, as unrecognized HTTP failures.
 
 To keep application errors and faults apart, binding checks each operation's error
 type:

@@ -1,0 +1,29 @@
+error: problem_types must be an absolute URI without a query, fragment or trailing slash
+ --> tests/ui-http/contract_problem_types.rs:6:28
+  |
+6 |     #[http(problem_types = "example.com/errors")]
+  |                            ^^^^^^^^^^^^^^^^^^^^
+
+error: problem_types must be an absolute URI without a query, fragment or trailing slash
+  --> tests/ui-http/contract_problem_types.rs:12:28
+   |
+12 |     #[http(problem_types = "https://example.com/errors/")]
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: problem_types must be an absolute URI without a query, fragment or trailing slash
+  --> tests/ui-http/contract_problem_types.rs:18:28
+   |
+18 |     #[http(problem_types = "https://example.com/errors?v=1")]
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: duplicate problem_types
+  --> tests/ui-http/contract_problem_types.rs:24:58
+   |
+24 |     #[http(problem_types = "https://example.com/errors", problem_types = "https://example.com/other")]
+   |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the supported contract HTTP option is problem_types
+  --> tests/ui-http/contract_problem_types.rs:30:12
+   |
+30 |     #[http(base = "/users")]
+   |            ^^^^

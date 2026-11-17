@@ -133,9 +133,10 @@ groups them under one Response Object with alternative problem schemas, all as
 factory can reject with 404 even when the resource also declares a 404 application error.
 
 Framework faults use a reusable `ServiceError` component describing `status`,
-`code` and an optional developer-facing `detail`; other problem members are
-allowed. Application errors are documented as their `code`-tagged values with
-`status` added. Common
+`code`, an optional developer-facing `detail` and an optional RFC 9457 `type`;
+other problem members are allowed. Application errors are documented as their
+`code`-tagged values with `status` (and an optional `type`) added. A contract that
+declares problem types sends `type` on every error. Common
 decoding/size/encoding/service failures have explicit responses. `4XX` and `5XX`
 framework-only fallbacks use the reusable `ServiceErrorResponse` response. Exact
 response keys take precedence over ranges, so explicit error responses also include
